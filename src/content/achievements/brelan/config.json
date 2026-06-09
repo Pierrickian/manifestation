@@ -1,0 +1,10 @@
+{
+  "id": "brelan",
+  "name": "Brelan",
+  "description": "Match the same non-minimum rank 3 times in a row",
+  "pointsReward": 85,
+  "handler": "tripletNonMin",
+  "params": {
+    "count": 3
+  }
+}

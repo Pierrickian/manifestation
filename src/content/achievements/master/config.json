@@ -1,0 +1,11 @@
+{
+  "id": "master",
+  "name": "Master",
+  "description": "Match the master rank twice in a row",
+  "pointsReward": 90,
+  "handler": "rankStreak",
+  "params": {
+    "rankIndex": 3,
+    "count": 2
+  }
+}

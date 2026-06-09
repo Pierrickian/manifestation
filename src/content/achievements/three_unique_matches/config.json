@@ -1,0 +1,10 @@
+{
+  "id": "three_unique_matches",
+  "name": "Variety",
+  "description": "Match 3 different ranks in a row",
+  "pointsReward": 50,
+  "handler": "streakUniqueMatches",
+  "params": {
+    "count": 3
+  }
+}

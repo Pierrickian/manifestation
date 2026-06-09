@@ -1,0 +1,11 @@
+{
+  "id": "big_loot",
+  "name": "Big Loot",
+  "description": "Match the second-highest rank twice in a row",
+  "pointsReward": 110,
+  "handler": "topValuePair",
+  "params": {
+    "rank": 2,
+    "count": 2
+  }
+}
