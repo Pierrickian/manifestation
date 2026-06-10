@@ -2,137 +2,68 @@
 
 ## Overview
 
-Monorepo pnpm TypeScript. Chaque package gère ses propres dépendances.
+Application React + Vite mobile-first appelée **Manifestation**.
 
-## Instructions agent
-
-For architecture, refactor, engine split, menu split, capability or runtime patch tasks, read and apply `skills/agent-architecture/SKILL.md` before coding.
+Manifestation remplace l’ancien template de jeu par un guide d’exploration intérieure. L’utilisateur part d’un ressenti simple, répond à quelques questions courtes, puis relit un chemin qui met en évidence un besoin dominant, des besoins liés, une couleur et une découverte possible.
 
 ## Stack
 
-- Monorepo: pnpm workspaces
 - Node.js: 24
-- TypeScript: 5.9
 - React + Vite
-- Web game architecture
+- Framer Motion pour transitions courtes uniquement
+- CSS mobile-first
 
 ## Key Commands
 
-- `pnpm run typecheck`
-- `pnpm run build`
-- `pnpm run dev`
+- `npm run dev`
+- `npm run build`
+- `npm run preview`
 
----
+## Architecture
 
-## Card Game (`artifacts/card-game`)
-
-Jeu de cartes web orienté gameplay évolutif.
-
-### Architecture
-
-```
+```txt
 src/
-  engine/
-    types.ts
-    Card.ts
-    game_engine.ts
-    useGameEngine.ts
-
-  scenes/
-    GameScene.tsx
-    TableView.tsx
-    HandView.tsx
-    CardView.tsx
-
-  game/
-    HUD.tsx
-    Menu.tsx
-    RuntimePanels.tsx
-
-  App.tsx
-
-public/
-  game_config.json
+  main.jsx
+  App.jsx
+  style.css
+  data/
+    needs.js
+    questions.js
+  logic/
+    wizardScoring.js
+  components/
+    DiscoveryCard.jsx
+    FeelingStep.jsx
+    ManifestationWizard.jsx
+    NeedBadge.jsx
+    NeedMap.jsx
+    QuestionStep.jsx
+    ReflectionStep.jsx
 ```
 
-### Principes d'architecture
+## Principes produit
 
-- Graphique et logique découplés.
-- Le moteur ne dépend pas de React.
-- Les paramètres gameplay viennent de `game_config.json`.
-- Les cartes, règles, effets et comportements doivent être configurables.
-- Les événements gameplay doivent pouvoir déclencher plusieurs réactions UI.
-- Les éléments UI temporaires doivent être traités comme des objets UI autonomes.
+- L’app est un guide d’exploration intérieure, pas un formulaire figé.
+- Le résultat ne doit jamais énoncer une vérité absolue sur l’utilisateur.
+- Préférer les formulations douces : “tu sembles peut-être chercher…”, “ce chemin pointe vers…”, “une piste possible serait…”.
+- Toujours montrer comment le chemin s’est construit : ressenti, réponse, reflets, besoin dominant, besoins liés.
+- Les couleurs structurent les besoins de façon subtile, sans surcharge spirituelle.
 
-### Objets UI autonomes
+## Principes d’architecture
 
-Les éléments suivants doivent pouvoir apparaître/disparaître indépendamment:
+- Garder les données séparées de l’UI.
+- Garder la logique de scoring dans `src/logic/wizardScoring.js`.
+- Préférer de petits composants lisibles.
+- Éviter les gros fichiers monolithiques.
+- Éviter les animations infinies lourdes ; privilégier des transitions courtes déclenchées par les choix utilisateur.
+- Penser d’abord au mobile portrait : grandes zones tactiles, texte court, hiérarchie claire.
 
-- notifications de manche,
-- victoire/défaite,
-- révélation de carte,
-- récompenses,
-- choix d'évolution,
-- tutoriels,
-- événements spéciaux,
-- messages runtime.
+## Besoins et couleurs
 
-Chaque objet UI doit idéalement avoir:
-
-- un type,
-- un id,
-- un payload,
-- une durée de vie,
-- un renderer dédié.
-
-### Configuration gameplay
-
-Le fichier `game_config.json` doit centraliser:
-
-- les cartes,
-- les familles de cartes,
-- les effets,
-- les decks,
-- les probabilités,
-- les niveaux,
-- les événements spéciaux,
-- les textes UI,
-- les règles de score.
-
-### Système de niveaux
-
-Le jeu peut évoluer par:
-
-- manches,
-- decks,
-- événements,
-- difficultés,
-- mutations runtime,
-- règles temporaires.
-
-Les niveaux doivent être configurables et testables indépendamment.
-
-### Notes de version
-
-Le tableau `release_notes` dans `game_config.json` doit:
-
-- recevoir une nouvelle entrée à chaque commit,
-- rester limité à 20 entrées,
-- être trié du plus récent au plus ancien.
-
-### Localisation
-
-Tout texte affiché au joueur doit pouvoir être localisé.
-
-### Règles développeur
-
-- Éviter les constantes gameplay en dur.
-- Garder les systèmes découplés.
-- Favoriser les petits fichiers cohérents.
-- Garder `GameEngine` comme API principale.
-- Ajouter les nouveaux comportements via handlers ou systèmes dédiés.
-
-
-## Architecture gameplay (mandatory)
-
-Apply and keep aligned with `architecture/gameplay-architecture.md` for all gameplay/engine/content refactors.
+- Violet : sens, clarté mentale.
+- Indigo : direction, imagination.
+- Bleu : autonomie, liberté, expression.
+- Vert : amour, lien.
+- Jaune : soi, estime, amour propre.
+- Orange : découverte, apprentissage, enrichissement, créativité.
+- Rouge : évolution, sécurité de mouvement, support.
