@@ -53,7 +53,8 @@ button:focus-visible {
 .wizard-card,
 .discovery-card,
 .need-map,
-.history-panel {
+.history-panel,
+.wizard-menu {
   border: 1px solid rgba(255, 255, 255, 0.13);
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.052));
   box-shadow: 0 22px 62px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.14);
@@ -72,9 +73,56 @@ button:focus-visible {
 }
 
 .need-map,
-.history-panel {
+.history-panel,
+.wizard-menu {
   border-radius: 20px;
   padding: 15px;
+}
+
+.wizard-menu {
+  color: rgba(255, 250, 244, 0.84);
+}
+
+.wizard-menu > summary,
+.ai-submenu > summary {
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.ai-submenu {
+  margin-top: 12px;
+  border-top: 1px solid rgba(255, 250, 244, 0.12);
+  padding-top: 12px;
+}
+
+.ai-settings-grid {
+  display: grid;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.ai-setting {
+  display: grid;
+  gap: 8px;
+}
+
+.ai-setting > span {
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.ai-setting input {
+  width: 100%;
+  accent-color: #fff2ad;
+}
+
+.ai-setting small {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(255, 250, 244, 0.58);
+  font-size: 0.72rem;
+  font-weight: 760;
 }
 
 .eyebrow {
