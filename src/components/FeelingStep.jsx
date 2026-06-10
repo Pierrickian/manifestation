@@ -1,19 +1,19 @@
 import { motion } from 'framer-motion'
-import { STARTING_FEELINGS } from '../data/questions'
+import { STARTING_FEELINGS } from '../data/staticQuestions'
 
 export function FeelingStep({ onChoose }) {
   return (
     <motion.section
       key="feelings"
       className="wizard-card"
-      initial={{ opacity: 0, y: 16 }}
+      initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
+      exit={{ opacity: 0, y: -8 }}
       transition={{ duration: 0.22 }}
       aria-labelledby="feeling-title"
     >
       <p className="eyebrow">Départ</p>
-      <h2 id="feeling-title">Qu’est-ce qui se manifeste en toi maintenant ?</h2>
+      <h2 id="feeling-title">Choisis le ressenti qui ressemble le plus au point de départ.</h2>
       <div className="wizard-options feeling-grid">
         {STARTING_FEELINGS.map((feeling) => (
           <button

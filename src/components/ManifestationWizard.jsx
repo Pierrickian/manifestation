@@ -1,120 +1,205 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
-import { REFLECTION_QUESTIONS } from '../data/questions'
-import { getWizardDiscovery } from '../logic/wizardScoring'
+import { createSessionSnapshot, getWizardDiscovery } from '../logic/wizardScoring'
+import { getDynamicDiscovery, getDynamicLinks, getDynamicQuestion } from '../services/aiClient'
 import { DiscoveryCard } from './DiscoveryCard'
+import { DynamicQuestionStep } from './DynamicQuestionStep'
 import { FeelingStep } from './FeelingStep'
+import { HistoryPanel } from './HistoryPanel'
 import { NeedMap } from './NeedMap'
-import { QuestionStep } from './QuestionStep'
-import { ReflectionStep } from './ReflectionStep'
+
+const MAX_PASSAGES = 4
+const HISTORY_KEY = 'manifestation:paths'
+
+function createSessionId() {
+  return `session-${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+function readHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]')
+  } catch {
+    return []
+  }
+}
 
 export function ManifestationWizard() {
+  const [sessionId, setSessionId] = useState(createSessionId)
   const [feeling, setFeeling] = useState(null)
-  const [adaptiveAnswer, setAdaptiveAnswer] = useState(null)
-  const [reflectionAnswers, setReflectionAnswers] = useState([])
+  const [answers, setAnswers] = useState([])
+  const [currentPrompt, setCurrentPrompt] = useState(null)
+  const [isLoadingPrompt, setIsLoadingPrompt] = useState(false)
+  const [discoveryText, setDiscoveryText] = useState('')
+  const [links, setLinks] = useState({ needLinks: [], pathLinks: [] })
+  const [history, setHistory] = useState(readHistory)
+  const savedSessionRef = useRef(null)
 
   const steps = useMemo(() => {
-    const nextSteps = []
+    const path = []
 
     if (feeling) {
-      nextSteps.push({
+      path.push({
         ...feeling,
         type: 'feeling',
         kicker: 'Ressenti'
       })
     }
 
-    if (adaptiveAnswer) {
-      nextSteps.push({
-        ...adaptiveAnswer,
-        type: 'adaptive-answer',
-        kicker: 'Besoin pressenti',
-        question: feeling.adaptiveQuestion
-      })
-    }
-
-    reflectionAnswers.forEach((answer, index) => {
-      nextSteps.push({
+    answers.forEach((answer, index) => {
+      path.push({
         ...answer,
-        type: 'reflection',
-        kicker: `Reflet ${index + 1}`,
-        question: REFLECTION_QUESTIONS[index]?.label
+        type: 'dynamic-answer',
+        kicker: `Passage ${index + 1}`
       })
     })
 
-    return nextSteps
-  }, [adaptiveAnswer, feeling, reflectionAnswers])
+    return path
+  }, [answers, feeling])
 
   const discovery = useMemo(() => getWizardDiscovery(steps), [steps])
-  const reflectionQuestion = REFLECTION_QUESTIONS[reflectionAnswers.length]
-  const isComplete = Boolean(feeling && adaptiveAnswer && !reflectionQuestion)
+  const isComplete = Boolean(feeling && answers.length >= MAX_PASSAGES)
+
+  const aiContext = useMemo(() => ({
+    sessionId,
+    feeling,
+    answers,
+    steps,
+    discovery,
+    dominantNeed: discovery.dominantNeed,
+    linkedNeeds: discovery.linkedNeeds,
+    pathLength: answers.length
+  }), [answers, discovery, feeling, sessionId, steps])
+
+  useEffect(() => {
+    let isActive = true
+
+    async function loadQuestion() {
+      if (!feeling || isComplete || currentPrompt) return
+
+      setIsLoadingPrompt(true)
+      const prompt = await getDynamicQuestion(aiContext)
+
+      if (isActive) {
+        setCurrentPrompt(prompt)
+        setIsLoadingPrompt(false)
+      }
+    }
+
+    loadQuestion()
+
+    return () => {
+      isActive = false
+    }
+  }, [aiContext, currentPrompt, feeling, isComplete])
+
+  useEffect(() => {
+    let isActive = true
+
+    async function loadDiscovery() {
+      if (!isComplete || savedSessionRef.current === sessionId) return
+
+      const [nextDiscoveryText, nextLinks] = await Promise.all([
+        getDynamicDiscovery(aiContext),
+        getDynamicLinks(aiContext)
+      ])
+
+      if (!isActive) return
+
+      setDiscoveryText(nextDiscoveryText)
+      setLinks(nextLinks)
+
+      const snapshot = createSessionSnapshot({
+        sessionId,
+        feeling,
+        answers,
+        discovery,
+        links: nextLinks
+      })
+
+      const nextHistory = [snapshot, ...history].slice(0, 12)
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(nextHistory))
+      setHistory(nextHistory)
+      savedSessionRef.current = sessionId
+    }
+
+    loadDiscovery()
+
+    return () => {
+      isActive = false
+    }
+  }, [aiContext, answers, discovery, feeling, history, isComplete, sessionId])
 
   function restart() {
+    setSessionId(createSessionId())
     setFeeling(null)
-    setAdaptiveAnswer(null)
-    setReflectionAnswers([])
+    setAnswers([])
+    setCurrentPrompt(null)
+    setDiscoveryText('')
+    setLinks({ needLinks: [], pathLinks: [] })
+    savedSessionRef.current = null
   }
 
   function chooseFeeling(nextFeeling) {
+    setSessionId(createSessionId())
     setFeeling(nextFeeling)
-    setAdaptiveAnswer(null)
-    setReflectionAnswers([])
+    setAnswers([])
+    setCurrentPrompt(null)
+    setDiscoveryText('')
+    setLinks({ needLinks: [], pathLinks: [] })
+    savedSessionRef.current = null
   }
 
-  function chooseAdaptiveAnswer(answer) {
-    setAdaptiveAnswer(answer)
-    setReflectionAnswers([])
-  }
-
-  function chooseReflectionAnswer(answer) {
-    setReflectionAnswers((answers) => [...answers, answer])
-  }
-
-  function goBackFromReflection() {
-    if (reflectionAnswers.length > 0) {
-      setReflectionAnswers((answers) => answers.slice(0, -1))
-      return
-    }
-
-    setAdaptiveAnswer(null)
+  function chooseAnswer(answer) {
+    setAnswers((currentAnswers) => [
+      ...currentAnswers,
+      {
+        ...answer,
+        question: currentPrompt?.question
+      }
+    ])
+    setCurrentPrompt(null)
   }
 
   return (
     <main className="manifestation-shell">
       <section className="wizard-hero">
         <p className="eyebrow">Manifestation</p>
-        <h1>Qu’est-ce qui se manifeste en toi maintenant&nbsp;?</h1>
+        <h1>Carte intérieure vivante</h1>
         <p>
-          Une carte vivante pour partir d’un ressenti, révéler un besoin, puis relire le chemin qui t’a mené à une découverte.
+          Pars d’un ressenti, observe les besoins qui se colorent, puis laisse apparaître un chemin possible.
+          Rien n’est imposé : chaque étape propose une piste à explorer.
         </p>
       </section>
 
-      <NeedMap steps={steps} discovery={discovery} />
+      <NeedMap steps={steps} discovery={discovery} links={links} />
 
       <AnimatePresence mode="wait">
         {!feeling ? (
           <FeelingStep key="feeling-step" onChoose={chooseFeeling} />
-        ) : !adaptiveAnswer ? (
-          <QuestionStep
-            key="question-step"
-            feeling={feeling}
+        ) : !isComplete ? (
+          <DynamicQuestionStep
+            key={currentPrompt?.id || `loading-${answers.length}`}
+            prompt={currentPrompt}
             activeNeed={discovery.dominantNeed}
-            onChoose={chooseAdaptiveAnswer}
+            currentIndex={answers.length}
+            total={MAX_PASSAGES}
+            isLoading={isLoadingPrompt || !currentPrompt}
+            onChoose={chooseAnswer}
             onBack={restart}
           />
-        ) : !isComplete ? (
-          <ReflectionStep
-            key={reflectionQuestion.id}
-            question={reflectionQuestion}
-            currentIndex={reflectionAnswers.length}
-            total={REFLECTION_QUESTIONS.length}
-            onChoose={chooseReflectionAnswer}
-            onBack={goBackFromReflection}
-          />
         ) : (
-          <DiscoveryCard key="discovery-card" steps={steps} discovery={discovery} onRestart={restart} />
+          <DiscoveryCard
+            key="discovery-card"
+            steps={steps}
+            discovery={discovery}
+            discoveryText={discoveryText}
+            links={links}
+            onRestart={restart}
+          />
         )}
       </AnimatePresence>
+
+      <HistoryPanel history={history} />
     </main>
   )
 }

@@ -23,10 +23,10 @@ body {
   margin: 0;
   overflow-x: hidden;
   background:
-    radial-gradient(circle at 12% -8%, rgba(181, 140, 255, 0.28), transparent 34%),
-    radial-gradient(circle at 94% 8%, rgba(84, 199, 255, 0.16), transparent 30%),
-    radial-gradient(circle at 88% 84%, rgba(255, 109, 122, 0.14), transparent 34%),
-    linear-gradient(180deg, #15162b 0%, #090a17 58%, #05050d 100%);
+    radial-gradient(circle at 18% -10%, rgba(115, 135, 255, 0.3), transparent 32%),
+    radial-gradient(circle at 95% 10%, rgba(84, 199, 255, 0.16), transparent 30%),
+    radial-gradient(circle at 90% 86%, rgba(255, 173, 92, 0.13), transparent 34%),
+    linear-gradient(180deg, #121528 0%, #080a16 58%, #05050d 100%);
 }
 
 button {
@@ -43,7 +43,7 @@ button:focus-visible {
   width: min(100%, 720px);
   min-height: 100dvh;
   margin: 0 auto;
-  padding: max(20px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom));
+  padding: max(18px, env(safe-area-inset-top)) 14px max(28px, env(safe-area-inset-bottom));
   display: grid;
   align-content: start;
   gap: 14px;
@@ -52,27 +52,29 @@ button:focus-visible {
 .wizard-hero,
 .wizard-card,
 .discovery-card,
-.need-map {
+.need-map,
+.history-panel {
   border: 1px solid rgba(255, 255, 255, 0.13);
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.052));
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  box-shadow: 0 22px 62px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.14);
   backdrop-filter: blur(12px);
 }
 
 .wizard-hero {
-  border-radius: 30px;
-  padding: 26px;
+  border-radius: 24px;
+  padding: 22px;
 }
 
 .wizard-card,
 .discovery-card {
-  border-radius: 28px;
-  padding: 22px;
+  border-radius: 24px;
+  padding: 20px;
 }
 
-.need-map {
-  border-radius: 24px;
-  padding: 16px;
+.need-map,
+.history-panel {
+  border-radius: 20px;
+  padding: 15px;
 }
 
 .eyebrow {
@@ -80,7 +82,7 @@ button:focus-visible {
   color: rgba(255, 250, 244, 0.62);
   font-size: 0.72rem;
   font-weight: 850;
-  letter-spacing: 0.17em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
@@ -92,16 +94,16 @@ p {
 
 h1 {
   margin-bottom: 12px;
-  font-size: clamp(2.15rem, 10vw, 4.8rem);
-  line-height: 0.92;
-  letter-spacing: -0.06em;
+  font-size: clamp(2.2rem, 11vw, 4rem);
+  line-height: 0.98;
+  letter-spacing: 0;
 }
 
 h2 {
-  margin-bottom: 16px;
-  font-size: clamp(1.42rem, 6.7vw, 2.45rem);
-  line-height: 1.02;
-  letter-spacing: -0.04em;
+  margin-bottom: 14px;
+  font-size: clamp(1.45rem, 7vw, 2.25rem);
+  line-height: 1.06;
+  letter-spacing: 0;
 }
 
 p {
@@ -123,6 +125,10 @@ p {
   margin-bottom: 14px;
 }
 
+.step-heading h2 {
+  margin-bottom: 0;
+}
+
 .map-header strong {
   display: block;
   line-height: 1.2;
@@ -137,9 +143,9 @@ p {
 .primary-action,
 .ghost-action {
   width: 100%;
-  min-height: 56px;
+  min-height: 58px;
   border: 0;
-  border-radius: 20px;
+  border-radius: 18px;
   padding: 16px 18px;
   font-weight: 820;
   text-align: left;
@@ -195,6 +201,7 @@ p {
 
 .need-badge {
   width: fit-content;
+  max-width: 100%;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -203,7 +210,7 @@ p {
   padding: 8px 10px;
   background: color-mix(in srgb, var(--need-color) 16%, transparent);
   color: #fffaf4;
-  font-size: 0.76rem;
+  font-size: 0.75rem;
   font-weight: 800;
   line-height: 1.1;
 }
@@ -218,7 +225,7 @@ p {
 }
 
 .need-badge-subtle {
-  max-width: 48%;
+  max-width: 46%;
   justify-content: flex-start;
   color: rgba(255, 250, 244, 0.82);
 }
@@ -248,7 +255,7 @@ p {
 .need-map-node small {
   margin-bottom: 2px;
   color: rgba(255, 250, 244, 0.56);
-  font-size: 0.75rem;
+  font-size: 0.74rem;
   font-weight: 760;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -270,13 +277,29 @@ p {
   box-shadow: 0 0 18px var(--need-color, #fffaf4);
 }
 
+.link-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.link-strip span {
+  border-radius: 999px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 250, 244, 0.72);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 .discovery-highlight {
   display: grid;
   gap: 12px;
   margin: 0 0 16px;
   padding: 16px;
   border: 1px solid color-mix(in srgb, var(--need-color) 48%, transparent);
-  border-radius: 22px;
+  border-radius: 20px;
   background: linear-gradient(145deg, color-mix(in srgb, var(--need-color) 18%, transparent), rgba(255, 255, 255, 0.05));
 }
 
@@ -284,27 +307,89 @@ p {
   margin: 0;
 }
 
-.path-recap {
+.path-flow {
   display: grid;
-  grid-template-columns: minmax(92px, 0.8fr) 1.4fr;
-  gap: 10px 12px;
+  gap: 10px;
   margin: 18px 0;
-  padding: 14px;
-  border-radius: 20px;
+}
+
+.path-flow-node {
+  position: relative;
+  padding: 14px 14px 14px 18px;
+  border-radius: 18px;
   background: rgba(0, 0, 0, 0.18);
 }
 
-.path-recap span {
+.path-flow-node + .path-flow-node::before {
+  content: "↓";
+  position: absolute;
+  top: -17px;
+  left: 18px;
+  color: rgba(255, 250, 244, 0.42);
+  font-weight: 900;
+}
+
+.path-flow-node span,
+.path-recap span,
+.history-item small {
+  display: block;
   color: rgba(255, 250, 244, 0.52);
-  font-size: 0.76rem;
+  font-size: 0.74rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
-.path-recap strong {
+.path-flow-node strong,
+.path-recap strong,
+.history-item strong {
+  display: block;
+  margin-top: 4px;
   color: rgba(255, 250, 244, 0.9);
   line-height: 1.25;
+}
+
+.path-recap {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0;
+}
+
+.path-recap div,
+.history-item {
+  padding: 13px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.history-list {
+  display: grid;
+  gap: 10px;
+}
+
+.history-item {
+  display: grid;
+  gap: 8px;
+}
+
+.breathing-loader {
+  width: 58px;
+  height: 58px;
+  margin: 8px auto 14px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(255, 250, 244, 0.86), rgba(181, 140, 255, 0.18) 46%, transparent 70%);
+  animation: breathe 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes breathe {
+  from {
+    transform: scale(0.9);
+    opacity: 0.6;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 @media (min-width: 680px) {
