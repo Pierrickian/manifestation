@@ -9,6 +9,33 @@ const client = process.env.OPENAI_API_KEY
   : null
 
 const responseFormats = {
+  answer: {
+    type: 'json_schema',
+    json_schema: {
+      name: 'wizard_answer',
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['answer'],
+        properties: {
+          answer: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['id', 'label', 'needId', 'scores'],
+            properties: {
+              id: { type: 'string' },
+              label: { type: 'string' },
+              needId: { type: 'string' },
+              scores: {
+                type: 'object',
+                additionalProperties: { type: 'number' }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
   question: {
     type: 'json_schema',
     json_schema: {
@@ -119,6 +146,19 @@ export default async function handler(request, response) {
 }
 
 function getLocalResult(kind, context) {
+  if (kind === 'answer') {
+    return {
+      answer: context?.answer || {
+        id: `fallback-answer-${Date.now()}`,
+        label: 'choisir une autre nuance possible',
+        needId: context?.dominantNeed?.id || 'red',
+        scores: {
+          [context?.dominantNeed?.id || 'red']: 2
+        }
+      }
+    }
+  }
+
   if (kind === 'discovery') return { text: generateDiscovery(context) }
   if (kind === 'links') return generateLinks(context)
   return generateQuestion(context)

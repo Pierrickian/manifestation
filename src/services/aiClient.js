@@ -40,6 +40,15 @@ export async function getDynamicQuestion(context) {
   return localQuestion(context)
 }
 
+export async function getReplacementAnswer(context) {
+  const result = await requestAI('answer', context)
+
+  return {
+    ...result,
+    source: result.source || result.debug?.source || 'ai'
+  }
+}
+
 export async function getDynamicDiscovery(context) {
   try {
     const result = await requestAI('discovery', context)

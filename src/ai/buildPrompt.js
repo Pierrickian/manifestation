@@ -36,6 +36,14 @@ export function buildPrompt(kind, context) {
 }
 
 function getTask(kind) {
+  if (kind === 'answer') {
+    return [
+      'Remplace uniquement la reponse donnee dans context.answer par une nouvelle reponse naturelle.',
+      'La nouvelle reponse doit rester coherente avec context.prompt.question, mais ne doit pas reprendre les labels deja presents dans context.prompt.answers.',
+      'Reponds avec un objet answer contenant id, label, needId et scores.'
+    ].join(' ')
+  }
+
   if (kind === 'question') {
     return 'Génère une question courte et 3 à 5 réponses naturelles. Chaque réponse doit contenir label, needId et scores.'
   }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { createSessionSnapshot, getWizardDiscovery } from '../logic/wizardScoring'
-import { getDynamicDiscovery, getDynamicLinks, getDynamicQuestion } from '../services/aiClient'
+import { getDynamicDiscovery, getDynamicLinks, getDynamicQuestion, getReplacementAnswer } from '../services/aiClient'
 import { DiscoveryCard } from './DiscoveryCard'
 import { DynamicQuestionStep } from './DynamicQuestionStep'
 import { FeelingStep } from './FeelingStep'
@@ -29,6 +29,7 @@ export function ManifestationWizard() {
   const [answers, setAnswers] = useState([])
   const [currentPrompt, setCurrentPrompt] = useState(null)
   const [isLoadingPrompt, setIsLoadingPrompt] = useState(false)
+  const [refreshingAnswerId, setRefreshingAnswerId] = useState(null)
   const [discoveryText, setDiscoveryText] = useState('')
   const [links, setLinks] = useState({ needLinks: [], pathLinks: [] })
   const [history, setHistory] = useState(readHistory)
@@ -134,6 +135,7 @@ export function ManifestationWizard() {
     setFeeling(null)
     setAnswers([])
     setCurrentPrompt(null)
+    setRefreshingAnswerId(null)
     setDiscoveryText('')
     setLinks({ needLinks: [], pathLinks: [] })
     savedSessionRef.current = null
@@ -144,6 +146,7 @@ export function ManifestationWizard() {
     setFeeling(nextFeeling)
     setAnswers([])
     setCurrentPrompt(null)
+    setRefreshingAnswerId(null)
     setDiscoveryText('')
     setLinks({ needLinks: [], pathLinks: [] })
     savedSessionRef.current = null
@@ -158,6 +161,62 @@ export function ManifestationWizard() {
       }
     ])
     setCurrentPrompt(null)
+    setRefreshingAnswerId(null)
+  }
+
+  async function refreshAnswer(answer, answerIndex) {
+    if (!currentPrompt || currentPrompt.source !== 'ai' || refreshingAnswerId) return
+
+    setRefreshingAnswerId(answer.id)
+
+    try {
+      const result = await getReplacementAnswer({
+        ...aiContext,
+        prompt: currentPrompt,
+        answer,
+        answerIndex
+      })
+
+      if (result.source !== 'ai' || !result.answer) {
+        setCurrentPrompt((prompt) => prompt
+          ? {
+              ...prompt,
+              debug: result.debug || prompt.debug
+            }
+          : prompt)
+        return
+      }
+
+      setCurrentPrompt((prompt) => {
+        if (!prompt) return prompt
+
+        return {
+          ...prompt,
+          debug: result.debug || prompt.debug,
+          answers: prompt.answers.map((currentAnswer, index) => (
+            index === answerIndex
+              ? {
+                  ...result.answer,
+                  id: result.answer.id || `${currentAnswer.id}-refresh-${Date.now()}`
+                }
+              : currentAnswer
+          ))
+        }
+      })
+    } catch (error) {
+      setCurrentPrompt((prompt) => prompt
+        ? {
+            ...prompt,
+            debug: {
+              source: 'local',
+              fallbackReason: 'answer_refresh_failed',
+              errorMessage: error?.message || 'Unable to refresh answer'
+            }
+          }
+        : prompt)
+    } finally {
+      setRefreshingAnswerId(null)
+    }
   }
 
   return (
@@ -185,6 +244,8 @@ export function ManifestationWizard() {
             total={MAX_PASSAGES}
             isLoading={isLoadingPrompt || !currentPrompt}
             onChoose={chooseAnswer}
+            onRefreshAnswer={refreshAnswer}
+            refreshingAnswerId={refreshingAnswerId}
             onBack={restart}
           />
         ) : (

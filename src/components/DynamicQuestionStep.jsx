@@ -8,10 +8,12 @@ export function DynamicQuestionStep({
   total,
   isLoading,
   onChoose,
+  onRefreshAnswer,
+  refreshingAnswerId,
   onBack
 }) {
   const answers = prompt?.answers || []
-  const showAiIcon = prompt?.source === 'ai'
+  const canUseAiChoices = prompt?.source === 'ai' && prompt?.debug?.source === 'ai'
   const debugRows = prompt?.debug
     ? [
         ['source', prompt.source || 'unknown'],
@@ -63,15 +65,30 @@ export function DynamicQuestionStep({
         <div className="breathing-loader" aria-label="Chargement de la question" />
       ) : (
         <div className="wizard-options">
-          {answers.map((answer) => (
-            <button type="button" className="wizard-option" key={answer.id} onClick={() => onChoose(answer)}>
-              <span className="wizard-option-label">{answer.label}</span>
-              {showAiIcon ? (
-                <span className="ai-choice-icon" aria-label="Propose par IA" title="Propose par IA">
-                  AI
-                </span>
+          {answers.map((answer, index) => (
+            <div className="wizard-option-row" key={answer.id}>
+              <button type="button" className="wizard-option" onClick={() => onChoose(answer)}>
+                <span className="wizard-option-label">{answer.label}</span>
+                {canUseAiChoices ? (
+                  <span className="ai-choice-icon" aria-label="Propose par IA" title="Propose par IA">
+                    AI
+                  </span>
+                ) : null}
+              </button>
+
+              {canUseAiChoices ? (
+                <button
+                  type="button"
+                  className="refresh-answer-action"
+                  onClick={() => onRefreshAnswer(answer, index)}
+                  disabled={Boolean(refreshingAnswerId)}
+                  aria-label={`Renouveler la reponse ${answer.label}`}
+                  title="Renouveler avec l'IA"
+                >
+                  {refreshingAnswerId === answer.id ? '...' : 'AI+'}
+                </button>
               ) : null}
-            </button>
+            </div>
           ))}
         </div>
       )}
