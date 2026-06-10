@@ -19,7 +19,12 @@ async function requestAI(kind, context) {
 export async function getDynamicQuestion(context) {
   try {
     const result = await requestAI('question', context)
-    if (result?.question && Array.isArray(result.answers)) return { ...result, source: 'ai' }
+    if (result?.question && Array.isArray(result.answers)) {
+      return {
+        ...result,
+        source: result.source || 'ai'
+      }
+    }
   } catch {
     // The local engine keeps the wizard alive when the server key is absent.
   }
