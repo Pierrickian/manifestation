@@ -1,19 +1,20 @@
-# 60game
+# Manifestation
 
-Jeu de cartes web en construction.
-
-Ce dépôt sert de base IA-first pour créer, tester et faire évoluer un jeu de cartes jouable dans le navigateur.
+Guide mobile d'exploration intérieure pour relier ressentis, besoins, couleurs et chemins de découverte.
 
 ## Intention
 
-- Jeu de cartes casual, lisible et évolutif.
-- Architecture simple à comprendre par un humain et par un agent IA.
-- Règles, cartes, textes UI et paramètres centralisés autant que possible dans la configuration.
-- UI découpée en composants autonomes, capables de réagir aux événements du jeu.
+- Partir d'un ressenti simple plutôt que d'une théorie.
+- Faire émerger un besoin dominant et des besoins liés.
+- Guider avec quelques questions courtes.
+- Afficher un chemin découvert que l'utilisateur peut relire.
 
-## Documents importants
+## Stack
 
-- `replit.md` : contexte de travail et règles agent.
-- `skills/agent-architecture/SKILL.md` : consignes à appliquer pour les refactors, le moteur, l'UI et les évolutions.
-- `architecture/ui.md` : direction d'architecture UI pour le jeu de cartes.
-- `architecture/gameplay-architecture.md` : règles d'architecture gameplay data-driven (niveaux, handlers, chargement de contenu).
+- React
+- Vite
+- Framer Motion
+
+## Direction
+
+L'application est pensée mobile-first, avec des animations courtes et non bloquantes. Les besoins et questions sont séparés dans des fichiers de données pour pouvoir faire évoluer le wizard sans durcir la logique dans les composants.
