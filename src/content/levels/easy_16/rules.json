@@ -1,5 +1,0 @@
-{
-  "jokerHandler": "classicJoker",
-  "comboHandler": "noDeckMultiply",
-  "scoreHandler": "classicScore"
-}

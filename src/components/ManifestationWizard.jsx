@@ -1,127 +1,118 @@
 import { useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { STARTING_FEELINGS, REFLECTION_QUESTIONS } from '../data/questions'
-import { NEED_BY_ID } from '../data/needs'
+import { AnimatePresence } from 'framer-motion'
+import { REFLECTION_QUESTIONS } from '../data/questions'
+import { getWizardDiscovery } from '../logic/wizardScoring'
 import { DiscoveryCard } from './DiscoveryCard'
+import { FeelingStep } from './FeelingStep'
 import { NeedMap } from './NeedMap'
-
-function mergeNeedIds(...groups) {
-  return [...new Set(groups.flat().filter(Boolean))]
-}
-
-function StepButton({ children, onClick }) {
-  return (
-    <button type="button" className="wizard-option" onClick={onClick}>
-      {children}
-    </button>
-  )
-}
+import { QuestionStep } from './QuestionStep'
+import { ReflectionStep } from './ReflectionStep'
 
 export function ManifestationWizard() {
-  const [selectedFeeling, setSelectedFeeling] = useState(null)
-  const [selectedAnswer, setSelectedAnswer] = useState(null)
-  const [reflectionIndex, setReflectionIndex] = useState(0)
+  const [feeling, setFeeling] = useState(null)
+  const [adaptiveAnswer, setAdaptiveAnswer] = useState(null)
+  const [reflectionAnswers, setReflectionAnswers] = useState([])
 
-  const path = useMemo(() => {
-    const steps = []
-    if (selectedFeeling) steps.push(selectedFeeling)
-    if (selectedAnswer) steps.push(selectedAnswer)
-    return steps
-  }, [selectedAnswer, selectedFeeling])
+  const steps = useMemo(() => {
+    const nextSteps = []
 
-  const activeNeed = selectedFeeling ? NEED_BY_ID[selectedFeeling.needIds[0]] : null
-  const isComplete = Boolean(selectedFeeling && selectedAnswer && reflectionIndex >= REFLECTION_QUESTIONS.length)
+    if (feeling) {
+      nextSteps.push({
+        ...feeling,
+        type: 'feeling',
+        kicker: 'Ressenti'
+      })
+    }
+
+    if (adaptiveAnswer) {
+      nextSteps.push({
+        ...adaptiveAnswer,
+        type: 'adaptive-answer',
+        kicker: 'Besoin pressenti',
+        question: feeling.adaptiveQuestion
+      })
+    }
+
+    reflectionAnswers.forEach((answer, index) => {
+      nextSteps.push({
+        ...answer,
+        type: 'reflection',
+        kicker: `Reflet ${index + 1}`,
+        question: REFLECTION_QUESTIONS[index]?.label
+      })
+    })
+
+    return nextSteps
+  }, [adaptiveAnswer, feeling, reflectionAnswers])
+
+  const discovery = useMemo(() => getWizardDiscovery(steps), [steps])
+  const reflectionQuestion = REFLECTION_QUESTIONS[reflectionAnswers.length]
+  const isComplete = Boolean(feeling && adaptiveAnswer && !reflectionQuestion)
 
   function restart() {
-    setSelectedFeeling(null)
-    setSelectedAnswer(null)
-    setReflectionIndex(0)
+    setFeeling(null)
+    setAdaptiveAnswer(null)
+    setReflectionAnswers([])
   }
 
-  function chooseFeeling(feeling) {
-    setSelectedFeeling(feeling)
-    setSelectedAnswer(null)
-    setReflectionIndex(0)
+  function chooseFeeling(nextFeeling) {
+    setFeeling(nextFeeling)
+    setAdaptiveAnswer(null)
+    setReflectionAnswers([])
   }
 
-  function chooseAnswer(answer) {
-    setSelectedAnswer({
-      ...answer,
-      id: `${selectedFeeling.id}-${answer.label}`,
-      needIds: mergeNeedIds(answer.needIds, selectedFeeling.needIds)
-    })
+  function chooseAdaptiveAnswer(answer) {
+    setAdaptiveAnswer(answer)
+    setReflectionAnswers([])
+  }
+
+  function chooseReflectionAnswer(answer) {
+    setReflectionAnswers((answers) => [...answers, answer])
+  }
+
+  function goBackFromReflection() {
+    if (reflectionAnswers.length > 0) {
+      setReflectionAnswers((answers) => answers.slice(0, -1))
+      return
+    }
+
+    setAdaptiveAnswer(null)
   }
 
   return (
     <main className="manifestation-shell">
       <section className="wizard-hero">
         <p className="eyebrow">Manifestation</p>
-        <h1>Explore ce que tu veux faire émerger.</h1>
+        <h1>Qu’est-ce qui se manifeste en toi maintenant&nbsp;?</h1>
         <p>
-          Pars d’un ressenti simple. L’app relie peu à peu état, besoin, couleur et découverte.
+          Une carte vivante pour partir d’un ressenti, révéler un besoin, puis relire le chemin qui t’a mené à une découverte.
         </p>
       </section>
 
-      <NeedMap path={path} />
+      <NeedMap steps={steps} discovery={discovery} />
 
       <AnimatePresence mode="wait">
-        {!selectedFeeling ? (
-          <motion.section
-            key="feelings"
-            className="wizard-card"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-          >
-            <p className="eyebrow">Départ</p>
-            <h2>Comment ça se manifeste maintenant ?</h2>
-            <div className="wizard-options">
-              {STARTING_FEELINGS.map((feeling) => (
-                <StepButton key={feeling.id} onClick={() => chooseFeeling(feeling)}>
-                  {feeling.label}
-                </StepButton>
-              ))}
-            </div>
-          </motion.section>
-        ) : !selectedAnswer ? (
-          <motion.section
-            key="answers"
-            className="wizard-card"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-          >
-            <p className="eyebrow">{activeNeed?.color} · {activeNeed?.label}</p>
-            <h2>{selectedFeeling.prompt}</h2>
-            <div className="wizard-options">
-              {selectedFeeling.answers.map((answer) => (
-                <StepButton key={answer.label} onClick={() => chooseAnswer(answer)}>
-                  {answer.label}
-                </StepButton>
-              ))}
-            </div>
-            <button type="button" className="ghost-action" onClick={restart}>Revenir au départ</button>
-          </motion.section>
+        {!feeling ? (
+          <FeelingStep key="feeling-step" onChoose={chooseFeeling} />
+        ) : !adaptiveAnswer ? (
+          <QuestionStep
+            key="question-step"
+            feeling={feeling}
+            activeNeed={discovery.dominantNeed}
+            onChoose={chooseAdaptiveAnswer}
+            onBack={restart}
+          />
         ) : !isComplete ? (
-          <motion.section
-            key="reflection"
-            className="wizard-card"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-          >
-            <p className="eyebrow">Question {reflectionIndex + 1}</p>
-            <h2>{REFLECTION_QUESTIONS[reflectionIndex]}</h2>
-            <p className="soft-note">Garde la réponse en toi, puis continue quand quelque chose s’éclaire.</p>
-            <button type="button" className="primary-action" onClick={() => setReflectionIndex((value) => value + 1)}>
-              Continuer
-            </button>
-          </motion.section>
+          <ReflectionStep
+            key={reflectionQuestion.id}
+            question={reflectionQuestion}
+            currentIndex={reflectionAnswers.length}
+            total={REFLECTION_QUESTIONS.length}
+            onChoose={chooseReflectionAnswer}
+            onBack={goBackFromReflection}
+          />
         ) : (
-          <DiscoveryCard key="discovery" path={path} onRestart={restart} />
+          <DiscoveryCard key="discovery-card" steps={steps} discovery={discovery} onRestart={restart} />
         )}
       </AnimatePresence>
     </main>

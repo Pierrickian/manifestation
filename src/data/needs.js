@@ -1,59 +1,73 @@
 export const NEEDS = [
   {
     id: 'violet',
-    color: 'Violet',
-    label: 'Sens',
-    needs: ['sens', 'clarté mentale'],
-    state: 'conscience, expansion, ouverture, alignement',
-    opposite: 'confusion'
+    name: 'Violet',
+    needLabel: 'Sens & clarté mentale',
+    needs: ['sens', 'clarté mentale', 'mise en perspective'],
+    positiveState: 'une pensée plus vaste, plus calme et reliée',
+    oppositeState: 'confusion, dispersion, perte de sens',
+    uiColor: '#b58cff',
+    guidance: 'Revenir au sens peut ouvrir un espace plus vaste que le problème lui-même.'
   },
   {
     id: 'indigo',
-    color: 'Indigo',
-    label: 'Direction',
-    needs: ['direction', 'imagination'],
-    state: 'écoute, rêve, intuition, perception',
-    opposite: 'égarement'
+    name: 'Indigo',
+    needLabel: 'Direction & imagination',
+    needs: ['direction', 'intuition', 'imagination'],
+    positiveState: 'une vision intérieure qui recommence à montrer une route',
+    oppositeState: 'égarement, brouillard, absence d’image',
+    uiColor: '#7287ff',
+    guidance: 'Une direction douce commence souvent par une image, pas par une certitude.'
   },
   {
     id: 'blue',
-    color: 'Bleu',
-    label: 'Liberté',
+    name: 'Bleu',
+    needLabel: 'Autonomie, liberté & expression',
     needs: ['autonomie', 'liberté', 'expression'],
-    state: 'expression, justesse, liberté',
-    opposite: 'répression'
+    positiveState: 'une parole juste et un espace pour respirer',
+    oppositeState: 'répression, contrainte, silence intérieur',
+    uiColor: '#54c7ff',
+    guidance: 'Nommer ce qui veut sortir peut déjà redonner du mouvement.'
   },
   {
     id: 'green',
-    color: 'Vert',
-    label: 'Lien',
-    needs: ['amour', 'lien'],
-    state: 'coeur, âme, rayonnement, amour',
-    opposite: 'séparation'
+    name: 'Vert',
+    needLabel: 'Amour & lien',
+    needs: ['amour', 'lien', 'présence'],
+    positiveState: 'une présence chaleureuse, reliée et accueillante',
+    oppositeState: 'séparation, isolement, fermeture',
+    uiColor: '#6dff9d',
+    guidance: 'Le lien peut commencer par une présence minuscule mais vraie.'
   },
   {
     id: 'yellow',
-    color: 'Jaune',
-    label: 'Valeur',
+    name: 'Jaune',
+    needLabel: 'Soi, estime & amour propre',
     needs: ['soi', 'estime', 'amour propre'],
-    state: 'foi, confiance, rayonnement intérieur',
-    opposite: 'dévalorisation'
+    positiveState: 'une confiance simple dans sa propre valeur',
+    oppositeState: 'dévalorisation, comparaison, effacement',
+    uiColor: '#ffe76a',
+    guidance: 'Retrouver sa place peut commencer par se croire digne d’attention.'
   },
   {
     id: 'orange',
-    color: 'Orange',
-    label: 'Exploration',
-    needs: ['découverte', 'apprentissage', 'enrichissement'],
-    state: 'unité, partage, grâce, créateur créatif',
-    opposite: 'routine'
+    name: 'Orange',
+    needLabel: 'Découverte, apprentissage & créativité',
+    needs: ['découverte', 'apprentissage', 'enrichissement', 'créativité'],
+    positiveState: 'une curiosité vivante qui remet de la saveur',
+    oppositeState: 'routine, vide, assèchement',
+    uiColor: '#ffad5c',
+    guidance: 'Une nouvelle réalité intérieure naît parfois d’un essai très petit.'
   },
   {
     id: 'red',
-    color: 'Rouge',
-    label: 'Support',
+    name: 'Rouge',
+    needLabel: 'Évolution, sécurité de mouvement & support',
     needs: ['évolution', 'sécurité de mouvement', 'support'],
-    state: 'stabilité, équilibre, ancrage, mouvement',
-    opposite: 'insécurité'
+    positiveState: 'un ancrage qui permet d’avancer sans se brusquer',
+    oppositeState: 'insécurité, fatigue, immobilité',
+    uiColor: '#ff6d7a',
+    guidance: 'Un support concret peut transformer la peur du mouvement en prochain pas.'
   }
 ]
 
