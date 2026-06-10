@@ -12,6 +12,7 @@ export function buildPrompt(kind, context) {
   const needsSummary = NEEDS.map((need) => {
     return `${need.name}: ${need.needs.join(', ')}`
   }).join('\n')
+  const aiSettingsRules = getAiSettingsRules(context?.aiSettings)
 
   return [
     {
@@ -20,6 +21,7 @@ export function buildPrompt(kind, context) {
         'Tu aides à générer une couche de variation pour un wizard d’exploration intérieure.',
         'Le système de besoins et couleurs reste la structure centrale. Tu proposes seulement des pistes.',
         `Besoins disponibles:\n${needsSummary}`,
+        `Reglages utilisateur IA:\n${aiSettingsRules.map((rule) => `- ${rule}`).join('\n')}`,
         `Règles de ton:\n${toneRules.map((rule) => `- ${rule}`).join('\n')}`,
         'Réponds uniquement en JSON valide, sans Markdown.'
       ].join('\n\n')
@@ -32,6 +34,36 @@ export function buildPrompt(kind, context) {
         context
       })
     }
+  ]
+}
+
+function getAiSettingsRules(settings = {}) {
+  const intensity = Number(settings.intensity ?? 28)
+  const grounding = Number(settings.grounding ?? 35)
+  const focus = Number(settings.focus ?? 58)
+  const register = Number(settings.register ?? 76)
+
+  return [
+    intensity < 40
+      ? 'Les reponses doivent etre douces, progressives, peu confrontantes.'
+      : intensity > 65
+        ? 'Les reponses peuvent etre plus directes, remuantes, avec des formulations qui secouent sans agresser.'
+        : 'Les reponses doivent garder une intensite moyenne, claire mais non brusque.',
+    grounding < 40
+      ? 'Choisir des mots concrets, pratiques, proches du vecu quotidien.'
+      : grounding > 65
+        ? 'Autoriser un vocabulaire plus spirituel ou symbolique, sans promesse ni posture de gourou.'
+        : 'Melanger concret et intuition de facon equilibree.',
+    focus < 40
+      ? 'Orienter les propositions vers les besoins: soutien, clarte, reconnaissance, liberte, securite.'
+      : focus > 65
+        ? 'Orienter les propositions vers les emotions ressenties et leurs nuances.'
+        : 'Equilibrer les besoins et les emotions dans les choix proposes.',
+    register < 40
+      ? 'Utiliser un registre familier, direct, parfois un peu cru, sans insulte ni vulgarite gratuite.'
+      : register > 65
+        ? 'Utiliser un registre soigne, calme, bien eleve.'
+        : 'Utiliser un registre naturel et conversationnel.'
   ]
 }
 
