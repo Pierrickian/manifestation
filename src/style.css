@@ -154,10 +154,29 @@ p {
 }
 
 .wizard-option {
-  display: grid;
-  gap: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   background: rgba(255, 255, 255, 0.095);
   border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.wizard-option-label {
+  min-width: 0;
+}
+
+.ai-choice-icon {
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 250, 244, 0.28);
+  border-radius: 999px;
+  padding: 4px 6px;
+  background: rgba(255, 250, 244, 0.1);
+  color: rgba(255, 250, 244, 0.82);
+  font-size: 0.64rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.04em;
 }
 
 .wizard-option small {

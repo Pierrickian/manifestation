@@ -11,6 +11,7 @@ export function DynamicQuestionStep({
   onBack
 }) {
   const answers = prompt?.answers || []
+  const showAiIcon = prompt?.source === 'ai'
 
   return (
     <motion.section
@@ -36,7 +37,12 @@ export function DynamicQuestionStep({
         <div className="wizard-options">
           {answers.map((answer) => (
             <button type="button" className="wizard-option" key={answer.id} onClick={() => onChoose(answer)}>
-              {answer.label}
+              <span className="wizard-option-label">{answer.label}</span>
+              {showAiIcon ? (
+                <span className="ai-choice-icon" aria-label="Propose par IA" title="Propose par IA">
+                  AI
+                </span>
+              ) : null}
             </button>
           ))}
         </div>
