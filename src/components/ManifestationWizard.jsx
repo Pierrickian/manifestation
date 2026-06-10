@@ -8,14 +8,25 @@ import { FeelingStep } from './FeelingStep'
 import { HistoryPanel } from './HistoryPanel'
 import { NeedMap } from './NeedMap'
 
-const MAX_PASSAGES = 4
+const PHASE_PASSAGES = {
+  1: 4,
+  2: 3,
+  3: 3
+}
 const HISTORY_KEY = 'manifestation:paths'
 const AI_SETTINGS_KEY = 'manifestation:ai-settings'
+const BEING_SETTINGS_KEY = 'manifestation:being-settings'
 const DEFAULT_AI_SETTINGS = {
   intensity: 28,
   grounding: 35,
   focus: 58,
   register: 76
+}
+const DEFAULT_BEING_SETTINGS = {
+  commitment: 34,
+  openness: 58,
+  sensitivity: 54,
+  autonomy: 62
 }
 
 const AI_SLIDERS = [
@@ -45,6 +56,33 @@ const AI_SLIDERS = [
   }
 ]
 
+const BEING_SLIDERS = [
+  {
+    id: 'commitment',
+    label: 'Position',
+    left: 'Insaisissable',
+    right: 'Engage'
+  },
+  {
+    id: 'openness',
+    label: 'Ouverture',
+    left: 'Prudent',
+    right: 'Curieux'
+  },
+  {
+    id: 'sensitivity',
+    label: 'Sensibilite',
+    left: 'Robuste',
+    right: 'Sensible'
+  },
+  {
+    id: 'autonomy',
+    label: 'Autonomie',
+    left: 'Accompagne',
+    right: 'Souverain'
+  }
+]
+
 function createSessionId() {
   return `session-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
@@ -66,6 +104,92 @@ function readAiSettings() {
   } catch {
     return DEFAULT_AI_SETTINGS
   }
+}
+
+function readBeingSettings() {
+  try {
+    return {
+      ...DEFAULT_BEING_SETTINGS,
+      ...JSON.parse(localStorage.getItem(BEING_SETTINGS_KEY) || '{}')
+    }
+  } catch {
+    return DEFAULT_BEING_SETTINGS
+  }
+}
+
+function getPhaseAnswers(answers, phase) {
+  return answers.filter((answer) => (answer.phase || 1) === phase)
+}
+
+function getPhaseChoiceTone(phase, settings) {
+  const commitment = Number(settings?.commitment ?? DEFAULT_BEING_SETTINGS.commitment)
+  const openness = Number(settings?.openness ?? DEFAULT_BEING_SETTINGS.openness)
+  const autonomy = Number(settings?.autonomy ?? DEFAULT_BEING_SETTINGS.autonomy)
+
+  if (phase === 2) {
+    if (openness > 66) return 'une exploration plus large'
+    if (autonomy > 66) return 'une piste choisie par toi'
+    return 'un pas discret vers une prise de conscience'
+  }
+
+  if (commitment > 66) return 'un engagement clair et vivable'
+  if (commitment < 40) return 'un constat leger, sans obligation'
+  return 'une decision souple et concrete'
+}
+
+function createOrientationChoices({ phase, discovery, answers, beingSettings }) {
+  const dominantNeed = discovery?.dominantNeed
+  const linkedNeeds = discovery?.linkedNeeds || []
+  const primaryId = dominantNeed?.id || 'red'
+  const secondaryId = linkedNeeds[0]?.id || 'blue'
+  const commitment = Number(beingSettings?.commitment ?? DEFAULT_BEING_SETTINGS.commitment)
+  const openness = Number(beingSettings?.openness ?? DEFAULT_BEING_SETTINGS.openness)
+  const sensitivity = Number(beingSettings?.sensitivity ?? DEFAULT_BEING_SETTINGS.sensitivity)
+  const recentLabels = answers.slice(-3).map((answer) => answer.label).join(' / ')
+
+  const phaseTwo = {
+    violet: ['Voir clair', 'Trouver sens', 'Relier idees'],
+    indigo: ['Suivre intuition', 'Voir route', 'Changer angle'],
+    blue: ['Dire vrai', 'Reprendre espace', 'Nommer limite'],
+    green: ['Chercher lien', 'Recevoir aide', 'Ouvrir coeur'],
+    yellow: ['Reprendre valeur', 'Oser place', 'Calmer doute'],
+    orange: ['Raviver envie', 'Explorer neuf', 'Creer jeu'],
+    red: ['Trouver appui', 'Stabiliser pas', 'Baisser pression']
+  }
+
+  const phaseThree = {
+    violet: ['Clarifier choix', 'Acter sens', 'Garder cap'],
+    indigo: ['Choisir route', 'Tester vision', 'Suivre signal'],
+    blue: ['Poser limite', 'Dire demande', 'Liberer geste'],
+    green: ['Demander soutien', 'Nourrir lien', 'Recevoir mieux'],
+    yellow: ['Prendre place', 'Valider valeur', 'Cesser comparaison'],
+    orange: ['Lancer essai', 'Changer rituel', 'Creer mouvement'],
+    red: ['Faire pas', 'Chercher support', 'Tenir base']
+  }
+
+  const labels = phase === 2 ? phaseTwo : phaseThree
+  const candidateLabels = [
+    ...(labels[primaryId] || labels.red),
+    ...(labels[secondaryId] || []),
+    sensitivity > 66 ? 'Rester doux' : null,
+    openness > 66 ? 'Ouvrir champ' : null,
+    commitment > 66 && phase === 3 ? 'Assumer choix' : null,
+    commitment < 40 && phase === 3 ? 'Constater juste' : null
+  ].filter(Boolean)
+
+  const uniqueLabels = [...new Set(candidateLabels)].slice(0, 3)
+
+  return uniqueLabels.map((label, index) => ({
+    id: `phase-${phase}-orientation-${index}-${label.toLowerCase().replace(/\s+/g, '-')}`,
+    label,
+    description: getPhaseChoiceTone(phase, beingSettings),
+    phase,
+    needId: index === 0 ? primaryId : secondaryId,
+    scores: {
+      [index === 0 ? primaryId : secondaryId]: phase === 3 ? 2 : 1
+    },
+    seed: recentLabels
+  }))
 }
 
 function getDebugRows(prompt) {
@@ -98,6 +222,9 @@ export function ManifestationWizard() {
   const [links, setLinks] = useState({ needLinks: [], pathLinks: [] })
   const [history, setHistory] = useState(readHistory)
   const [aiSettings, setAiSettings] = useState(readAiSettings)
+  const [beingSettings, setBeingSettings] = useState(readBeingSettings)
+  const [phase, setPhase] = useState(1)
+  const [phaseChoices, setPhaseChoices] = useState({})
   const savedSessionRef = useRef(null)
 
   const steps = useMemo(() => {
@@ -123,19 +250,34 @@ export function ManifestationWizard() {
   }, [answers, feeling])
 
   const discovery = useMemo(() => getWizardDiscovery(steps), [steps])
-  const isComplete = Boolean(feeling && answers.length >= MAX_PASSAGES)
+  const currentPhaseAnswers = useMemo(() => getPhaseAnswers(answers, phase), [answers, phase])
+  const currentPhaseTotal = PHASE_PASSAGES[phase]
+  const isPhaseDone = Boolean(feeling && currentPhaseAnswers.length >= currentPhaseTotal)
+  const needsPhaseChoice = isPhaseDone && phase < 3
+  const isComplete = Boolean(feeling && phase === 3 && isPhaseDone)
+  const orientationChoices = useMemo(() => createOrientationChoices({
+    phase: phase + 1,
+    discovery,
+    answers,
+    beingSettings
+  }), [answers, beingSettings, discovery, phase])
 
   const aiContext = useMemo(() => ({
     sessionId,
     feeling,
     answers,
+    phase,
+    phaseIndex: currentPhaseAnswers.length,
+    phaseChoice: phaseChoices[phase] || null,
+    phaseChoices,
     steps,
     discovery,
     dominantNeed: discovery.dominantNeed,
     linkedNeeds: discovery.linkedNeeds,
     pathLength: answers.length,
-    aiSettings
-  }), [aiSettings, answers, discovery, feeling, sessionId, steps])
+    aiSettings,
+    beingSettings
+  }), [aiSettings, answers, beingSettings, currentPhaseAnswers.length, discovery, feeling, phase, phaseChoices, sessionId, steps])
 
   function updateAiSetting(id, value) {
     setAiSettings((currentSettings) => {
@@ -149,11 +291,23 @@ export function ManifestationWizard() {
     })
   }
 
+  function updateBeingSetting(id, value) {
+    setBeingSettings((currentSettings) => {
+      const nextSettings = {
+        ...currentSettings,
+        [id]: Number(value)
+      }
+
+      localStorage.setItem(BEING_SETTINGS_KEY, JSON.stringify(nextSettings))
+      return nextSettings
+    })
+  }
+
   useEffect(() => {
     let isActive = true
 
     async function loadQuestion() {
-      if (!feeling || isComplete || currentPrompt) return
+      if (!feeling || isComplete || needsPhaseChoice || currentPrompt) return
 
       setIsLoadingPrompt(true)
       const prompt = await getDynamicQuestion(aiContext)
@@ -169,7 +323,7 @@ export function ManifestationWizard() {
     return () => {
       isActive = false
     }
-  }, [aiContext, currentPrompt, feeling, isComplete])
+  }, [aiContext, currentPrompt, feeling, isComplete, needsPhaseChoice])
 
   useEffect(() => {
     let isActive = true
@@ -216,6 +370,8 @@ export function ManifestationWizard() {
     setRefreshingAnswerId(null)
     setDiscoveryText('')
     setLinks({ needLinks: [], pathLinks: [] })
+    setPhase(1)
+    setPhaseChoices({})
     savedSessionRef.current = null
   }
 
@@ -227,6 +383,8 @@ export function ManifestationWizard() {
     setRefreshingAnswerId(null)
     setDiscoveryText('')
     setLinks({ needLinks: [], pathLinks: [] })
+    setPhase(1)
+    setPhaseChoices({})
     savedSessionRef.current = null
   }
 
@@ -235,9 +393,21 @@ export function ManifestationWizard() {
       ...currentAnswers,
       {
         ...answer,
+        phase,
+        phaseChoice: phaseChoices[phase] || null,
         question: currentPrompt?.question
       }
     ])
+    setCurrentPrompt(null)
+    setRefreshingAnswerId(null)
+  }
+
+  function chooseOrientation(choice) {
+    setPhaseChoices((currentChoices) => ({
+      ...currentChoices,
+      [choice.phase]: choice
+    }))
+    setPhase(choice.phase)
     setCurrentPrompt(null)
     setRefreshingAnswerId(null)
   }
@@ -310,7 +480,9 @@ export function ManifestationWizard() {
 
       <WizardMenu
         aiSettings={aiSettings}
+        beingSettings={beingSettings}
         onAiSettingChange={updateAiSetting}
+        onBeingSettingChange={updateBeingSetting}
         debugRows={getDebugRows(currentPrompt)}
       />
 
@@ -319,13 +491,24 @@ export function ManifestationWizard() {
       <AnimatePresence mode="wait">
         {!feeling ? (
           <FeelingStep key="feeling-step" onChoose={chooseFeeling} />
+        ) : needsPhaseChoice ? (
+          <PhaseBridge
+            key={`phase-bridge-${phase}`}
+            phase={phase}
+            nextPhase={phase + 1}
+            steps={steps}
+            choices={orientationChoices}
+            onChoose={chooseOrientation}
+            onBack={restart}
+          />
         ) : !isComplete ? (
           <DynamicQuestionStep
             key={currentPrompt?.id || `loading-${answers.length}`}
             prompt={currentPrompt}
             activeNeed={discovery.dominantNeed}
-            currentIndex={answers.length}
-            total={MAX_PASSAGES}
+            currentIndex={currentPhaseAnswers.length}
+            total={currentPhaseTotal}
+            phase={phase}
             isLoading={isLoadingPrompt || !currentPrompt}
             onChoose={chooseAnswer}
             onRefreshAnswer={refreshAnswer}
@@ -349,7 +532,39 @@ export function ManifestationWizard() {
   )
 }
 
-function WizardMenu({ aiSettings, onAiSettingChange, debugRows }) {
+function PhaseBridge({ phase, nextPhase, steps, choices, onChoose, onBack }) {
+  return (
+    <section className="wizard-card phase-bridge" aria-labelledby="phase-bridge-title">
+      <p className="eyebrow">Synthese</p>
+      <h2 id="phase-bridge-title">Choisis l'orientation de la phase {nextPhase}.</h2>
+
+      <div className="path-flow compact" aria-label="Synthese des reponses">
+        {steps.map((step, index) => (
+          <div className="path-flow-node" key={`${step.id}-${index}`}>
+            <span>{step.kicker}</span>
+            {step.question ? <em>{step.question}</em> : null}
+            <strong>{step.label}</strong>
+          </div>
+        ))}
+      </div>
+
+      <div className="wizard-options orientation-options">
+        {choices.map((choice) => (
+          <button type="button" className="wizard-option orientation-option" key={choice.id} onClick={() => onChoose(choice)}>
+            <span className="wizard-option-label">{choice.label}</span>
+            <small>{choice.description}</small>
+          </button>
+        ))}
+      </div>
+
+      <button type="button" className="ghost-action" onClick={onBack}>
+        Revenir au depart
+      </button>
+    </section>
+  )
+}
+
+function WizardMenu({ aiSettings, beingSettings, onAiSettingChange, onBeingSettingChange, debugRows }) {
   return (
     <details className="wizard-menu">
       <summary>Menu</summary>
@@ -389,6 +604,29 @@ function WizardMenu({ aiSettings, onAiSettingChange, debugRows }) {
             </dl>
           </details>
         ) : null}
+      </details>
+
+      <details className="ai-submenu">
+        <summary>Etre</summary>
+
+        <div className="ai-settings-grid">
+          {BEING_SLIDERS.map((slider) => (
+            <label className="ai-setting" key={slider.id}>
+              <span>{slider.label}</span>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={beingSettings[slider.id]}
+                onChange={(event) => onBeingSettingChange(slider.id, event.target.value)}
+              />
+              <small>
+                <span>{slider.left}</span>
+                <span>{slider.right}</span>
+              </small>
+            </label>
+          ))}
+        </div>
       </details>
     </details>
   )

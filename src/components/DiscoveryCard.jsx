@@ -33,6 +33,7 @@ export function DiscoveryCard({ steps, discovery, discoveryText, links, onRestar
         {steps.map((step, index) => (
           <div className="path-flow-node" key={`${step.id}-${index}`}>
             <span>{step.kicker}</span>
+            {step.question ? <em>{step.question}</em> : null}
             <strong>{step.label}</strong>
           </div>
         ))}
@@ -44,17 +45,6 @@ export function DiscoveryCard({ steps, discovery, discoveryText, links, onRestar
           ? `Des besoins liés apparaissent aussi autour de ${formatList(linkedNeeds.map((need) => need.needLabel.toLowerCase()))}.`
           : 'Pour l’instant, le chemin reste concentré autour d’un seul besoin.'}
       </p>
-
-      {links?.pathLinks?.length > 0 ? (
-        <div className="path-recap" aria-label="Liens du chemin">
-          {links.pathLinks.slice(0, 4).map((link) => (
-            <div key={link.id}>
-              <span>{link.from}</span>
-              <strong>{link.to}</strong>
-            </div>
-          ))}
-        </div>
-      ) : null}
 
       <p className="soft-note">
         Ce n’est pas une vérité absolue. C’est une piste sensible : créer, ici, c’est découvrir ce que tu crées en toi.
