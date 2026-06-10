@@ -82,22 +82,39 @@ export default async function handler(request, response) {
   const { kind, context } = request.body || {}
 
   if (!client) {
-    response.status(200).json(getLocalResult(kind, context))
+    response.status(200).json(withDebug(getLocalResult(kind, context), {
+      source: 'local',
+      fallbackReason: 'missing_openai_api_key',
+      hasOpenAIKey: false
+    }))
     return
   }
 
   try {
+    const model = process.env.OPENAI_MODEL || 'gpt-4.1-mini'
     const completion = await client.chat.completions.create({
-      model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
+      model,
       messages: buildPrompt(kind, context),
       response_format: responseFormats[kind] || responseFormats.question,
       temperature: 0.75
     })
 
     const content = completion.choices[0]?.message?.content
-    response.status(200).json(JSON.parse(content))
-  } catch {
-    response.status(200).json(getLocalResult(kind, context))
+    response.status(200).json(withDebug(JSON.parse(content), {
+      source: 'ai',
+      hasOpenAIKey: true,
+      model,
+      finishReason: completion.choices[0]?.finish_reason || 'unknown'
+    }))
+  } catch (error) {
+    response.status(200).json(withDebug(getLocalResult(kind, context), {
+      source: 'local',
+      fallbackReason: 'openai_request_failed',
+      hasOpenAIKey: true,
+      model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
+      errorName: error?.name || 'Error',
+      errorMessage: error?.message || 'Unknown OpenAI error'
+    }))
   }
 }
 
@@ -105,4 +122,12 @@ function getLocalResult(kind, context) {
   if (kind === 'discovery') return { text: generateDiscovery(context) }
   if (kind === 'links') return generateLinks(context)
   return generateQuestion(context)
+}
+
+function withDebug(result, debug) {
+  return {
+    ...result,
+    source: result?.source || debug.source,
+    debug
+  }
 }

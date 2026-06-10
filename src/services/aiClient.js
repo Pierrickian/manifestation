@@ -22,11 +22,19 @@ export async function getDynamicQuestion(context) {
     if (result?.question && Array.isArray(result.answers)) {
       return {
         ...result,
-        source: result.source || 'ai'
+        source: result.source || result.debug?.source || 'ai'
       }
     }
-  } catch {
+  } catch (error) {
     // The local engine keeps the wizard alive when the server key is absent.
+    return {
+      ...localQuestion(context),
+      debug: {
+        source: 'local',
+        fallbackReason: 'client_request_failed',
+        errorMessage: error?.message || 'Unable to reach /api/ai'
+      }
+    }
   }
 
   return localQuestion(context)

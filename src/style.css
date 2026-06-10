@@ -189,6 +189,48 @@ p {
   background: rgba(255, 255, 255, 0.14);
 }
 
+.ai-debug-panel {
+  margin: 0 0 14px;
+  border: 1px solid rgba(255, 250, 244, 0.14);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.18);
+  color: rgba(255, 250, 244, 0.74);
+  font-size: 0.76rem;
+}
+
+.ai-debug-panel summary {
+  cursor: pointer;
+  font-weight: 850;
+}
+
+.ai-debug-panel dl {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 0;
+}
+
+.ai-debug-panel div {
+  display: grid;
+  grid-template-columns: minmax(90px, auto) 1fr;
+  gap: 8px;
+}
+
+.ai-debug-panel dt,
+.ai-debug-panel dd {
+  margin: 0;
+}
+
+.ai-debug-panel dt {
+  color: rgba(255, 250, 244, 0.5);
+  font-weight: 800;
+}
+
+.ai-debug-panel dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .wizard-option:active,
 .primary-action:active,
 .ghost-action:active {

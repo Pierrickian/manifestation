@@ -12,6 +12,20 @@ export function DynamicQuestionStep({
 }) {
   const answers = prompt?.answers || []
   const showAiIcon = prompt?.source === 'ai'
+  const debugRows = prompt?.debug
+    ? [
+        ['source', prompt.source || 'unknown'],
+        ['debug.source', prompt.debug.source || 'unknown'],
+        ['hasOpenAIKey', String(prompt.debug.hasOpenAIKey ?? 'unknown')],
+        ['fallbackReason', prompt.debug.fallbackReason || 'none'],
+        ['model', prompt.debug.model || 'unknown'],
+        ['finishReason', prompt.debug.finishReason || 'unknown'],
+        ['errorName', prompt.debug.errorName || 'none'],
+        ['errorMessage', prompt.debug.errorMessage || 'none'],
+        ['questionId', prompt.id || 'none'],
+        ['answerIds', answers.map((answer) => answer.id).join(', ') || 'none']
+      ]
+    : []
 
   return (
     <motion.section
@@ -30,6 +44,20 @@ export function DynamicQuestionStep({
         </div>
         <NeedBadge need={activeNeed} subtle />
       </div>
+
+      {!isLoading && debugRows.length ? (
+        <details className="ai-debug-panel" open>
+          <summary>Debug IA</summary>
+          <dl>
+            {debugRows.map(([label, value]) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
+      ) : null}
 
       {isLoading ? (
         <div className="breathing-loader" aria-label="Chargement de la question" />
