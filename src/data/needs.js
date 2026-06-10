@@ -2,9 +2,9 @@ export const NEEDS = [
   {
     id: 'violet',
     name: 'Violet',
-    needLabel: 'Sens & clarté mentale',
-    needs: ['sens', 'clarté mentale', 'mise en perspective'],
-    positiveState: 'une pensée plus vaste, plus calme et reliée',
+    needLabel: 'Sens et clarté mentale',
+    needs: ['sens', 'clarté mentale', 'conscience', 'expansion'],
+    positiveState: 'une pensée plus vaste, plus calme et mieux reliée',
     oppositeState: 'confusion, dispersion, perte de sens',
     uiColor: '#b58cff',
     guidance: 'Revenir au sens peut ouvrir un espace plus vaste que le problème lui-même.'
@@ -12,8 +12,8 @@ export const NEEDS = [
   {
     id: 'indigo',
     name: 'Indigo',
-    needLabel: 'Direction & imagination',
-    needs: ['direction', 'intuition', 'imagination'],
+    needLabel: 'Direction et imagination',
+    needs: ['direction', 'imagination', 'intuition', 'perception'],
     positiveState: 'une vision intérieure qui recommence à montrer une route',
     oppositeState: 'égarement, brouillard, absence d’image',
     uiColor: '#7287ff',
@@ -22,8 +22,8 @@ export const NEEDS = [
   {
     id: 'blue',
     name: 'Bleu',
-    needLabel: 'Autonomie, liberté & expression',
-    needs: ['autonomie', 'liberté', 'expression'],
+    needLabel: 'Autonomie, liberté et expression',
+    needs: ['autonomie', 'liberté', 'expression', 'justesse'],
     positiveState: 'une parole juste et un espace pour respirer',
     oppositeState: 'répression, contrainte, silence intérieur',
     uiColor: '#54c7ff',
@@ -32,8 +32,8 @@ export const NEEDS = [
   {
     id: 'green',
     name: 'Vert',
-    needLabel: 'Amour & lien',
-    needs: ['amour', 'lien', 'présence'],
+    needLabel: 'Amour et lien',
+    needs: ['amour', 'lien', 'âme', 'rayonnement'],
     positiveState: 'une présence chaleureuse, reliée et accueillante',
     oppositeState: 'séparation, isolement, fermeture',
     uiColor: '#6dff9d',
@@ -42,8 +42,8 @@ export const NEEDS = [
   {
     id: 'yellow',
     name: 'Jaune',
-    needLabel: 'Soi, estime & amour propre',
-    needs: ['soi', 'estime', 'amour propre'],
+    needLabel: 'Estime et valeur personnelle',
+    needs: ['estime', 'amour propre', 'confiance', 'valeur personnelle'],
     positiveState: 'une confiance simple dans sa propre valeur',
     oppositeState: 'dévalorisation, comparaison, effacement',
     uiColor: '#ffe76a',
@@ -52,8 +52,8 @@ export const NEEDS = [
   {
     id: 'orange',
     name: 'Orange',
-    needLabel: 'Découverte, apprentissage & créativité',
-    needs: ['découverte', 'apprentissage', 'enrichissement', 'créativité'],
+    needLabel: 'Découverte et créativité',
+    needs: ['découverte', 'apprentissage', 'enrichissement', 'créativité', 'exploration'],
     positiveState: 'une curiosité vivante qui remet de la saveur',
     oppositeState: 'routine, vide, assèchement',
     uiColor: '#ffad5c',
@@ -62,8 +62,8 @@ export const NEEDS = [
   {
     id: 'red',
     name: 'Rouge',
-    needLabel: 'Évolution, sécurité de mouvement & support',
-    needs: ['évolution', 'sécurité de mouvement', 'support'],
+    needLabel: 'Évolution, support et stabilité',
+    needs: ['évolution', 'sécurité de mouvement', 'support', 'stabilité'],
     positiveState: 'un ancrage qui permet d’avancer sans se brusquer',
     oppositeState: 'insécurité, fatigue, immobilité',
     uiColor: '#ff6d7a',

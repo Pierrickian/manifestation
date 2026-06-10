@@ -1,4 +1,4 @@
-import { NEEDS } from '../data/needs'
+import { NEEDS } from '../data/needs.js'
 
 const EMPTY_SCORES = Object.fromEntries(NEEDS.map((need) => [need.id, 0]))
 
@@ -26,13 +26,28 @@ export function rankNeeds(scores) {
 
 export function getWizardDiscovery(steps) {
   const scores = scorePath(steps)
-  const rankedNeeds = rankNeeds(scores).filter((need) => need.score > 0)
-  const dominantNeed = rankedNeeds[0] || null
-  const linkedNeeds = rankedNeeds.slice(1, 3)
+  const rankedNeeds = rankNeeds(scores)
+  const activeNeeds = rankedNeeds.filter((need) => need.score > 0)
+  const dominantNeed = activeNeeds[0] || null
+  const linkedNeeds = activeNeeds.slice(1, 4)
 
   return {
     scores,
+    rankedNeeds,
     dominantNeed,
-    linkedNeeds
+    linkedNeeds,
+    dominantColor: dominantNeed?.name || null
+  }
+}
+
+export function createSessionSnapshot({ sessionId, feeling, answers, discovery, links }) {
+  return {
+    sessionId,
+    feeling,
+    answers,
+    needs: discovery?.rankedNeeds?.filter((need) => need.score > 0) || [],
+    links,
+    discovery,
+    timestamp: new Date().toISOString()
   }
 }
