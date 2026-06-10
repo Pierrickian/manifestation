@@ -262,6 +262,25 @@ p {
   line-height: 1.35;
 }
 
+.orientation-options {
+  margin-top: 14px;
+}
+
+.orientation-option {
+  display: grid;
+  align-items: start;
+  justify-content: start;
+}
+
+.phase-kicker {
+  margin: 4px 0 8px;
+  color: rgba(255, 250, 244, 0.58);
+  font-size: 0.76rem;
+  font-weight: 820;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
 .wizard-option:hover {
   background: rgba(255, 255, 255, 0.14);
 }
@@ -449,6 +468,10 @@ p {
   display: grid;
   gap: 10px;
   margin: 18px 0;
+}
+
+.path-flow.compact {
+  margin-bottom: 12px;
 }
 
 .path-flow-node {

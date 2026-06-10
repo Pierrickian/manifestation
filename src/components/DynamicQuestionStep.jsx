@@ -6,6 +6,7 @@ export function DynamicQuestionStep({
   activeNeed,
   currentIndex,
   total,
+  phase = 1,
   isLoading,
   onChoose,
   onRefreshAnswer,
@@ -28,6 +29,7 @@ export function DynamicQuestionStep({
       <div className="step-heading">
         <div>
           <p className="eyebrow">Passage {currentIndex + 1} / {total}</p>
+          {phase > 1 ? <p className="phase-kicker">Phase {phase}</p> : null}
           <h2 id="question-title">{isLoading ? 'Le prochain passage se dessine...' : prompt?.question}</h2>
         </div>
         <NeedBadge need={activeNeed} subtle />
