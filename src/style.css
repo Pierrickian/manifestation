@@ -139,6 +139,12 @@ p {
   gap: 10px;
 }
 
+.wizard-option-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
 .wizard-option,
 .primary-action,
 .ghost-action {
@@ -154,10 +160,52 @@ p {
 }
 
 .wizard-option {
-  display: grid;
-  gap: 5px;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   background: rgba(255, 255, 255, 0.095);
   border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.wizard-option-label {
+  min-width: 0;
+}
+
+.ai-choice-icon {
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 250, 244, 0.28);
+  border-radius: 999px;
+  padding: 4px 6px;
+  background: rgba(255, 250, 244, 0.1);
+  color: rgba(255, 250, 244, 0.82);
+  font-size: 0.64rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.04em;
+}
+
+.refresh-answer-action {
+  width: 48px;
+  min-height: 58px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 250, 244, 0.16);
+  border-radius: 16px;
+  background: rgba(255, 250, 244, 0.08);
+  color: rgba(255, 250, 244, 0.86);
+  font-size: 0.74rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.refresh-answer-action:hover:not(:disabled) {
+  background: rgba(255, 250, 244, 0.14);
+}
+
+.refresh-answer-action:disabled {
+  cursor: wait;
+  opacity: 0.58;
 }
 
 .wizard-option small {
@@ -168,6 +216,48 @@ p {
 
 .wizard-option:hover {
   background: rgba(255, 255, 255, 0.14);
+}
+
+.ai-debug-panel {
+  margin: 0 0 14px;
+  border: 1px solid rgba(255, 250, 244, 0.14);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.18);
+  color: rgba(255, 250, 244, 0.74);
+  font-size: 0.76rem;
+}
+
+.ai-debug-panel summary {
+  cursor: pointer;
+  font-weight: 850;
+}
+
+.ai-debug-panel dl {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 0;
+}
+
+.ai-debug-panel div {
+  display: grid;
+  grid-template-columns: minmax(90px, auto) 1fr;
+  gap: 8px;
+}
+
+.ai-debug-panel dt,
+.ai-debug-panel dd {
+  margin: 0;
+}
+
+.ai-debug-panel dt {
+  color: rgba(255, 250, 244, 0.5);
+  font-weight: 800;
+}
+
+.ai-debug-panel dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .wizard-option:active,

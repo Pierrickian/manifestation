@@ -19,12 +19,34 @@ async function requestAI(kind, context) {
 export async function getDynamicQuestion(context) {
   try {
     const result = await requestAI('question', context)
-    if (result?.question && Array.isArray(result.answers)) return { ...result, source: 'ai' }
-  } catch {
+    if (result?.question && Array.isArray(result.answers)) {
+      return {
+        ...result,
+        source: result.source || result.debug?.source || 'ai'
+      }
+    }
+  } catch (error) {
     // The local engine keeps the wizard alive when the server key is absent.
+    return {
+      ...localQuestion(context),
+      debug: {
+        source: 'local',
+        fallbackReason: 'client_request_failed',
+        errorMessage: error?.message || 'Unable to reach /api/ai'
+      }
+    }
   }
 
   return localQuestion(context)
+}
+
+export async function getReplacementAnswer(context) {
+  const result = await requestAI('answer', context)
+
+  return {
+    ...result,
+    source: result.source || result.debug?.source || 'ai'
+  }
 }
 
 export async function getDynamicDiscovery(context) {
