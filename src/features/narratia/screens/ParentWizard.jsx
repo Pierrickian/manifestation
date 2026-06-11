@@ -1,6 +1,13 @@
 import { ChoiceCard } from '../components/ChoiceCard'
 import { NarratiaLayout } from '../components/NarratiaLayout'
 
+const AGE_RANGES = [
+  ['2-3', '2-3 ans', 'Des images très simples, répétitives et très sécurisantes.'],
+  ['4-5', '4-5 ans', 'Une aventure courte, concrète et facile à suivre.'],
+  ['6-8', '6-8 ans', 'Un conte plus imagé avec des choix et des émotions nuancées.'],
+  ['9-12', '9-12 ans', 'Une histoire plus ample, symbolique et maligne.']
+]
+
 const DURATIONS = [
   ['short', 'Courte', 'Une petite aventure pour le soir.'],
   ['medium', 'Moyenne', 'Une histoire plus ample avec le temps de rêver.'],
@@ -78,6 +85,12 @@ export function ParentWizard({ configuration, onChange, onSubmit, isLoading }) {
       intro="Ces choix restent du côté adulte. L’enfant verra seulement des ingrédients de conte, simples et joueurs."
       footer={<button className="primary-action" type="button" onClick={onSubmit} disabled={isLoading}>{isLoading ? 'Préparation des choix...' : 'Inviter l’enfant'}</button>}
     >
+      <div className="narratia-fieldset">
+        <strong>Âge de l’enfant</strong>
+        <div className="narratia-card-grid">
+          {AGE_RANGES.map(([id, title, description]) => <ChoiceCard key={id} title={title} description={description} active={(configuration.ageRange || '6-8') === id} onClick={() => setSingle('ageRange', id)} />)}
+        </div>
+      </div>
       <div className="narratia-fieldset">
         <strong>Durée de l’histoire</strong>
         <div className="narratia-card-grid">

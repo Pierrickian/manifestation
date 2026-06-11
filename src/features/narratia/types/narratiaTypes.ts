@@ -1,3 +1,4 @@
+export type AgeRange = '2-3' | '4-5' | '6-8' | '9-12'
 export type StoryDuration = 'short' | 'medium' | 'long'
 export type StoryIntensity = 'very_soft' | 'balanced' | 'intense_imagination'
 export type ReadingMode = 'parent_reads' | 'mixed_narration' | 'ai_children_narrate'
@@ -5,6 +6,7 @@ export type ChildChoiceCategory = 'object' | 'creature' | 'place' | 'magic' | 'a
 export type NarratorId = 'virtual_child_a' | 'virtual_child_b' | 'player_child' | 'parent'
 
 export interface ParentConfiguration {
+  ageRange: AgeRange
   duration: StoryDuration
   emotionalTones: string[]
   themes: string[]
@@ -67,7 +69,7 @@ export interface NarratiaStoryPackage {
   metadata: {
     duration: StoryDuration
     readingMode: ReadingMode
-    ageRange: string
+    ageRange: AgeRange
     createdAt: string
   }
 }

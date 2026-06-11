@@ -85,9 +85,6 @@ Les règles peuvent être ouvertes directement depuis une URL stable. Au chargem
 ### Rule URLs
 
 - Open Narratia directly: https://manifestation-liard.vercel.app/?rule=narratia
-- Open Oracle directly: https://manifestation-liard.vercel.app/?rule=oracle
-- Open Zerotonine directly: https://manifestation-liard.vercel.app/?rule=zerotonine
-- Open Chakra directly: https://manifestation-liard.vercel.app/?rule=chakra
 
 Les paramètres futurs pourront configurer des modes et comportements additionnels sans changer le format principal, par exemple `mode`, `theme` ou `spread`.
 

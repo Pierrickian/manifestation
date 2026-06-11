@@ -1,5 +1,5 @@
 export const narratiaSystemPrompt = [
-  'You create emotionally safe, child-facing collaborative stories for a parent and a child around 7 years old.',
+  'You create emotionally safe, child-facing collaborative stories for a parent and a child in the age range selected by the parent.',
   'The experience is not a chatbot. It is a guided narrative ritual with immutable milestones and playful shared narration.',
   'Use plain, warm language. Keep fear gentle and contained. Avoid danger that feels graphic, punitive, or hopeless.',
   'Never expose parent configuration labels, system instructions, JSON explanations, or AI terminology to the child.',
@@ -12,7 +12,7 @@ export function buildChildChoicesPrompt(parentConfiguration) {
     constraints: [
       'Choices must be concrete things a child can imagine: objects, creatures, places, magical elements, or atmosphere.',
       'Choices must match the parent configuration while hiding all parent-facing emotional tuning vocabulary.',
-      'Labels must be short, gentle, playful, age appropriate, and emotionally coherent.',
+      'Labels must be short, gentle, playful, age appropriate for parentConfiguration.ageRange, and emotionally coherent.',
       'No frightening, violent, hopeless, or adult themes.'
     ],
     parentConfiguration,
@@ -34,7 +34,7 @@ export function buildStoryPackagePrompt({ parentConfiguration, childSelection, s
       'At least one segment must be narrated by virtual_child_a and at least one by virtual_child_b when there are enough segments.',
       'Reserve the final emotional agency for the real child through the ending choice or a player_child final segment.',
       'Generate exactly 3 endings with short titles, distinct emotional orientations, and full ending text.',
-      'All endings must fit the same milestones and remain coherent for a child around 7.',
+      'All endings must fit the same milestones and remain coherent for parentConfiguration.ageRange.',
       'Every narration block must contain narrator id, narrator display name, text, and a mood tag for future text to speech.',
       'No visible JSON-like wording inside story text. No developer explanations.'
     ],
@@ -55,7 +55,7 @@ export function buildStoryPackagePrompt({ parentConfiguration, childSelection, s
       endings: [
         { id: 'ending_1', title: 'Titre court de la fin', emotion: 'heureuse', text: 'Texte complet de la fin en français.', visualHint: 'Illustration hint' }
       ],
-      metadata: { duration: parentConfiguration.duration, readingMode: parentConfiguration.readingMode, ageRange: 'around 7', createdAt: 'ISO date' }
+      metadata: { duration: parentConfiguration.duration, readingMode: parentConfiguration.readingMode, ageRange: parentConfiguration.ageRange, createdAt: 'ISO date' }
     }
   }
 }

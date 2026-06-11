@@ -2,36 +2,12 @@ export const DEFAULT_RULE_ID = 'default'
 export const RECONCILIATION_RULE_ID = 'emotional-reconciliation'
 export const FLOW_RULE_ID = 'flow'
 export const NARRATIA_RULE_ID = 'narratia'
-export const ORACLE_RULE_ID = 'oracle'
-export const ZEROTONINE_RULE_ID = 'zerotonine'
-export const CHAKRA_RULE_ID = 'chakra'
 
 export const ruleRegistry = {
   [DEFAULT_RULE_ID]: {
     id: DEFAULT_RULE_ID,
     label: 'Exploration par defaut',
     description: 'La regle actuelle: partir d un ressenti, lire les besoins, puis orienter les phases.',
-    family: 'guided-journey',
-    isEnabled: () => true
-  },
-  [ORACLE_RULE_ID]: {
-    id: ORACLE_RULE_ID,
-    label: 'Oracle',
-    description: 'Ouvrir le parcours comme un tirage intuitif centre sur les signes et les besoins.',
-    family: 'guided-journey',
-    isEnabled: () => true
-  },
-  [ZEROTONINE_RULE_ID]: {
-    id: ZEROTONINE_RULE_ID,
-    label: 'Zerotonine',
-    description: 'Explorer le chemin avec une tonalite plus vive, mentale et ludique.',
-    family: 'guided-journey',
-    isEnabled: () => true
-  },
-  [CHAKRA_RULE_ID]: {
-    id: CHAKRA_RULE_ID,
-    label: 'Chakra',
-    description: 'Lire les besoins a travers les couleurs et les centres d energie du parcours.',
     family: 'guided-journey',
     isEnabled: () => true
   },
@@ -60,9 +36,6 @@ export const ruleRegistry = {
 
 export const defaultRuleSet = [
   DEFAULT_RULE_ID,
-  ORACLE_RULE_ID,
-  ZEROTONINE_RULE_ID,
-  CHAKRA_RULE_ID,
   RECONCILIATION_RULE_ID,
   FLOW_RULE_ID,
   NARRATIA_RULE_ID

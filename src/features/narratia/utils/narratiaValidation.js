@@ -87,7 +87,7 @@ export function validateStoryPackage(payload, context = {}) {
     metadata: {
       duration: context.parentConfiguration?.duration || 'short',
       readingMode: context.parentConfiguration?.readingMode || 'mixed_narration',
-      ageRange: 'autour de 7 ans',
+      ageRange: context.parentConfiguration?.ageRange || '6-8',
       createdAt: payload?.metadata?.createdAt || new Date().toISOString()
     }
   }
