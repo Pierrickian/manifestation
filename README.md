@@ -74,7 +74,7 @@ Sur Vercel ou un autre hébergeur, ajoute `OPENAI_API_KEY` dans les variables d�
 Tu peux aussi définir le modèle serveur :
 
 ```txt
-OPENAI_MODEL=gpt-4.1-mini
+OPENAI_MODEL=gpt-5.4-mini
 ```
 
 ## Scripts

@@ -4,6 +4,8 @@ import { generateDiscovery } from '../src/ai/generateDiscovery.js'
 import { generateLinks } from '../src/ai/generateLinks.js'
 import { generateQuestion } from '../src/ai/generateQuestion.js'
 
+const DEFAULT_OPENAI_MODEL = 'gpt-5.4-mini'
+
 const client = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null
@@ -177,7 +179,7 @@ export default async function handler(request, response) {
   }
 
   try {
-    const model = process.env.OPENAI_MODEL || 'gpt-4.1-mini'
+    const model = process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL
     const completion = await client.chat.completions.create({
       model,
       messages: buildPrompt(kind, context),
@@ -197,7 +199,7 @@ export default async function handler(request, response) {
       source: 'local',
       fallbackReason: 'openai_request_failed',
       hasOpenAIKey: true,
-      model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
+      model: process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL,
       errorName: error?.name || 'Error',
       errorMessage: error?.message || 'Unknown OpenAI error'
     }))
