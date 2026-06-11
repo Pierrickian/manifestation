@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { createSessionSnapshot, getWizardDiscovery } from '../logic/wizardScoring'
 import { getDynamicDiscovery, getDynamicLinks, getDynamicQuestion, getReplacementAnswer } from '../services/aiClient'
+import { NEGATIVE_EMOTIONS, OPPOSITE_POSITIVE_EMOTIONS, POSITIVE_EMOTIONS } from '../data/staticQuestions'
 import { DiscoveryCard } from './DiscoveryCard'
 import { DynamicQuestionStep } from './DynamicQuestionStep'
 import { FeelingStep } from './FeelingStep'
@@ -16,12 +17,28 @@ const PHASE_PASSAGES = {
 const HISTORY_KEY = 'manifestation:paths'
 const AI_SETTINGS_KEY = 'manifestation:ai-settings'
 const BEING_SETTINGS_KEY = 'manifestation:being-settings'
+const RULE_SETTINGS_KEY = 'manifestation:rule'
+const DEFAULT_RULE_ID = 'default'
+const RECONCILIATION_RULE_ID = 'emotional-reconciliation'
 const DEFAULT_AI_SETTINGS = {
   intensity: 28,
   grounding: 35,
   focus: 58,
   register: 76
 }
+
+const WIZARD_RULES = [
+  {
+    id: DEFAULT_RULE_ID,
+    label: 'Exploration par defaut',
+    description: 'La regle actuelle: partir d un ressenti, lire les besoins, puis orienter les phases.'
+  },
+  {
+    id: RECONCILIATION_RULE_ID,
+    label: 'Reconciliation emotionnelle',
+    description: 'Retrouver une vibration positive et relier la part qui la porte a celle qui signale le negatif.'
+  }
+]
 const DEFAULT_BEING_SETTINGS = {
   commitment: 34,
   openness: 58,
@@ -114,6 +131,59 @@ function readBeingSettings() {
     }
   } catch {
     return DEFAULT_BEING_SETTINGS
+  }
+}
+
+function readActiveRuleId() {
+  try {
+    const ruleId = localStorage.getItem(RULE_SETTINGS_KEY) || DEFAULT_RULE_ID
+    return WIZARD_RULES.some((rule) => rule.id === ruleId) ? ruleId : DEFAULT_RULE_ID
+  } catch {
+    return DEFAULT_RULE_ID
+  }
+}
+
+function getPhaseTotal(ruleId, phase) {
+  if (ruleId === RECONCILIATION_RULE_ID) return 2
+  return PHASE_PASSAGES[phase]
+}
+
+function getPhaseChoice(ruleId, phase, phaseChoices, reconciliation) {
+  if (ruleId === RECONCILIATION_RULE_ID) {
+    return {
+      id: 'reconciliation-guidance',
+      label: reconciliation?.positiveEmotion?.label || 'vibration positive',
+      ruleId,
+      positiveEmotion: reconciliation?.positiveEmotion || null,
+      negativeEmotion: reconciliation?.negativeEmotion || null,
+      phase
+    }
+  }
+
+  return phaseChoices[phase] || null
+}
+
+function getReconciliationPromptStep(reconciliation) {
+  if (!reconciliation?.polarity) return 'polarity'
+  if (reconciliation.polarity === 'positive' && !reconciliation.positiveEmotion) return 'positive-emotion'
+  if (reconciliation.polarity === 'negative' && !reconciliation.negativeEmotion) return 'negative-emotion'
+  if (reconciliation.polarity === 'negative' && !reconciliation.positiveEmotion) return 'opposite-positive-emotion'
+  return null
+}
+
+function createFeelingFromEmotion(reconciliation) {
+  const positiveEmotion = reconciliation?.positiveEmotion
+  const negativeEmotion = reconciliation?.negativeEmotion
+
+  return {
+    id: `reconciliation-${positiveEmotion?.id || 'positive'}`,
+    label: positiveEmotion?.label || 'Vibration positive',
+    description: negativeEmotion
+      ? `Reanimer ${positiveEmotion?.label || 'une vibration positive'} face a ${negativeEmotion.label}.`
+      : `Retrouver ${positiveEmotion?.label || 'une vibration positive'} longtemps moins presente.`,
+    scores: positiveEmotion?.scores || { green: 2, red: 1 },
+    seedQuestion: `Qu est-ce que ${positiveEmotion?.label || 'cette vibration positive'} commence a rendre possible ?`,
+    reconciliation
   }
 }
 
@@ -223,6 +293,11 @@ export function ManifestationWizard() {
   const [history, setHistory] = useState(readHistory)
   const [aiSettings, setAiSettings] = useState(readAiSettings)
   const [beingSettings, setBeingSettings] = useState(readBeingSettings)
+  const [activeRuleId, setActiveRuleId] = useState(readActiveRuleId)
+  const [reconciliation, setReconciliation] = useState({ polarity: null, positiveEmotion: null, negativeEmotion: null })
+  const [phaseZeroPrompt, setPhaseZeroPrompt] = useState(null)
+  const [isLoadingPhaseZeroPrompt, setIsLoadingPhaseZeroPrompt] = useState(false)
+  const [refreshingPhaseZeroId, setRefreshingPhaseZeroId] = useState(null)
   const [phase, setPhase] = useState(1)
   const [phaseChoices, setPhaseChoices] = useState({})
   const savedSessionRef = useRef(null)
@@ -251,9 +326,11 @@ export function ManifestationWizard() {
 
   const discovery = useMemo(() => getWizardDiscovery(steps), [steps])
   const currentPhaseAnswers = useMemo(() => getPhaseAnswers(answers, phase), [answers, phase])
-  const currentPhaseTotal = PHASE_PASSAGES[phase]
+  const currentPhaseTotal = getPhaseTotal(activeRuleId, phase)
+  const phaseZeroStep = activeRuleId === RECONCILIATION_RULE_ID ? getReconciliationPromptStep(reconciliation) : null
+  const needsPhaseZero = activeRuleId === RECONCILIATION_RULE_ID && Boolean(phaseZeroStep)
   const isPhaseDone = Boolean(feeling && currentPhaseAnswers.length >= currentPhaseTotal)
-  const needsPhaseChoice = isPhaseDone && phase < 3
+  const needsPhaseChoice = activeRuleId === DEFAULT_RULE_ID && isPhaseDone && phase < 3
   const isComplete = Boolean(feeling && phase === 3 && isPhaseDone)
   const orientationChoices = useMemo(() => createOrientationChoices({
     phase: phase + 1,
@@ -264,12 +341,16 @@ export function ManifestationWizard() {
 
   const aiContext = useMemo(() => ({
     sessionId,
+    ruleId: activeRuleId,
     feeling,
     answers,
     phase,
     phaseIndex: currentPhaseAnswers.length,
-    phaseChoice: phaseChoices[phase] || null,
+    phaseChoice: getPhaseChoice(activeRuleId, phase, phaseChoices, reconciliation),
     phaseChoices,
+    phaseZeroStep,
+    reconciliation,
+    previousQuestions: answers.map((answer) => answer.question).filter(Boolean),
     steps,
     discovery,
     dominantNeed: discovery.dominantNeed,
@@ -277,7 +358,7 @@ export function ManifestationWizard() {
     pathLength: answers.length,
     aiSettings,
     beingSettings
-  }), [aiSettings, answers, beingSettings, currentPhaseAnswers.length, discovery, feeling, phase, phaseChoices, sessionId, steps])
+  }), [activeRuleId, aiSettings, answers, beingSettings, currentPhaseAnswers.length, discovery, feeling, phase, phaseChoices, phaseZeroStep, reconciliation, sessionId, steps])
 
   function updateAiSetting(id, value) {
     setAiSettings((currentSettings) => {
@@ -303,11 +384,34 @@ export function ManifestationWizard() {
     })
   }
 
+  function resetJourney() {
+    setSessionId(createSessionId())
+    setFeeling(null)
+    setAnswers([])
+    setCurrentPrompt(null)
+    setRefreshingAnswerId(null)
+    setDiscoveryText('')
+    setLinks({ needLinks: [], pathLinks: [] })
+    setPhase(1)
+    setPhaseChoices({})
+    setReconciliation({ polarity: null, positiveEmotion: null, negativeEmotion: null })
+    setPhaseZeroPrompt(null)
+    setIsLoadingPhaseZeroPrompt(false)
+    setRefreshingPhaseZeroId(null)
+    savedSessionRef.current = null
+  }
+
+  function chooseRule(ruleId) {
+    setActiveRuleId(ruleId)
+    localStorage.setItem(RULE_SETTINGS_KEY, ruleId)
+    resetJourney()
+  }
+
   useEffect(() => {
     let isActive = true
 
     async function loadQuestion() {
-      if (!feeling || isComplete || needsPhaseChoice || currentPrompt) return
+      if (!feeling || isComplete || needsPhaseChoice || isPhaseDone || currentPrompt) return
 
       setIsLoadingPrompt(true)
       const prompt = await getDynamicQuestion(aiContext)
@@ -323,7 +427,41 @@ export function ManifestationWizard() {
     return () => {
       isActive = false
     }
-  }, [aiContext, currentPrompt, feeling, isComplete, needsPhaseChoice])
+  }, [aiContext, currentPrompt, feeling, isComplete, isPhaseDone, needsPhaseChoice])
+
+  useEffect(() => {
+    let isActive = true
+
+    async function loadPhaseZeroQuestion() {
+      if (!needsPhaseZero || phaseZeroStep === 'polarity' || phaseZeroPrompt) return
+
+      setIsLoadingPhaseZeroPrompt(true)
+      const prompt = await getDynamicQuestion({
+        ...aiContext,
+        phase: 0,
+        phaseZeroStep
+      })
+
+      if (isActive) {
+        setPhaseZeroPrompt(prompt)
+        setIsLoadingPhaseZeroPrompt(false)
+      }
+    }
+
+    loadPhaseZeroQuestion()
+
+    return () => {
+      isActive = false
+    }
+  }, [aiContext, needsPhaseZero, phaseZeroPrompt, phaseZeroStep])
+
+  useEffect(() => {
+    if (activeRuleId !== RECONCILIATION_RULE_ID || !isPhaseDone || phase >= 3) return
+
+    setPhase((currentPhase) => currentPhase + 1)
+    setCurrentPrompt(null)
+    setRefreshingAnswerId(null)
+  }, [activeRuleId, isPhaseDone, phase])
 
   useEffect(() => {
     let isActive = true
@@ -363,16 +501,7 @@ export function ManifestationWizard() {
   }, [aiContext, answers, discovery, feeling, history, isComplete, sessionId])
 
   function restart() {
-    setSessionId(createSessionId())
-    setFeeling(null)
-    setAnswers([])
-    setCurrentPrompt(null)
-    setRefreshingAnswerId(null)
-    setDiscoveryText('')
-    setLinks({ needLinks: [], pathLinks: [] })
-    setPhase(1)
-    setPhaseChoices({})
-    savedSessionRef.current = null
+    resetJourney()
   }
 
   function chooseFeeling(nextFeeling) {
@@ -385,7 +514,105 @@ export function ManifestationWizard() {
     setLinks({ needLinks: [], pathLinks: [] })
     setPhase(1)
     setPhaseChoices({})
+    setPhaseZeroPrompt(null)
+    setRefreshingPhaseZeroId(null)
     savedSessionRef.current = null
+  }
+
+  function chooseReconciliationPolarity(polarity) {
+    setReconciliation({ polarity, positiveEmotion: null, negativeEmotion: null })
+    setPhaseZeroPrompt(null)
+    setRefreshingPhaseZeroId(null)
+  }
+
+  function chooseReconciliationEmotion(emotion) {
+    const nextReconciliation = reconciliation.polarity === 'negative' && !reconciliation.negativeEmotion
+      ? {
+          ...reconciliation,
+          negativeEmotion: emotion
+        }
+      : {
+          ...reconciliation,
+          positiveEmotion: emotion
+        }
+
+    setReconciliation(nextReconciliation)
+
+    if (nextReconciliation.positiveEmotion) {
+      chooseFeeling(createFeelingFromEmotion(nextReconciliation))
+    } else {
+      setPhaseZeroPrompt(null)
+      setRefreshingPhaseZeroId(null)
+    }
+  }
+
+  async function refreshPhaseZeroAnswer(answer, answerIndex) {
+    if (!phaseZeroPrompt || refreshingPhaseZeroId) return
+
+    setRefreshingPhaseZeroId(answer.id)
+
+    try {
+      const result = await getReplacementAnswer({
+        ...aiContext,
+        phase: 0,
+        phaseZeroStep,
+        prompt: phaseZeroPrompt,
+        answer,
+        answerIndex
+      })
+
+      if (result.source !== 'ai' || !result.answer) {
+        rotateLocalPhaseZeroAnswer(answerIndex)
+        return
+      }
+
+      setPhaseZeroPrompt((prompt) => prompt
+        ? {
+            ...prompt,
+            debug: result.debug || prompt.debug,
+            source: result.source || prompt.source,
+            answers: prompt.answers.map((currentAnswer, index) => (
+              index === answerIndex
+                ? {
+                    ...result.answer,
+                    id: result.answer.id || `${currentAnswer.id}-refresh-${Date.now()}`
+                  }
+                : currentAnswer
+            ))
+          }
+        : prompt)
+    } catch {
+      rotateLocalPhaseZeroAnswer(answerIndex)
+    } finally {
+      setRefreshingPhaseZeroId(null)
+    }
+  }
+
+  function rotateLocalPhaseZeroAnswer(answerIndex) {
+    const fallbackBank = phaseZeroStep === 'negative-emotion'
+      ? NEGATIVE_EMOTIONS
+      : phaseZeroStep === 'opposite-positive-emotion'
+        ? OPPOSITE_POSITIVE_EMOTIONS[reconciliation.negativeEmotion?.id] || OPPOSITE_POSITIVE_EMOTIONS.agitation
+        : POSITIVE_EMOTIONS
+
+    setPhaseZeroPrompt((prompt) => {
+      if (!prompt) return prompt
+
+      const usedLabels = new Set(prompt.answers.map((answer) => answer.label))
+      const replacement = fallbackBank.find((candidate) => !usedLabels.has(candidate.label)) || fallbackBank[(answerIndex + 1) % fallbackBank.length]
+
+      return {
+        ...prompt,
+        answers: prompt.answers.map((currentAnswer, index) => (
+          index === answerIndex
+            ? {
+                ...replacement,
+                id: `${phaseZeroStep}-${replacement.id}-${Date.now()}`
+              }
+            : currentAnswer
+        ))
+      }
+    })
   }
 
   function chooseAnswer(answer) {
@@ -479,6 +706,9 @@ export function ManifestationWizard() {
       </section>
 
       <WizardMenu
+        rules={WIZARD_RULES}
+        activeRuleId={activeRuleId}
+        onRuleChange={chooseRule}
         aiSettings={aiSettings}
         beingSettings={beingSettings}
         onAiSettingChange={updateAiSetting}
@@ -489,7 +719,19 @@ export function ManifestationWizard() {
       <NeedMap steps={steps} discovery={discovery} links={links} />
 
       <AnimatePresence mode="wait">
-        {!feeling ? (
+        {needsPhaseZero ? (
+          <ReconciliationStep
+            key={`reconciliation-${phaseZeroStep}`}
+            step={phaseZeroStep}
+            prompt={phaseZeroPrompt}
+            isLoading={isLoadingPhaseZeroPrompt}
+            refreshingAnswerId={refreshingPhaseZeroId}
+            onChoosePolarity={chooseReconciliationPolarity}
+            onChooseEmotion={chooseReconciliationEmotion}
+            onRefreshAnswer={refreshPhaseZeroAnswer}
+            onBack={restart}
+          />
+        ) : !feeling ? (
           <FeelingStep key="feeling-step" onChoose={chooseFeeling} />
         ) : needsPhaseChoice ? (
           <PhaseBridge
@@ -564,10 +806,108 @@ function PhaseBridge({ phase, nextPhase, steps, choices, onChoose, onBack }) {
   )
 }
 
-function WizardMenu({ aiSettings, beingSettings, onAiSettingChange, onBeingSettingChange, debugRows }) {
+function ReconciliationStep({
+  step,
+  prompt,
+  isLoading,
+  refreshingAnswerId,
+  onChoosePolarity,
+  onChooseEmotion,
+  onRefreshAnswer,
+  onBack
+}) {
+  const titles = {
+    polarity: 'Choisis la porte d entree emotionnelle.',
+    'positive-emotion': 'Quelle emotion positive n as-tu pas ressentie depuis longtemps ?',
+    'negative-emotion': 'Quelle emotion negative te submerge le plus ?',
+    'opposite-positive-emotion': 'Quelle vibration positive opposee veut etre reanimee ?'
+  }
+  const answers = prompt?.answers || []
+
+  return (
+    <section className="wizard-card" aria-labelledby="reconciliation-title">
+      <p className="eyebrow">Phase 0</p>
+      <h2 id="reconciliation-title">{titles[step]}</h2>
+
+      {step === 'polarity' ? (
+        <div className="wizard-options feeling-grid">
+          <button type="button" className="wizard-option feeling-option" onClick={() => onChoosePolarity('positive')}>
+            <strong>Positif</strong>
+            <small>Retrouver une emotion positive longtemps absente.</small>
+          </button>
+          <button type="button" className="wizard-option feeling-option" onClick={() => onChoosePolarity('negative')}>
+            <strong>Negatif</strong>
+            <small>Partir de l emotion qui submerge pour trouver son oppose positif.</small>
+          </button>
+        </div>
+      ) : isLoading || !prompt ? (
+        <div className="breathing-loader" aria-label="Chargement des options emotionnelles" />
+      ) : (
+        <div className="wizard-options">
+          {answers.map((answer, index) => (
+            <div className="wizard-option-row" key={answer.id}>
+              <button type="button" className="wizard-option" onClick={() => onChooseEmotion(answer)}>
+                <span className="wizard-option-label">{answer.label}</span>
+                {prompt.source === 'ai' ? (
+                  <span className="ai-choice-icon" aria-label="Propose par IA" title="Propose par IA">
+                    AI
+                  </span>
+                ) : null}
+              </button>
+              <button
+                type="button"
+                className="refresh-answer-action"
+                onClick={() => onRefreshAnswer(answer, index)}
+                disabled={Boolean(refreshingAnswerId)}
+                aria-label={`Renouveler l option ${answer.label}`}
+                title="Renouveler avec l'IA"
+              >
+                {refreshingAnswerId === answer.id ? '...' : 'AI+'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button type="button" className="ghost-action" onClick={onBack}>
+        Revenir au depart
+      </button>
+    </section>
+  )
+}
+
+function WizardMenu({
+  rules,
+  activeRuleId,
+  onRuleChange,
+  aiSettings,
+  beingSettings,
+  onAiSettingChange,
+  onBeingSettingChange,
+  debugRows
+}) {
   return (
     <details className="wizard-menu">
       <summary>Menu</summary>
+
+      <details className="ai-submenu">
+        <summary>Regles</summary>
+
+        <div className="rule-options" role="list">
+          {rules.map((rule) => (
+            <button
+              type="button"
+              className={`rule-option${rule.id === activeRuleId ? ' active' : ''}`}
+              key={rule.id}
+              onClick={() => onRuleChange(rule.id)}
+              aria-pressed={rule.id === activeRuleId}
+            >
+              <span>{rule.label}</span>
+              <small>{rule.description}</small>
+            </button>
+          ))}
+        </div>
+      </details>
 
       <details className="ai-submenu">
         <summary>AI</summary>

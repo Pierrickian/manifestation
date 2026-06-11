@@ -81,6 +81,60 @@ export const QUESTION_BANK = {
   ]
 }
 
+export const POSITIVE_EMOTIONS = [
+  { id: 'peace', label: 'Paix', needId: 'red', scores: { red: 3, green: 1 } },
+  { id: 'joy', label: 'Joie simple', needId: 'orange', scores: { orange: 3, yellow: 1 } },
+  { id: 'confidence', label: 'Confiance', needId: 'yellow', scores: { yellow: 3, red: 1 } },
+  { id: 'tenderness', label: 'Tendresse', needId: 'green', scores: { green: 3, blue: 1 } },
+  { id: 'clarity', label: 'Clarte', needId: 'violet', scores: { violet: 3, indigo: 1 } }
+]
+
+export const NEGATIVE_EMOTIONS = [
+  { id: 'agitation', label: 'Agitation', needId: 'red', scores: { red: 2, blue: 1 } },
+  { id: 'anger', label: 'Enervement', needId: 'blue', scores: { blue: 2, yellow: 1 } },
+  { id: 'sadness', label: 'Tristesse lourde', needId: 'green', scores: { green: 2, red: 1 } },
+  { id: 'fear', label: 'Peur', needId: 'red', scores: { red: 3, indigo: 1 } },
+  { id: 'shame', label: 'Honte', needId: 'yellow', scores: { yellow: 3, green: 1 } }
+]
+
+export const OPPOSITE_POSITIVE_EMOTIONS = {
+  agitation: [
+    { id: 'calm', label: 'Calme', needId: 'red', scores: { red: 3, green: 1 } },
+    { id: 'serenity', label: 'Serenite', needId: 'violet', scores: { violet: 2, red: 2 } },
+    { id: 'grounded-peace', label: 'Paix posee', needId: 'red', scores: { red: 3, blue: 1 } },
+    { id: 'inner-silence', label: 'Silence interieur', needId: 'indigo', scores: { indigo: 2, violet: 2 } },
+    { id: 'ease', label: 'Aisance', needId: 'orange', scores: { orange: 2, red: 2 } }
+  ],
+  anger: [
+    { id: 'gentleness', label: 'Douceur', needId: 'green', scores: { green: 3, blue: 1 } },
+    { id: 'respect', label: 'Respect', needId: 'blue', scores: { blue: 3, yellow: 1 } },
+    { id: 'fair-peace', label: 'Paix juste', needId: 'blue', scores: { blue: 2, red: 2 } },
+    { id: 'patience', label: 'Patience', needId: 'red', scores: { red: 2, green: 2 } },
+    { id: 'understanding', label: 'Comprehension', needId: 'violet', scores: { violet: 3, green: 1 } }
+  ],
+  sadness: [
+    { id: 'warmth', label: 'Chaleur', needId: 'green', scores: { green: 3, orange: 1 } },
+    { id: 'hope', label: 'Esperance', needId: 'indigo', scores: { indigo: 3, green: 1 } },
+    { id: 'comfort', label: 'Reconfort', needId: 'green', scores: { green: 3, red: 1 } },
+    { id: 'lightness', label: 'Legerete', needId: 'orange', scores: { orange: 3, yellow: 1 } },
+    { id: 'presence', label: 'Presence', needId: 'green', scores: { green: 2, red: 2 } }
+  ],
+  fear: [
+    { id: 'safety', label: 'Securite', needId: 'red', scores: { red: 3, green: 1 } },
+    { id: 'trust', label: 'Confiance', needId: 'yellow', scores: { yellow: 2, red: 2 } },
+    { id: 'courage', label: 'Courage doux', needId: 'yellow', scores: { yellow: 3, red: 1 } },
+    { id: 'faith', label: 'Foi calme', needId: 'indigo', scores: { indigo: 3, violet: 1 } },
+    { id: 'stability', label: 'Stabilite', needId: 'red', scores: { red: 3, blue: 1 } }
+  ],
+  shame: [
+    { id: 'dignity', label: 'Dignite', needId: 'yellow', scores: { yellow: 3, blue: 1 } },
+    { id: 'innocence', label: 'Innocence retrouvee', needId: 'green', scores: { green: 3, yellow: 1 } },
+    { id: 'self-respect', label: 'Estime de soi', needId: 'yellow', scores: { yellow: 3, red: 1 } },
+    { id: 'acceptance', label: 'Accueil', needId: 'green', scores: { green: 2, violet: 2 } },
+    { id: 'permission', label: 'Permission d exister', needId: 'blue', scores: { blue: 2, yellow: 2 } }
+  ]
+}
+
 export const ANSWER_BANK = {
   violet: ['donner du sens à ce que je traverse', 'comprendre ce qui se répète', 'mettre de l’ordre dans mes pensées'],
   indigo: ['voir une direction possible', 'faire confiance à une intuition', 'imaginer une autre route'],
