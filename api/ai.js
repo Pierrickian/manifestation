@@ -125,6 +125,54 @@ const responseFormats = {
       }
     }
   },
+  narratia_child_choices: {
+    type: 'json_schema',
+    json_schema: {
+      name: 'narratia_child_choices',
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['childChoices'],
+        properties: {
+          childChoices: {
+            type: 'array',
+            minItems: 6,
+            maxItems: 12,
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['id', 'label', 'category'],
+              properties: {
+                id: { type: 'string' },
+                label: { type: 'string' },
+                category: { type: 'string', enum: ['object', 'creature', 'place', 'magic', 'atmosphere'] }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  narratia_story_package: {
+    type: 'json_schema',
+    json_schema: {
+      name: 'narratia_story_package',
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['id', 'title', 'narrators', 'milestones', 'segments', 'endings', 'metadata'],
+        properties: {
+          id: { type: 'string' },
+          title: { type: 'string' },
+          narrators: { type: 'array', items: { type: 'object', additionalProperties: true } },
+          milestones: { type: 'array', minItems: 3, maxItems: 5, items: { type: 'object', additionalProperties: true } },
+          segments: { type: 'array', minItems: 2, maxItems: 4, items: { type: 'object', additionalProperties: true } },
+          endings: { type: 'array', minItems: 3, maxItems: 3, items: { type: 'object', additionalProperties: true } },
+          metadata: { type: 'object', additionalProperties: true }
+        }
+      }
+    }
+  },
   flow: {
     type: 'json_schema',
     json_schema: {
@@ -254,7 +302,9 @@ function validateAiPayload(kind, payload) {
     discovery: (value) => Boolean(value?.text),
     links: (value) => Array.isArray(value?.needLinks) || Array.isArray(value?.pathLinks),
     settings: (value) => Boolean(value?.slider?.id && value.slider.label),
-    flow: (value) => Array.isArray(value?.words)
+    flow: (value) => Array.isArray(value?.words),
+    narratia_child_choices: (value) => Array.isArray(value?.childChoices) && value.childChoices.length >= 6,
+    narratia_story_package: (value) => Boolean(value?.title && Array.isArray(value.milestones) && Array.isArray(value.segments) && Array.isArray(value.endings) && value.endings.length === 3)
   }
 
   const isValid = (validators[kind] || validators.question)(payload)
@@ -274,6 +324,8 @@ function getShapeInstruction(kind) {
   if (kind === 'links') return 'Format attendu: { "needLinks": array, "pathLinks": array }.'
   if (kind === 'settings') return 'Format attendu: { "slider": { "id": string, "label": string, "left": string, "right": string, "value": number } }.'
   if (kind === 'flow') return 'Format attendu: { "words": array, "conclusion": string }.'
+  if (kind === 'narratia_child_choices') return 'Expected format: { "childChoices": [{ "id": string, "label": string, "category": string }] }.'
+  if (kind === 'narratia_story_package') return 'Expected format: { "id": string, "title": string, "narrators": array, "milestones": array, "segments": array, "endings": array, "metadata": object }.'
   return 'Format attendu: un objet JSON de donnees finales, pas un schema.'
 }
 
@@ -302,6 +354,45 @@ function getLocalResult(kind, context) {
         right: 'Traverser',
         value: 50
       }
+    }
+  }
+  if (kind === 'narratia_child_choices') {
+    return {
+      childChoices: [
+        { id: 'mysterious_key', label: 'A mysterious key', category: 'object' },
+        { id: 'sleeping_fox', label: 'A sleeping fox', category: 'creature' },
+        { id: 'glowing_train', label: 'A glowing train', category: 'magic' },
+        { id: 'hidden_cabin', label: 'A hidden cabin', category: 'place' },
+        { id: 'following_cloud', label: 'A rain cloud that follows people', category: 'atmosphere' },
+        { id: 'giant_tree', label: 'A giant tree', category: 'place' }
+      ]
+    }
+  }
+  if (kind === 'narratia_story_package') {
+    return {
+      id: `local-narratia-${Date.now()}`,
+      title: 'The Key Beneath the Tree',
+      narrators: [
+        { id: 'virtual_child_a', displayName: 'Mira', personality: 'Curious and observant.', voiceHint: 'bright and gentle' },
+        { id: 'virtual_child_b', displayName: 'Noe', personality: 'Dreamy and calm.', voiceHint: 'slow and warm' },
+        { id: 'player_child', displayName: 'You', personality: 'The child who chooses the final feeling.', voiceHint: 'open' },
+        { id: 'parent', displayName: 'Grown-up reader', personality: 'Steady and reassuring.', voiceHint: 'calm' }
+      ],
+      milestones: [
+        { id: 1, title: 'The Warm Key', text: 'The child finds a warm key beneath an old tree.', visualHint: 'A key glowing under roots' },
+        { id: 2, title: 'The Sleeping Fox', text: 'A sleeping fox wakes and points toward a hidden cabin.', visualHint: 'A fox beside a lantern path' },
+        { id: 3, title: 'The Three Doors', text: 'Inside the cabin, three gentle doors wait for one choice.', visualHint: 'Three rounded doors' }
+      ],
+      segments: [
+        { id: 'segment_1', from: 1, to: 2, narrator: 'virtual_child_a', narratorDisplayName: 'Mira', text: 'Mira notices that the key hums only when everyone walks kindly. The tree bends one branch toward the path, as if it is proud to help.', mood: 'curious' },
+        { id: 'segment_2', from: 2, to: 3, narrator: 'virtual_child_b', narratorDisplayName: 'Noe', text: 'Noe imagines the fox dreaming the path before it appears. Each pawprint shines softly, and the cabin waits without hurry.', mood: 'dreamy' }
+      ],
+      endings: [
+        { id: 'happy_lantern', title: 'The Happy Lantern', emotion: 'happy', text: 'The chosen door opens to a lantern that remembers every kind step. It lights the way home and leaves a tiny glow for tomorrow.', visualHint: 'A lantern by a bed' },
+        { id: 'quiet_secret', title: 'The Quiet Secret', emotion: 'mysterious', text: 'The door opens to a whisper that says some wonders can wait. The child smiles, knowing the secret will be ready when the next story begins.', visualHint: 'A curtain with starlight' },
+        { id: 'giggle_door', title: 'The Giggle Door', emotion: 'funny', text: 'The door giggles before anyone touches it. Even the fox laughs in its sleep, and the key turns into a biscuit-shaped moon.', visualHint: 'A laughing moon' }
+      ],
+      metadata: { duration: 'short', readingMode: 'mixed_narration', ageRange: 'around 7', createdAt: new Date().toISOString() }
     }
   }
   if (kind === 'flow') {

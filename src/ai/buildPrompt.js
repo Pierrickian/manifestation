@@ -21,6 +21,7 @@ const questionVariationRules = [
 ]
 
 export function buildPrompt(kind, context) {
+  if (kind?.startsWith('narratia_')) return buildNarratiaPrompt(context)
   const needsSummary = NEEDS.map((need) => {
     return `${need.name}: ${need.needs.join(', ')}`
   }).join('\n')
@@ -178,4 +179,18 @@ function getExpectedShape(kind) {
   if (kind === 'settings') return { slider: { id: 'string', label: 'string', left: 'string', right: 'string', value: 'number' } }
   if (kind === 'flow') return { words: [], conclusion: 'string' }
   return { result: 'object' }
+}
+
+
+function buildNarratiaPrompt(context = {}) {
+  return [
+    {
+      role: 'system',
+      content: context.systemPrompt || 'You create safe child-facing structured story JSON.'
+    },
+    {
+      role: 'user',
+      content: JSON.stringify(context.prompt || {}, null, 2)
+    }
+  ]
 }
