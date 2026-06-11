@@ -21,8 +21,10 @@ export const initialNarratiaState = {
   storyPackage: null,
   currentSegmentIndex: 0,
   selectedEndingId: null,
+  loadingEndingId: null,
   revealedSegmentIds: [],
   segmentNarratorChoices: {},
+  loadingSegmentId: null,
   status: 'idle',
   error: ''
 }
@@ -44,8 +46,10 @@ export function saveNarratiaState(state) {
     storyPackage: state.storyPackage,
     currentSegmentIndex: state.currentSegmentIndex,
     selectedEndingId: state.selectedEndingId,
+    loadingEndingId: null,
     revealedSegmentIds: state.revealedSegmentIds || [],
     segmentNarratorChoices: state.segmentNarratorChoices || {},
+    loadingSegmentId: null,
     screen: state.screen
   }
 

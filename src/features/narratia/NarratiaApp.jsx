@@ -3,12 +3,13 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { generateNarratiaChildChoices, generateNarratiaStoryPackage } from './services/narratiaAiService'
 import { clearNarratiaState, defaultParentConfiguration, loadNarratiaState, saveNarratiaState } from './stores/narratiaStore'
 import { ChildWizard } from './screens/ChildWizard'
-import { EndingChoice } from './screens/EndingChoice'
-import { EndingReveal } from './screens/EndingReveal'
 import { NarratiaIntro } from './screens/NarratiaIntro'
 import { NarrationView } from './screens/NarrationView'
 import { ParentWizard } from './screens/ParentWizard'
 import { StoryTimeline } from './screens/StoryTimeline'
+
+const SEGMENT_REVEAL_DELAY = 700
+const ENDING_REVEAL_DELAY = 2000
 
 export function NarratiaApp() {
   const [state, setState] = useState(() => loadNarratiaState())
@@ -30,9 +31,11 @@ export function NarratiaApp() {
       childChoices: [],
       storyPackage: null,
       selectedEndingId: null,
+      loadingEndingId: null,
       currentSegmentIndex: 0,
       revealedSegmentIds: [],
-      segmentNarratorChoices: {}
+      segmentNarratorChoices: {},
+      loadingSegmentId: null
     })
   }
 
@@ -52,34 +55,58 @@ export function NarratiaApp() {
     patchState({
       storyPackage,
       selectedEndingId: null,
+      loadingEndingId: null,
       currentSegmentIndex: 0,
       revealedSegmentIds: [],
       segmentNarratorChoices: {},
+      loadingSegmentId: null,
       screen: 'timeline',
       status: 'idle'
     })
   }
 
+  function revealSegment(segmentId, storyId) {
+    setState((current) => {
+      if (current.storyPackage?.id !== storyId) return current
+
+      const nextRevealed = [...new Set([...(current.revealedSegmentIds || []), segmentId])]
+      const nextIndex = current.storyPackage.segments.findIndex((segment) => !nextRevealed.includes(segment.id))
+
+      return {
+        ...current,
+        revealedSegmentIds: nextRevealed,
+        loadingSegmentId: null,
+        currentSegmentIndex: nextIndex === -1 ? current.storyPackage.segments.length : nextIndex
+      }
+    })
+  }
+
   function chooseSegmentNarrator(segmentId, narratorId) {
+    const storyId = state.storyPackage?.id
+    if (!storyId || state.loadingSegmentId || state.revealedSegmentIds?.includes(segmentId)) return
+
     patchState({
+      loadingSegmentId: segmentId,
       segmentNarratorChoices: {
         ...state.segmentNarratorChoices,
         [segmentId]: narratorId
       }
     })
+
+    window.setTimeout(() => revealSegment(segmentId, storyId), SEGMENT_REVEAL_DELAY)
   }
 
-  function revealSegment(segmentId) {
-    const nextRevealed = [...new Set([...(state.revealedSegmentIds || []), segmentId])]
-    const nextIndex = state.storyPackage?.segments.findIndex((segment) => !nextRevealed.includes(segment.id)) ?? 0
+  function chooseEnding(endingId) {
+    const storyId = state.storyPackage?.id
+    if (!storyId || state.loadingEndingId) return
 
-    patchState({
-      revealedSegmentIds: nextRevealed,
-      currentSegmentIndex: nextIndex === -1 ? state.storyPackage.segments.length : nextIndex
-    })
+    patchState({ loadingEndingId: endingId, selectedEndingId: null })
+    window.setTimeout(() => {
+      setState((current) => current.storyPackage?.id === storyId
+        ? { ...current, loadingEndingId: null, selectedEndingId: endingId, screen: 'narration' }
+        : current)
+    }, ENDING_REVEAL_DELAY)
   }
-
-  const selectedEnding = state.storyPackage?.endings.find((ending) => ending.id === state.selectedEndingId)
 
   let screen = null
   if (state.screen === 'parent') {
@@ -87,26 +114,25 @@ export function NarratiaApp() {
   } else if (state.screen === 'child') {
     screen = <ChildWizard choices={state.childChoices} selection={state.childSelection} onChange={(childSelection) => patchState({ childSelection })} onSubmit={submitChildSelection} isLoading={state.status === 'loading_story'} />
   } else if (state.screen === 'timeline' && state.storyPackage) {
-    screen = <StoryTimeline storyPackage={state.storyPackage} onBegin={() => patchState({ screen: 'narration', currentSegmentIndex: 0 })} onReplayEnding={state.selectedEndingId ? () => patchState({ screen: 'ending-choice' }) : null} />
-  } else if (state.screen === 'narration' && state.storyPackage) {
+    screen = <StoryTimeline storyPackage={state.storyPackage} onBegin={() => patchState({ screen: 'narration', currentSegmentIndex: 0 })} onReplayEnding={state.selectedEndingId ? () => patchState({ screen: 'narration' }) : null} />
+  } else if (state.storyPackage) {
     screen = (
       <NarrationView
         storyPackage={state.storyPackage}
         currentSegmentIndex={state.currentSegmentIndex}
         revealedSegmentIds={state.revealedSegmentIds || []}
         segmentNarratorChoices={state.segmentNarratorChoices || {}}
+        loadingSegmentId={state.loadingSegmentId}
+        selectedEndingId={state.selectedEndingId}
+        loadingEndingId={state.loadingEndingId}
         onChooseNarrator={chooseSegmentNarrator}
-        onRevealSegment={revealSegment}
-        onChooseEnding={() => patchState({ screen: 'ending-choice' })}
+        onChooseEnding={chooseEnding}
         onBackToTimeline={() => patchState({ screen: 'timeline' })}
+        onNewStory={startNewStory}
       />
     )
-  } else if (state.screen === 'ending-choice' && state.storyPackage) {
-    screen = <EndingChoice endings={state.storyPackage.endings} onChoose={(selectedEndingId) => patchState({ selectedEndingId, screen: 'ending-reveal' })} onBackToStory={() => patchState({ screen: 'narration' })} />
-  } else if (state.screen === 'ending-reveal' && selectedEnding) {
-    screen = <EndingReveal ending={selectedEnding} onReplay={() => patchState({ screen: 'timeline', currentSegmentIndex: 0, revealedSegmentIds: [], segmentNarratorChoices: {} })} onAlternate={() => patchState({ screen: 'ending-choice' })} onNewStory={startNewStory} />
   } else {
-    screen = <NarratiaIntro hasStory={Boolean(state.storyPackage)} onStart={startNewStory} onResume={() => patchState({ screen: state.selectedEndingId ? 'ending-reveal' : 'timeline' })} />
+    screen = <NarratiaIntro hasStory={Boolean(state.storyPackage)} onStart={startNewStory} onResume={() => patchState({ screen: 'narration' })} />
   }
 
   return (

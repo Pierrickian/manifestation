@@ -29,13 +29,22 @@ function MilestoneBlock({ milestone, index, isLast }) {
   )
 }
 
-function SegmentBlock({ segment, index, narrators, selectedNarratorId, isRevealed, isCurrent, isLocked, onChooseNarrator, onReveal }) {
+function LoadingLine({ label = 'La carte lumineuse s’ouvre...' }) {
+  return (
+    <div className="narratia-loading-line" role="status" aria-live="polite">
+      <span aria-hidden="true" />
+      <strong>{label}</strong>
+    </div>
+  )
+}
+
+function SegmentBlock({ segment, narrators, selectedNarratorId, isRevealed, isCurrent, isLocked, isLoading, onChooseNarrator }) {
   const possibleNarrators = narrators.filter((narrator) => VIRTUAL_CHILD_IDS.includes(narrator.id))
   const selectedNarrator = narrators.find((narrator) => narrator.id === selectedNarratorId) || narrators.find((narrator) => narrator.id === segment.narrator)
   const tone = getNarratorTone(selectedNarrator?.id)
 
   return (
-    <li className={`narratia-path-item narratia-path-item--segment is-${tone}${isCurrent ? ' is-current' : ''}${isRevealed ? ' is-revealed' : ''}`}>
+    <li className={`narratia-path-item narratia-path-item--segment is-${tone}${isCurrent ? ' is-current' : ''}${isRevealed ? ' is-revealed' : ''}${isLoading ? ' is-loading' : ''}`}>
       <span className={`narratia-path-dot narratia-path-dot--${tone}`} aria-hidden="true" />
       <article className="narratia-reveal-card">
         <small>Entre le moment {segment.from} et le moment {segment.to}</small>
@@ -44,10 +53,12 @@ function SegmentBlock({ segment, index, narrators, selectedNarratorId, isReveale
             <strong>Ce passage attend son tour.</strong>
             <p>Révèle d’abord la carte lumineuse précédente.</p>
           </div>
+        ) : isLoading ? (
+          <LoadingLine label="Le passage se prépare..." />
         ) : !selectedNarratorId ? (
           <div className="narratia-next-choice">
             <strong>Qui raconte ce passage ?</strong>
-            <p>Choisis Mira ou Noé, puis touche la carte pour révéler la narration.</p>
+            <p>Choisis Mira ou Noé. Le texte apparaîtra juste après un court scintillement.</p>
             <div className="narratia-narrator-choice-grid">
               {possibleNarrators.map((narrator) => (
                 <button className={`narratia-narrator-choice is-${getNarratorTone(narrator.id)}`} type="button" key={narrator.id} onClick={() => onChooseNarrator(segment.id, narrator.id)}>
@@ -58,11 +69,6 @@ function SegmentBlock({ segment, index, narrators, selectedNarratorId, isReveale
               ))}
             </div>
           </div>
-        ) : !isRevealed ? (
-          <button className={`narratia-reveal-button is-${tone}`} type="button" onClick={() => onReveal(segment.id)}>
-            <NarratorBadge narrator={selectedNarrator} tone={tone} />
-            <span>Toucher pour révéler ce que {selectedNarrator.displayName} raconte.</span>
-          </button>
         ) : (
           <div className="narratia-revealed-text">
             <NarratorBadge narrator={selectedNarrator} tone={tone} />
@@ -74,34 +80,58 @@ function SegmentBlock({ segment, index, narrators, selectedNarratorId, isReveale
   )
 }
 
-function EndingGate({ isReady, onContinue }) {
+function EndingGate({ endings, selectedEndingId, loadingEndingId, isReady, onChooseEnding, onNewStory }) {
+  const selectedEnding = endings.find((ending) => ending.id === selectedEndingId)
+
   return (
-    <li className={`narratia-path-item narratia-path-item--ending${isReady ? ' is-ready' : ''}`}>
+    <li className={`narratia-path-item narratia-path-item--ending${isReady ? ' is-ready' : ''}${selectedEnding ? ' is-revealed' : ''}`}>
       <span className="narratia-path-dot narratia-path-dot--ending" aria-hidden="true" />
       <article className="narratia-reveal-card narratia-ending-gate">
         <small>Dernier espace</small>
-        <strong>Le choix de la fin attend ici.</strong>
-        <p>Quand tous les passages sont révélés, l’enfant choisit une fin parmi trois chemins possibles.</p>
-        <button className="primary-action" type="button" onClick={onContinue} disabled={!isReady}>Choisir la fin</button>
+        <strong>Quelle fin doit s’ouvrir ?</strong>
+        <p>Les trois fins restent dans la même histoire. Choisis un titre pour révéler son texte ici.</p>
+        <div className="narratia-ending-button-grid">
+          {endings.map((ending) => (
+            <button
+              className={`narratia-ending-choice-button${selectedEndingId === ending.id ? ' is-active' : ''}`}
+              type="button"
+              key={ending.id}
+              onClick={() => onChooseEnding(ending.id)}
+              disabled={!isReady || Boolean(loadingEndingId)}
+            >
+              <strong>{ending.title}</strong>
+              <small>{ending.emotion}</small>
+            </button>
+          ))}
+        </div>
+        {loadingEndingId ? <LoadingLine label="La fin s’illumine..." /> : null}
+        {selectedEnding ? (
+          <div className="narratia-ending-text">
+            <strong>{selectedEnding.title}</strong>
+            <p>{selectedEnding.text}</p>
+            <button className="ghost-action" type="button" onClick={onNewStory}>Créer une nouvelle histoire</button>
+          </div>
+        ) : null}
       </article>
     </li>
   )
 }
 
-export function NarrationView({ storyPackage, currentSegmentIndex, revealedSegmentIds, segmentNarratorChoices, onChooseNarrator, onRevealSegment, onChooseEnding, onBackToTimeline }) {
+export function NarrationView({ storyPackage, currentSegmentIndex, revealedSegmentIds, segmentNarratorChoices, loadingSegmentId, selectedEndingId, loadingEndingId, onChooseNarrator, onChooseEnding, onBackToTimeline, onNewStory }) {
   const revealedSet = new Set(revealedSegmentIds)
   const allRevealed = storyPackage.segments.every((segment) => revealedSet.has(segment.id))
   const activeIndex = storyPackage.segments.findIndex((segment) => !revealedSet.has(segment.id))
   const currentIndex = activeIndex === -1 ? storyPackage.segments.length : activeIndex
+  const endingProgress = selectedEndingId ? 1 : 0
 
   return (
     <NarratiaLayout
       eyebrow="Fil lumineux"
       title="Les moments promis se relient"
-      intro="Lis un moment, choisis quel enfant raconte l’espace suivant, puis révèle le texte en touchant la carte."
+      intro="Lis un moment, choisis quel enfant raconte l’espace suivant, puis continue jusqu’à la fin sans quitter cette page."
       footer={<button className="ghost-action" type="button" onClick={onBackToTimeline}>Revoir seulement les moments promis</button>}
     >
-      <ol className="narratia-story-path" style={{ '--path-progress': `${Math.min(100, ((currentIndex + 1) / (storyPackage.segments.length + 1)) * 100)}%` }}>
+      <ol className="narratia-story-path" style={{ '--path-progress': `${Math.min(100, ((currentIndex + 1 + endingProgress) / (storyPackage.segments.length + 2)) * 100)}%` }}>
         {storyPackage.milestones.map((milestone, index) => {
           const segment = storyPackage.segments[index]
           return (
@@ -110,20 +140,26 @@ export function NarrationView({ storyPackage, currentSegmentIndex, revealedSegme
               {segment ? (
                 <SegmentBlock
                   segment={segment}
-                  index={index}
                   narrators={storyPackage.narrators}
                   selectedNarratorId={segmentNarratorChoices[segment.id]}
                   isRevealed={revealedSet.has(segment.id)}
                   isCurrent={index === currentSegmentIndex}
                   isLocked={index > currentSegmentIndex}
+                  isLoading={loadingSegmentId === segment.id}
                   onChooseNarrator={onChooseNarrator}
-                  onReveal={onRevealSegment}
                 />
               ) : null}
             </Fragment>
           )
         })}
-        <EndingGate isReady={allRevealed} onContinue={onChooseEnding} />
+        <EndingGate
+          endings={storyPackage.endings}
+          selectedEndingId={selectedEndingId}
+          loadingEndingId={loadingEndingId}
+          isReady={allRevealed}
+          onChooseEnding={onChooseEnding}
+          onNewStory={onNewStory}
+        />
       </ol>
     </NarratiaLayout>
   )
