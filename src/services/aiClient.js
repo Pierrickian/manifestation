@@ -47,18 +47,29 @@ const FLOW_WORDS_BY_NEED = {
   red: ['base', 'sol', 'rythme', 'corps', 'securite', 'pas', 'ancrage', 'force']
 }
 
+const AI_ENDPOINT = '/api/ai'
+
 async function requestAI(kind, context) {
-  const response = await fetch('/api/ai', {
+  const response = await fetch(AI_ENDPOINT, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json'
+    },
     body: JSON.stringify({ kind, context })
   })
 
+  const responseText = await response.text()
+
   if (!response.ok) {
-    throw new Error(`AI request failed: ${response.status}`)
+    throw new Error(`AI request failed: ${response.status} ${responseText.slice(0, 120)}`.trim())
   }
 
-  return response.json()
+  try {
+    return JSON.parse(responseText)
+  } catch {
+    throw new Error(`AI response was not JSON: ${responseText.slice(0, 120) || 'empty response'}`)
+  }
 }
 
 function localSliderSuggestion(context = {}) {
