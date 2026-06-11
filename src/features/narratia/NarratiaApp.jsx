@@ -30,7 +30,9 @@ export function NarratiaApp() {
       childChoices: [],
       storyPackage: null,
       selectedEndingId: null,
-      currentSegmentIndex: 0
+      currentSegmentIndex: 0,
+      revealedSegmentIds: [],
+      segmentNarratorChoices: {}
     })
   }
 
@@ -47,16 +49,34 @@ export function NarratiaApp() {
       childSelection: state.childSelection,
       childChoices: state.childChoices
     })
-    patchState({ storyPackage, selectedEndingId: null, currentSegmentIndex: 0, screen: 'timeline', status: 'idle' })
+    patchState({
+      storyPackage,
+      selectedEndingId: null,
+      currentSegmentIndex: 0,
+      revealedSegmentIds: [],
+      segmentNarratorChoices: {},
+      screen: 'timeline',
+      status: 'idle'
+    })
   }
 
-  function continueNarration() {
-    if (state.currentSegmentIndex >= state.storyPackage.segments.length - 1) {
-      patchState({ screen: 'ending-choice' })
-      return
-    }
+  function chooseSegmentNarrator(segmentId, narratorId) {
+    patchState({
+      segmentNarratorChoices: {
+        ...state.segmentNarratorChoices,
+        [segmentId]: narratorId
+      }
+    })
+  }
 
-    patchState({ currentSegmentIndex: state.currentSegmentIndex + 1 })
+  function revealSegment(segmentId) {
+    const nextRevealed = [...new Set([...(state.revealedSegmentIds || []), segmentId])]
+    const nextIndex = state.storyPackage?.segments.findIndex((segment) => !nextRevealed.includes(segment.id)) ?? 0
+
+    patchState({
+      revealedSegmentIds: nextRevealed,
+      currentSegmentIndex: nextIndex === -1 ? state.storyPackage.segments.length : nextIndex
+    })
   }
 
   const selectedEnding = state.storyPackage?.endings.find((ending) => ending.id === state.selectedEndingId)
@@ -69,11 +89,22 @@ export function NarratiaApp() {
   } else if (state.screen === 'timeline' && state.storyPackage) {
     screen = <StoryTimeline storyPackage={state.storyPackage} onBegin={() => patchState({ screen: 'narration', currentSegmentIndex: 0 })} onReplayEnding={state.selectedEndingId ? () => patchState({ screen: 'ending-choice' }) : null} />
   } else if (state.screen === 'narration' && state.storyPackage) {
-    screen = <NarrationView storyPackage={state.storyPackage} segmentIndex={state.currentSegmentIndex} onNext={continueNarration} onBackToTimeline={() => patchState({ screen: 'timeline' })} />
+    screen = (
+      <NarrationView
+        storyPackage={state.storyPackage}
+        currentSegmentIndex={state.currentSegmentIndex}
+        revealedSegmentIds={state.revealedSegmentIds || []}
+        segmentNarratorChoices={state.segmentNarratorChoices || {}}
+        onChooseNarrator={chooseSegmentNarrator}
+        onRevealSegment={revealSegment}
+        onChooseEnding={() => patchState({ screen: 'ending-choice' })}
+        onBackToTimeline={() => patchState({ screen: 'timeline' })}
+      />
+    )
   } else if (state.screen === 'ending-choice' && state.storyPackage) {
-    screen = <EndingChoice endings={state.storyPackage.endings} onChoose={(selectedEndingId) => patchState({ selectedEndingId, screen: 'ending-reveal' })} />
+    screen = <EndingChoice endings={state.storyPackage.endings} onChoose={(selectedEndingId) => patchState({ selectedEndingId, screen: 'ending-reveal' })} onBackToStory={() => patchState({ screen: 'narration' })} />
   } else if (state.screen === 'ending-reveal' && selectedEnding) {
-    screen = <EndingReveal ending={selectedEnding} onReplay={() => patchState({ screen: 'timeline', currentSegmentIndex: 0 })} onAlternate={() => patchState({ screen: 'ending-choice' })} onNewStory={startNewStory} />
+    screen = <EndingReveal ending={selectedEnding} onReplay={() => patchState({ screen: 'timeline', currentSegmentIndex: 0, revealedSegmentIds: [], segmentNarratorChoices: {} })} onAlternate={() => patchState({ screen: 'ending-choice' })} onNewStory={startNewStory} />
   } else {
     screen = <NarratiaIntro hasStory={Boolean(state.storyPackage)} onStart={startNewStory} onResume={() => patchState({ screen: state.selectedEndingId ? 'ending-reveal' : 'timeline' })} />
   }

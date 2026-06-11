@@ -4,13 +4,13 @@ import { NarratiaLayout } from '../components/NarratiaLayout'
 export function StoryTimeline({ storyPackage, onBegin, onReplayEnding }) {
   return (
     <NarratiaLayout
-      eyebrow="Promised moments"
+      eyebrow="Moments promis"
       title={storyPackage.title}
-      intro="These moments will happen. The story lives in how everyone travels between them."
+      intro="Ces moments vont arriver. La surprise se cache dans le chemin qui les relie."
       footer={(
         <div className="flow-actions">
-          <button className="primary-action" type="button" onClick={onBegin}>Begin narration</button>
-          {onReplayEnding ? <button className="ghost-action" type="button" onClick={onReplayEnding}>Choose an ending again</button> : null}
+          <button className="primary-action" type="button" onClick={onBegin}>Entrer dans le fil lumineux</button>
+          {onReplayEnding ? <button className="ghost-action" type="button" onClick={onReplayEnding}>Choisir une autre fin</button> : null}
         </div>
       )}
     >

@@ -2,37 +2,57 @@ import { ChoiceCard } from '../components/ChoiceCard'
 import { NarratiaLayout } from '../components/NarratiaLayout'
 
 const DURATIONS = [
-  ['short', 'Short', 'A small bedtime-sized journey.'],
-  ['medium', 'Medium', 'A fuller story with room to wander.'],
-  ['long', 'Long', 'A slower ritual for an unhurried moment.']
+  ['short', 'Courte', 'Une petite aventure pour le soir.'],
+  ['medium', 'Moyenne', 'Une histoire plus ample avec le temps de rêver.'],
+  ['long', 'Longue', 'Un rituel plus lent pour un moment sans hâte.']
 ]
 
-const TONES = ['funny', 'mysterious', 'reassuring', 'adventurous', 'poetic', 'calm']
-const THEMES = ['courage', 'friendship', 'fear', 'discovery', 'forgiveness', 'growing_up', 'secrets', 'helping_others', 'imagination', 'nature']
+const TONES = [
+  ['funny', 'Drôle'],
+  ['mysterious', 'Mystérieux'],
+  ['reassuring', 'Rassurant'],
+  ['adventurous', 'Aventureux'],
+  ['poetic', 'Poétique'],
+  ['calm', 'Calme']
+]
+const THEMES = [
+  ['courage', 'Courage'],
+  ['friendship', 'Amitié'],
+  ['fear', 'Peur'],
+  ['discovery', 'Découverte'],
+  ['forgiveness', 'Pardon'],
+  ['growing_up', 'Grandir'],
+  ['secrets', 'Secrets'],
+  ['helping_others', 'Aider les autres'],
+  ['imagination', 'Imagination'],
+  ['nature', 'Nature']
+]
 const INTENSITIES = [
-  ['very_soft', 'Very soft', 'Gentle wonder with strong reassurance.'],
-  ['balanced', 'Balanced', 'A little mystery with steady safety.'],
-  ['intense_imagination', 'Intense imagination', 'More vivid images without unsafe fear.']
+  ['very_soft', 'Très douce', 'Une merveille calme et très rassurante.'],
+  ['balanced', 'Équilibrée', 'Un peu de mystère avec une sécurité claire.'],
+  ['intense_imagination', 'Imagination intense', 'Des images plus vives, sans peur dangereuse.']
 ]
-const ENDINGS = ['happy', 'surprising', 'emotional', 'open_mystery', 'funny']
+const ENDINGS = [
+  ['happy', 'Heureuse'],
+  ['surprising', 'Surprenante'],
+  ['emotional', 'Émouvante'],
+  ['open_mystery', 'Mystère ouvert'],
+  ['funny', 'Drôle']
+]
 const MODES = [
-  ['parent_reads', 'Parent reads everything', 'One steady voice carries the story.'],
-  ['mixed_narration', 'Mixed narration', 'Parent, child, and companions share turns.'],
-  ['ai_children_narrate', 'AI children narrate parts', 'Mira and Noe carry more of the middle.']
+  ['parent_reads', 'L’adulte lit tout', 'Une voix stable porte toute l’histoire.'],
+  ['mixed_narration', 'Narration partagée', 'Adulte, enfant et compagnons se relaient.'],
+  ['ai_children_narrate', 'Les enfants virtuels racontent', 'Mira et Noé portent davantage le milieu.']
 ]
-
-function labelize(value) {
-  return value.replace(/_/g, ' ').replace(/^\w/, (letter) => letter.toUpperCase())
-}
 
 function ToggleGroup({ title, values, selected, onToggle }) {
   return (
     <div className="narratia-fieldset">
       <strong>{title}</strong>
       <div className="narratia-chip-grid">
-        {values.map((value) => (
+        {values.map(([value, label]) => (
           <button className={selected.includes(value) ? 'is-active' : ''} type="button" key={value} onClick={() => onToggle(value)}>
-            {labelize(value)}
+            {label}
           </button>
         ))}
       </div>
@@ -53,28 +73,28 @@ export function ParentWizard({ configuration, onChange, onSubmit, isLoading }) {
 
   return (
     <NarratiaLayout
-      eyebrow="Grown-up setup"
-      title="Choose the story weather"
-      intro="These settings stay with the grown-up. The child will only see playful story ingredients."
-      footer={<button className="primary-action" type="button" onClick={onSubmit} disabled={isLoading}>{isLoading ? 'Preparing choices...' : 'Invite the child'}</button>}
+      eyebrow="Réglage adulte"
+      title="Choisir la météo de l’histoire"
+      intro="Ces choix restent du côté adulte. L’enfant verra seulement des ingrédients de conte, simples et joueurs."
+      footer={<button className="primary-action" type="button" onClick={onSubmit} disabled={isLoading}>{isLoading ? 'Préparation des choix...' : 'Inviter l’enfant'}</button>}
     >
       <div className="narratia-fieldset">
-        <strong>Story duration</strong>
+        <strong>Durée de l’histoire</strong>
         <div className="narratia-card-grid">
           {DURATIONS.map(([id, title, description]) => <ChoiceCard key={id} title={title} description={description} active={configuration.duration === id} onClick={() => setSingle('duration', id)} />)}
         </div>
       </div>
-      <ToggleGroup title="Emotional tone" values={TONES} selected={configuration.emotionalTones} onToggle={(value) => toggleList('emotionalTones', value)} />
-      <ToggleGroup title="Themes" values={THEMES} selected={configuration.themes} onToggle={(value) => toggleList('themes', value)} />
+      <ToggleGroup title="Ton émotionnel" values={TONES} selected={configuration.emotionalTones} onToggle={(value) => toggleList('emotionalTones', value)} />
+      <ToggleGroup title="Thèmes" values={THEMES} selected={configuration.themes} onToggle={(value) => toggleList('themes', value)} />
       <div className="narratia-fieldset">
-        <strong>Intensity</strong>
+        <strong>Intensité</strong>
         <div className="narratia-card-grid">
           {INTENSITIES.map(([id, title, description]) => <ChoiceCard key={id} title={title} description={description} active={configuration.intensity === id} onClick={() => setSingle('intensity', id)} />)}
         </div>
       </div>
-      <ToggleGroup title="Ending styles allowed" values={ENDINGS} selected={configuration.allowedEndingStyles} onToggle={(value) => toggleList('allowedEndingStyles', value)} />
+      <ToggleGroup title="Styles de fin autorisés" values={ENDINGS} selected={configuration.allowedEndingStyles} onToggle={(value) => toggleList('allowedEndingStyles', value)} />
       <div className="narratia-fieldset">
-        <strong>Reading mode</strong>
+        <strong>Mode de lecture</strong>
         <div className="narratia-card-grid">
           {MODES.map(([id, title, description]) => <ChoiceCard key={id} title={title} description={description} active={configuration.readingMode === id} onClick={() => setSingle('readingMode', id)} />)}
         </div>

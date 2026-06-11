@@ -1038,3 +1038,207 @@ p {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.narratia-story-path {
+  --path-progress: 0%;
+  position: relative;
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 4px 0 4px;
+  list-style: none;
+}
+
+.narratia-story-path::before,
+.narratia-story-path::after {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: 18px;
+  width: 3px;
+  border-radius: 999px;
+}
+
+.narratia-story-path::before {
+  bottom: 24px;
+  background: rgba(255, 250, 244, 0.14);
+}
+
+.narratia-story-path::after {
+  height: var(--path-progress);
+  max-height: calc(100% - 42px);
+  background: linear-gradient(180deg, #fff2ad 0%, #ff9f4f 48%, #ff6f6f 100%);
+  box-shadow: 0 0 18px rgba(255, 177, 95, 0.5);
+  transition: height 0.28s ease;
+}
+
+.narratia-path-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 12px;
+  padding-bottom: 16px;
+}
+
+.narratia-path-item:last-child {
+  padding-bottom: 0;
+}
+
+.narratia-path-dot {
+  position: relative;
+  z-index: 2;
+  width: 31px;
+  height: 31px;
+  margin-top: 14px;
+  border: 2px solid rgba(255, 250, 244, 0.64);
+  border-radius: 999px;
+  background: #fff2ad;
+  box-shadow: 0 0 24px rgba(255, 242, 173, 0.62);
+}
+
+.narratia-path-dot--boy {
+  background: #ffad5f;
+  border-color: rgba(255, 210, 156, 0.9);
+  box-shadow: 0 0 24px rgba(255, 151, 72, 0.72);
+}
+
+.narratia-path-dot--girl {
+  background: #ff6f6f;
+  border-color: rgba(255, 184, 184, 0.9);
+  box-shadow: 0 0 24px rgba(255, 90, 99, 0.72);
+}
+
+.narratia-path-dot--ending {
+  background: linear-gradient(135deg, #fff2ad, #a9b9ff);
+  box-shadow: 0 0 26px rgba(169, 185, 255, 0.62);
+}
+
+.narratia-milestone-card,
+.narratia-reveal-card {
+  min-height: 116px;
+  border: 1px solid rgba(255, 250, 244, 0.13);
+  border-radius: 24px;
+  padding: 16px;
+  background: rgba(255, 250, 244, 0.075);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.narratia-milestone-card {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(255, 242, 173, 0.2), transparent 28%),
+    rgba(255, 250, 244, 0.08);
+}
+
+.narratia-milestone-card small,
+.narratia-reveal-card small {
+  display: block;
+  margin-bottom: 7px;
+  color: rgba(255, 250, 244, 0.58);
+  font-size: 0.74rem;
+  font-weight: 880;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.narratia-milestone-card strong,
+.narratia-reveal-card strong {
+  display: block;
+  color: #fffaf4;
+  line-height: 1.15;
+}
+
+.narratia-milestone-card p,
+.narratia-reveal-card p {
+  margin: 8px 0 0;
+}
+
+.narratia-path-item--segment .narratia-reveal-card {
+  border-style: dashed;
+}
+
+.narratia-path-item--segment.is-boy .narratia-reveal-card,
+.narratia-narrator-choice.is-boy,
+.narratia-reveal-button.is-boy {
+  border-color: rgba(255, 173, 95, 0.48);
+  background: rgba(255, 173, 95, 0.1);
+}
+
+.narratia-path-item--segment.is-girl .narratia-reveal-card,
+.narratia-narrator-choice.is-girl,
+.narratia-reveal-button.is-girl {
+  border-color: rgba(255, 111, 111, 0.48);
+  background: rgba(255, 111, 111, 0.1);
+}
+
+.narratia-narrator-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.narratia-narrator-choice,
+.narratia-reveal-button {
+  width: 100%;
+  border: 1px solid rgba(255, 250, 244, 0.14);
+  border-radius: 20px;
+  padding: 13px;
+  color: #fffaf4;
+  text-align: left;
+  cursor: pointer;
+}
+
+.narratia-narrator-choice span {
+  display: block;
+  width: 28px;
+  height: 28px;
+  margin-bottom: 8px;
+  border-radius: 999px;
+}
+
+.narratia-narrator-choice.is-boy span,
+.narratia-narrator.is-boy > span {
+  background: #ffad5f;
+  box-shadow: 0 0 20px rgba(255, 151, 72, 0.62);
+}
+
+.narratia-narrator-choice.is-girl span,
+.narratia-narrator.is-girl > span {
+  background: #ff6f6f;
+  box-shadow: 0 0 20px rgba(255, 90, 99, 0.62);
+}
+
+.narratia-narrator-choice small {
+  display: block;
+  margin-top: 3px;
+  color: rgba(255, 250, 244, 0.62);
+}
+
+.narratia-next-choice--locked {
+  opacity: 0.62;
+}
+
+.narratia-reveal-button {
+  display: grid;
+  gap: 12px;
+}
+
+.narratia-reveal-button > span {
+  color: rgba(255, 250, 244, 0.78);
+  font-weight: 820;
+}
+
+.narratia-revealed-text {
+  display: grid;
+  gap: 12px;
+}
+
+.narratia-ending-gate .primary-action {
+  margin-top: 14px;
+}
+
+.narratia-ending-gate .primary-action:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.4);
+  opacity: 0.52;
+}

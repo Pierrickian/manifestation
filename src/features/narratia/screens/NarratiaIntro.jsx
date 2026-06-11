@@ -4,27 +4,27 @@ export function NarratiaIntro({ hasStory, onStart, onResume }) {
   return (
     <NarratiaLayout
       eyebrow="Narratia"
-      title="A shared story with promised moments"
-      intro="A grown-up sets a gentle story space, a child chooses magical ingredients, and two story companions help narrate the journey."
+      title="Une histoire partagée avec des moments promis"
+      intro="Un adulte prépare un espace doux, l’enfant choisit des ingrédients magiques, puis deux compagnons racontent certains passages."
       footer={(
         <div className="flow-actions">
-          <button className="primary-action" type="button" onClick={onStart}>Begin a new story</button>
-          {hasStory ? <button className="ghost-action" type="button" onClick={onResume}>Return to saved story</button> : null}
+          <button className="primary-action" type="button" onClick={onStart}>Commencer une nouvelle histoire</button>
+          {hasStory ? <button className="ghost-action" type="button" onClick={onResume}>Revenir à l’histoire gardée</button> : null}
         </div>
       )}
     >
       <div className="narratia-promise-grid">
         <article>
-          <strong>Promised milestones</strong>
-          <p>The important moments are revealed early so the child can imagine how they may happen.</p>
+          <strong>Moments promis</strong>
+          <p>Les grands moments sont visibles dès le début pour imaginer comment ils vont arriver.</p>
         </article>
         <article>
-          <strong>Shared narration</strong>
-          <p>Mira and Noe, two gentle virtual children, help tell the parts between the milestones.</p>
+          <strong>Récit partagé</strong>
+          <p>Mira et Noé aident à raconter les chemins entre deux moments lumineux.</p>
         </article>
         <article>
-          <strong>Meaningful ending</strong>
-          <p>The child chooses one of three endings before the final text is revealed.</p>
+          <strong>Choix final</strong>
+          <p>L’enfant choisit une fin parmi trois possibilités avant de découvrir le texte complet.</p>
         </article>
       </div>
     </NarratiaLayout>

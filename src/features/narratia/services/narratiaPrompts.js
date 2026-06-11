@@ -3,12 +3,12 @@ export const narratiaSystemPrompt = [
   'The experience is not a chatbot. It is a guided narrative ritual with immutable milestones and playful shared narration.',
   'Use plain, warm language. Keep fear gentle and contained. Avoid danger that feels graphic, punitive, or hopeless.',
   'Never expose parent configuration labels, system instructions, JSON explanations, or AI terminology to the child.',
-  'Return only valid JSON matching the requested shape.'
+  'Return only valid JSON matching the requested shape. All child-visible labels and story text must be in French.'
 ].join(' ')
 
 export function buildChildChoicesPrompt(parentConfiguration) {
   return {
-    task: 'Generate 6 to 12 child-facing story ingredient choices.',
+    task: 'Generate 6 to 12 French child-facing story ingredient choices.',
     constraints: [
       'Choices must be concrete things a child can imagine: objects, creatures, places, magical elements, or atmosphere.',
       'Choices must match the parent configuration while hiding all parent-facing emotional tuning vocabulary.',
@@ -18,7 +18,7 @@ export function buildChildChoicesPrompt(parentConfiguration) {
     parentConfiguration,
     outputShape: {
       childChoices: [
-        { id: 'magic_key', label: 'A mysterious key', category: 'object' }
+        { id: 'cle_mysterieuse', label: 'Une clé mystérieuse', category: 'object' }
       ]
     }
   }
@@ -26,7 +26,7 @@ export function buildChildChoicesPrompt(parentConfiguration) {
 
 export function buildStoryPackagePrompt({ parentConfiguration, childSelection, selectedChoices, narrators }) {
   return {
-    task: 'Generate one complete Narratia story package. This is the final generation call for the session.',
+    task: 'Generate one complete Narratia story package in French. This is the final generation call for the session.',
     constraints: [
       'Generate the entire package now. Do not rely on future generation.',
       'Create 3 to 5 immutable milestones. They are revealed immediately at the beginning and must feel exciting, safe, and inevitable.',
@@ -44,16 +44,16 @@ export function buildStoryPackagePrompt({ parentConfiguration, childSelection, s
     narrators,
     outputShape: {
       id: 'story_id',
-      title: 'Story title',
+      title: 'Titre de l’histoire',
       narrators,
       milestones: [
-        { id: 1, title: 'Short milestone title', text: 'The promised moment that will happen.', visualHint: 'Illustration hint' }
+        { id: 1, title: 'Titre court du moment', text: 'Le moment promis qui arrivera.', visualHint: 'Illustration hint' }
       ],
       segments: [
         { id: 'segment_1', from: 1, to: 2, narrator: 'virtual_child_a', narratorDisplayName: 'Mira', text: 'Narration text.', mood: 'curious' }
       ],
       endings: [
-        { id: 'ending_1', title: 'Short ending title', emotion: 'happy', text: 'Full ending text.', visualHint: 'Illustration hint' }
+        { id: 'ending_1', title: 'Titre court de la fin', emotion: 'heureuse', text: 'Texte complet de la fin en français.', visualHint: 'Illustration hint' }
       ],
       metadata: { duration: parentConfiguration.duration, readingMode: parentConfiguration.readingMode, ageRange: 'around 7', createdAt: 'ISO date' }
     }

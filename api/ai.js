@@ -359,40 +359,40 @@ function getLocalResult(kind, context) {
   if (kind === 'narratia_child_choices') {
     return {
       childChoices: [
-        { id: 'mysterious_key', label: 'A mysterious key', category: 'object' },
-        { id: 'sleeping_fox', label: 'A sleeping fox', category: 'creature' },
-        { id: 'glowing_train', label: 'A glowing train', category: 'magic' },
-        { id: 'hidden_cabin', label: 'A hidden cabin', category: 'place' },
-        { id: 'following_cloud', label: 'A rain cloud that follows people', category: 'atmosphere' },
-        { id: 'giant_tree', label: 'A giant tree', category: 'place' }
+        { id: 'cle_mysterieuse', label: 'Une clé mystérieuse', category: 'object' },
+        { id: 'renard_endormi', label: 'Un renard endormi', category: 'creature' },
+        { id: 'train_lumineux', label: 'Un train lumineux', category: 'magic' },
+        { id: 'cabane_cachee', label: 'Une cabane cachée', category: 'place' },
+        { id: 'nuage_suiveur', label: 'Un nuage de pluie qui suit les gens', category: 'atmosphere' },
+        { id: 'arbre_geant', label: 'Un arbre géant', category: 'place' }
       ]
     }
   }
   if (kind === 'narratia_story_package') {
     return {
       id: `local-narratia-${Date.now()}`,
-      title: 'The Key Beneath the Tree',
+      title: 'La clé sous l’arbre',
       narrators: [
-        { id: 'virtual_child_a', displayName: 'Mira', personality: 'Curious and observant.', voiceHint: 'bright and gentle' },
-        { id: 'virtual_child_b', displayName: 'Noe', personality: 'Dreamy and calm.', voiceHint: 'slow and warm' },
-        { id: 'player_child', displayName: 'You', personality: 'The child who chooses the final feeling.', voiceHint: 'open' },
-        { id: 'parent', displayName: 'Grown-up reader', personality: 'Steady and reassuring.', voiceHint: 'calm' }
+        { id: 'virtual_child_a', displayName: 'Mira', personality: 'Curieuse et attentive.', voiceHint: 'douce et vive' },
+        { id: 'virtual_child_b', displayName: 'Noé', personality: 'Rêveur et calme.', voiceHint: 'lent et chaleureux' },
+        { id: 'player_child', displayName: 'Toi', personality: 'L’enfant qui choisit la couleur de la fin.', voiceHint: 'ouvert' },
+        { id: 'parent', displayName: 'Lecteur adulte', personality: 'Stable et rassurant.', voiceHint: 'calme' }
       ],
       milestones: [
-        { id: 1, title: 'The Warm Key', text: 'The child finds a warm key beneath an old tree.', visualHint: 'A key glowing under roots' },
-        { id: 2, title: 'The Sleeping Fox', text: 'A sleeping fox wakes and points toward a hidden cabin.', visualHint: 'A fox beside a lantern path' },
-        { id: 3, title: 'The Three Doors', text: 'Inside the cabin, three gentle doors wait for one choice.', visualHint: 'Three rounded doors' }
+        { id: 1, title: 'La clé tiède', text: 'L’enfant trouve une clé tiède sous un vieil arbre.', visualHint: 'Une clé lumineuse sous des racines' },
+        { id: 2, title: 'Le renard endormi', text: 'Un renard endormi se réveille et montre une cabane cachée.', visualHint: 'Un renard près d’un chemin de lanternes' },
+        { id: 3, title: 'Les trois portes', text: 'Dans la cabane, trois portes douces attendent un choix.', visualHint: 'Trois portes rondes' }
       ],
       segments: [
-        { id: 'segment_1', from: 1, to: 2, narrator: 'virtual_child_a', narratorDisplayName: 'Mira', text: 'Mira notices that the key hums only when everyone walks kindly. The tree bends one branch toward the path, as if it is proud to help.', mood: 'curious' },
-        { id: 'segment_2', from: 2, to: 3, narrator: 'virtual_child_b', narratorDisplayName: 'Noe', text: 'Noe imagines the fox dreaming the path before it appears. Each pawprint shines softly, and the cabin waits without hurry.', mood: 'dreamy' }
+        { id: 'segment_1', from: 1, to: 2, narrator: 'virtual_child_a', narratorDisplayName: 'Mira', text: 'Mira remarque que la clé chante seulement quand tout le monde avance avec gentillesse. L’arbre penche une branche vers le sentier, comme s’il était fier d’aider.', mood: 'curieuse' },
+        { id: 'segment_2', from: 2, to: 3, narrator: 'virtual_child_b', narratorDisplayName: 'Noé', text: 'Noé imagine que le renard rêve le chemin avant qu’il apparaisse. Chaque trace de patte brille doucement, et la cabane attend sans se presser.', mood: 'rêveur' }
       ],
       endings: [
-        { id: 'happy_lantern', title: 'The Happy Lantern', emotion: 'happy', text: 'The chosen door opens to a lantern that remembers every kind step. It lights the way home and leaves a tiny glow for tomorrow.', visualHint: 'A lantern by a bed' },
-        { id: 'quiet_secret', title: 'The Quiet Secret', emotion: 'mysterious', text: 'The door opens to a whisper that says some wonders can wait. The child smiles, knowing the secret will be ready when the next story begins.', visualHint: 'A curtain with starlight' },
-        { id: 'giggle_door', title: 'The Giggle Door', emotion: 'funny', text: 'The door giggles before anyone touches it. Even the fox laughs in its sleep, and the key turns into a biscuit-shaped moon.', visualHint: 'A laughing moon' }
+        { id: 'lanterne_heureuse', title: 'La lanterne heureuse', emotion: 'heureuse', text: 'La porte choisie s’ouvre sur une lanterne qui se souvient de chaque pas gentil. Elle éclaire le retour et garde une petite lueur pour demain.', visualHint: 'Une lanterne près d’un lit' },
+        { id: 'secret_calme', title: 'Le secret calme', emotion: 'mystérieuse', text: 'La porte s’ouvre sur un chuchotement qui dit que certaines merveilles peuvent attendre. L’enfant sourit : le secret sera prêt quand la prochaine histoire commencera.', visualHint: 'Un rideau avec de la lumière d’étoiles' },
+        { id: 'porte_qui_rit', title: 'La porte qui rit', emotion: 'drôle', text: 'La porte glousse avant même qu’on la touche. Même le renard rit en dormant, et la clé devient une lune en forme de biscuit.', visualHint: 'Une lune qui rit' }
       ],
-      metadata: { duration: 'short', readingMode: 'mixed_narration', ageRange: 'around 7', createdAt: new Date().toISOString() }
+      metadata: { duration: 'short', readingMode: 'mixed_narration', ageRange: 'autour de 7 ans', createdAt: new Date().toISOString() }
     }
   }
   if (kind === 'flow') {

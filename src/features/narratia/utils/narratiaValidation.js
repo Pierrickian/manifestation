@@ -31,7 +31,7 @@ export function validateChildChoices(payload) {
   const rawChoices = ensureArray(payload?.childChoices)
   const childChoices = uniqueById(rawChoices.map((choice, index) => ({
     id: createSlug(choice?.id || choice?.label, `choice_${index + 1}`),
-    label: clampText(choice?.label, `Story wonder ${index + 1}`, 64),
+    label: clampText(choice?.label, `Merveille ${index + 1}`, 64),
     category: ['object', 'creature', 'place', 'magic', 'atmosphere'].includes(choice?.category) ? choice.category : 'magic'
   }))).slice(0, 12)
 
@@ -41,8 +41,8 @@ export function validateChildChoices(payload) {
 export function validateStoryPackage(payload, context = {}) {
   const narrators = ensureArray(payload?.narrators).map((narrator) => ({
     id: ['virtual_child_a', 'virtual_child_b', 'player_child', 'parent'].includes(narrator?.id) ? narrator.id : 'parent',
-    displayName: clampText(narrator?.displayName, 'Story friend', 40),
-    personality: clampText(narrator?.personality, 'Gentle and curious.', 120),
+    displayName: clampText(narrator?.displayName, 'Ami de l’histoire', 40),
+    personality: clampText(narrator?.personality, 'Doux et curieux.', 120),
     voiceHint: clampText(narrator?.voiceHint, 'soft', 40)
   }))
 
@@ -50,8 +50,8 @@ export function validateStoryPackage(payload, context = {}) {
   const milestones = ensureArray(payload?.milestones).map((milestone, index) => ({
     id: Number(milestone?.id || index + 1),
     title: clampText(milestone?.title, `Milestone ${index + 1}`, 80),
-    text: clampText(milestone?.text, 'A promised story moment waits here.', 220),
-    visualHint: clampText(milestone?.visualHint, 'A soft illustrated story scene', 100)
+    text: clampText(milestone?.text, 'Un moment promis attend ici.', 220),
+    visualHint: clampText(milestone?.visualHint, 'Une scène illustrée douce', 100)
   })).slice(0, 5)
 
   const segments = ensureArray(payload?.segments).map((segment, index) => {
@@ -61,8 +61,8 @@ export function validateStoryPackage(payload, context = {}) {
       from: Number(segment?.from || index + 1),
       to: Number(segment?.to || index + 2),
       narrator,
-      narratorDisplayName: clampText(segment?.narratorDisplayName, narratorMap.get(narrator) || 'Story friend', 40),
-      text: clampText(segment?.text, 'The path between two promised moments opens with gentle wonder.', 1400),
+      narratorDisplayName: clampText(segment?.narratorDisplayName, narratorMap.get(narrator) || 'Ami de l’histoire', 40),
+      text: clampText(segment?.text, 'Le chemin entre deux moments promis s’ouvre avec douceur.', 1400),
       mood: clampText(segment?.mood, 'wonder', 40)
     }
   })
@@ -71,15 +71,15 @@ export function validateStoryPackage(payload, context = {}) {
     id: createSlug(ending?.id || ending?.title, `ending_${index + 1}`),
     title: clampText(ending?.title, `Ending ${index + 1}`, 64),
     emotion: clampText(ending?.emotion, 'happy', 40),
-    text: clampText(ending?.text, 'The story closes gently, leaving a warm thought for the night.', 1600),
-    visualHint: clampText(ending?.visualHint, 'A calm final illustration', 100)
+    text: clampText(ending?.text, 'L’histoire se termine doucement et garde une pensée chaude pour la nuit.', 1600),
+    visualHint: clampText(ending?.visualHint, 'Une illustration finale calme', 100)
   })).slice(0, 3)
 
   if (milestones.length < 3 || milestones.length > 5 || segments.length < milestones.length - 1 || endings.length !== 3) return null
 
   return {
     id: createSlug(payload?.id || `narratia_${Date.now()}`, `narratia_${Date.now()}`),
-    title: clampText(payload?.title, 'The Night of Three Wonders', 90),
+    title: clampText(payload?.title, 'La nuit des trois merveilles', 90),
     narrators: narrators.length ? narrators : context.defaultNarrators,
     milestones,
     segments: segments.slice(0, Math.max(1, milestones.length - 1)),
@@ -87,7 +87,7 @@ export function validateStoryPackage(payload, context = {}) {
     metadata: {
       duration: context.parentConfiguration?.duration || 'short',
       readingMode: context.parentConfiguration?.readingMode || 'mixed_narration',
-      ageRange: 'around 7',
+      ageRange: 'autour de 7 ans',
       createdAt: payload?.metadata?.createdAt || new Date().toISOString()
     }
   }

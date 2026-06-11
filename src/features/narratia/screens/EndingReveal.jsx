@@ -5,16 +5,16 @@ export function EndingReveal({ ending, onReplay, onAlternate, onNewStory }) {
     <NarratiaLayout
       eyebrow={ending.emotion}
       title={ending.title}
-      intro="The chosen ending opens now."
+      intro="La fin choisie se révèle maintenant."
       footer={(
         <div className="flow-actions">
-          <button className="primary-action" type="button" onClick={onReplay}>Replay this story</button>
-          <button className="ghost-action" type="button" onClick={onAlternate}>Try another ending</button>
-          <button className="ghost-action" type="button" onClick={onNewStory}>Create a new story</button>
+          <button className="primary-action" type="button" onClick={onReplay}>Rejouer cette histoire</button>
+          <button className="ghost-action" type="button" onClick={onAlternate}>Essayer une autre fin</button>
+          <button className="ghost-action" type="button" onClick={onNewStory}>Créer une nouvelle histoire</button>
         </div>
       )}
     >
-      <article className="narratia-story-card narratia-story-card--ending">
+      <article className="narratia-story-card narratia-story-card--ending narratia-reveal-card is-revealed">
         <span className="narratia-ending-art" aria-hidden="true" />
         <p>{ending.text}</p>
       </article>
