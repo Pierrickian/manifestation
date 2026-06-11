@@ -22,6 +22,10 @@ export function NarratiaApp() {
     setState((current) => ({ ...current, ...patch }))
   }
 
+  function returnHome() {
+    patchState({ screen: 'intro' })
+  }
+
   function startNewStory() {
     clearNarratiaState()
     setState({
@@ -109,12 +113,14 @@ export function NarratiaApp() {
   }
 
   let screen = null
-  if (state.screen === 'parent') {
+  if (state.screen === 'intro') {
+    screen = <NarratiaIntro hasStory={Boolean(state.storyPackage)} onStart={startNewStory} onResume={() => patchState({ screen: state.storyPackage ? 'timeline' : 'parent' })} />
+  } else if (state.screen === 'parent') {
     screen = <ParentWizard configuration={state.parentConfiguration} onChange={(parentConfiguration) => patchState({ parentConfiguration })} onSubmit={submitParentConfiguration} isLoading={state.status === 'loading_choices'} />
   } else if (state.screen === 'child') {
     screen = <ChildWizard choices={state.childChoices} selection={state.childSelection} onChange={(childSelection) => patchState({ childSelection })} onSubmit={submitChildSelection} isLoading={state.status === 'loading_story'} />
   } else if (state.screen === 'timeline' && state.storyPackage) {
-    screen = <StoryTimeline storyPackage={state.storyPackage} onBegin={() => patchState({ screen: 'narration', currentSegmentIndex: 0 })} onReplayEnding={state.selectedEndingId ? () => patchState({ screen: 'narration' }) : null} />
+    screen = <StoryTimeline storyPackage={state.storyPackage} onBegin={() => patchState({ screen: 'narration', currentSegmentIndex: 0 })} onReplayEnding={state.selectedEndingId ? () => patchState({ screen: 'narration' }) : null} onHome={returnHome} onNewStory={startNewStory} />
   } else if (state.storyPackage) {
     screen = (
       <NarrationView
@@ -128,11 +134,12 @@ export function NarratiaApp() {
         onChooseNarrator={chooseSegmentNarrator}
         onChooseEnding={chooseEnding}
         onBackToTimeline={() => patchState({ screen: 'timeline' })}
+        onHome={returnHome}
         onNewStory={startNewStory}
       />
     )
   } else {
-    screen = <NarratiaIntro hasStory={Boolean(state.storyPackage)} onStart={startNewStory} onResume={() => patchState({ screen: 'narration' })} />
+    screen = <NarratiaIntro hasStory={Boolean(state.storyPackage)} onStart={startNewStory} onResume={() => patchState({ screen: state.storyPackage ? 'timeline' : 'parent' })} />
   }
 
   return (

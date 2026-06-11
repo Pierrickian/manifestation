@@ -117,8 +117,11 @@ function EndingGate({ endings, selectedEndingId, loadingEndingId, isReady, onCho
   )
 }
 
-export function NarrationView({ storyPackage, currentSegmentIndex, revealedSegmentIds, segmentNarratorChoices, loadingSegmentId, selectedEndingId, loadingEndingId, onChooseNarrator, onChooseEnding, onBackToTimeline, onNewStory }) {
+export function NarrationView({ storyPackage, currentSegmentIndex, revealedSegmentIds, segmentNarratorChoices, loadingSegmentId, selectedEndingId, loadingEndingId, onChooseNarrator, onChooseEnding, onBackToTimeline, onHome, onNewStory }) {
   const revealedSet = new Set(revealedSegmentIds)
+  storyPackage.segments.forEach((segment) => {
+    if (segmentNarratorChoices[segment.id] && loadingSegmentId !== segment.id) revealedSet.add(segment.id)
+  })
   const allRevealed = storyPackage.segments.every((segment) => revealedSet.has(segment.id))
   const activeIndex = storyPackage.segments.findIndex((segment) => !revealedSet.has(segment.id))
   const currentIndex = activeIndex === -1 ? storyPackage.segments.length : activeIndex
@@ -129,7 +132,13 @@ export function NarrationView({ storyPackage, currentSegmentIndex, revealedSegme
       eyebrow="Fil lumineux"
       title="Les moments promis se relient"
       intro="Lis un moment, choisis quel enfant raconte l’espace suivant, puis continue jusqu’à la fin sans quitter cette page."
-      footer={<button className="ghost-action" type="button" onClick={onBackToTimeline}>Revoir seulement les moments promis</button>}
+      footer={(
+        <div className="flow-actions">
+          <button className="ghost-action" type="button" onClick={onBackToTimeline}>Revoir seulement les moments promis</button>
+          <button className="ghost-action" type="button" onClick={onHome}>Accueil Narratia</button>
+          <button className="ghost-action" type="button" onClick={onNewStory}>Nouvelle histoire</button>
+        </div>
+      )}
     >
       <ol className="narratia-story-path" style={{ '--path-progress': `${Math.min(100, ((currentIndex + 1 + endingProgress) / (storyPackage.segments.length + 2)) * 100)}%` }}>
         {storyPackage.milestones.map((milestone, index) => {

@@ -1,7 +1,7 @@
 import { MilestoneTimeline } from '../components/MilestoneTimeline'
 import { NarratiaLayout } from '../components/NarratiaLayout'
 
-export function StoryTimeline({ storyPackage, onBegin, onReplayEnding }) {
+export function StoryTimeline({ storyPackage, onBegin, onReplayEnding, onHome, onNewStory }) {
   return (
     <NarratiaLayout
       eyebrow="Moments promis"
@@ -11,6 +11,8 @@ export function StoryTimeline({ storyPackage, onBegin, onReplayEnding }) {
         <div className="flow-actions">
           <button className="primary-action" type="button" onClick={onBegin}>Entrer dans le fil lumineux</button>
           {onReplayEnding ? <button className="ghost-action" type="button" onClick={onReplayEnding}>Choisir une autre fin</button> : null}
+          <button className="ghost-action" type="button" onClick={onHome}>Accueil Narratia</button>
+          <button className="ghost-action" type="button" onClick={onNewStory}>Nouvelle histoire</button>
         </div>
       )}
     >

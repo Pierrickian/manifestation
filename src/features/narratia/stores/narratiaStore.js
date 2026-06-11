@@ -29,10 +29,56 @@ export const initialNarratiaState = {
   error: ''
 }
 
+const VALID_SCREENS = new Set(['intro', 'parent', 'child', 'timeline', 'narration'])
+
+function getNormalizedRevealedSegmentIds(storyPackage, revealedSegmentIds = [], segmentNarratorChoices = {}) {
+  if (!storyPackage?.segments?.length) return []
+
+  const knownSegmentIds = new Set(storyPackage.segments.map((segment) => segment.id))
+  const revealed = new Set(revealedSegmentIds.filter((segmentId) => knownSegmentIds.has(segmentId)))
+
+  storyPackage.segments.forEach((segment) => {
+    if (segmentNarratorChoices?.[segment.id]) revealed.add(segment.id)
+  })
+
+  return [...revealed]
+}
+
+function getNextSegmentIndex(storyPackage, revealedSegmentIds) {
+  if (!storyPackage?.segments?.length) return 0
+
+  const nextIndex = storyPackage.segments.findIndex((segment) => !revealedSegmentIds.includes(segment.id))
+  return nextIndex === -1 ? storyPackage.segments.length : nextIndex
+}
+
+function normalizeNarratiaState(saved) {
+  const state = {
+    ...initialNarratiaState,
+    ...saved,
+    status: 'idle',
+    error: '',
+    loadingEndingId: null,
+    loadingSegmentId: null
+  }
+
+  if (!VALID_SCREENS.has(state.screen)) state.screen = state.storyPackage ? 'intro' : 'intro'
+  if (!state.storyPackage && !['intro', 'parent', 'child'].includes(state.screen)) state.screen = 'intro'
+
+  state.segmentNarratorChoices = state.segmentNarratorChoices || {}
+  state.revealedSegmentIds = getNormalizedRevealedSegmentIds(
+    state.storyPackage,
+    state.revealedSegmentIds || [],
+    state.segmentNarratorChoices
+  )
+  state.currentSegmentIndex = getNextSegmentIndex(state.storyPackage, state.revealedSegmentIds)
+
+  return state
+}
+
 export function loadNarratiaState() {
   try {
     const saved = JSON.parse(localStorage.getItem(NARRATIA_STORAGE_KEY) || 'null')
-    return saved ? { ...initialNarratiaState, ...saved, status: 'idle', error: '' } : initialNarratiaState
+    return saved ? normalizeNarratiaState(saved) : initialNarratiaState
   } catch {
     return initialNarratiaState
   }
