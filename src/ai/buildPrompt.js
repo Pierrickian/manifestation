@@ -5,7 +5,18 @@ const toneRules = [
   'Ne jamais ecrire "tu es" ou "la verite est".',
   'Utiliser des formulations comme "il semble peut-etre", "une piste possible", "ce chemin peut pointer vers".',
   'Rester doux, intelligent, sensible, concret, non intrusif.',
-  'Eviter les cliches spirituels, les promesses et le ton de gourou.'
+  'Eviter les cliches spirituels, les promesses et le ton de gourou.',
+  'Eviter les tics de langage repetes: pas de suite de questions construites sur "dans ce moment", "en observant", "en regardant", "quelle petite", "pourrait doucement".',
+  'Utiliser les mots "doucement", "petit/petite", "lumiere" et "interieur" avec parcimonie: jamais comme structure automatique.'
+]
+
+const questionVariationRules = [
+  'Comparer la nouvelle question a context.previousQuestions et aux question champs de context.answers.',
+  'Ne jamais reprendre la meme amorce, le meme verbe directeur ou la meme metaphore qu une question recente.',
+  'Varier les angles dans cet ordre si possible: corps, situation concrete, relation, besoin, part de soi, limite, choix, geste praticable, sens.',
+  'Si le ressenti de depart revient dans plusieurs questions, le nommer autrement ou ne pas le nommer.',
+  'Ne pas repeter le besoin dominant dans chaque question: le faire parfois sentir par une image concrete ou une action.',
+  'Les reponses peuvent rester poetiques, mais la question doit rester specifique et nettement differente des precedentes.'
 ]
 
 export function buildPrompt(kind, context) {
@@ -25,6 +36,7 @@ export function buildPrompt(kind, context) {
         `Reglages utilisateur IA:\n${aiSettingsRules.map((rule) => `- ${rule}`).join('\n')}`,
         `Profil utilisateur Etre:\n${beingSettingsRules.map((rule) => `- ${rule}`).join('\n')}`,
         `Regles de ton:\n${toneRules.map((rule) => `- ${rule}`).join('\n')}`,
+        `Regles de variation des questions:\n${questionVariationRules.map((rule) => `- ${rule}`).join('\n')}`,
         'Reponds uniquement en JSON valide, sans Markdown.'
       ].join('\n\n')
     },
@@ -100,6 +112,7 @@ function getTask(kind) {
     return [
       'Remplace uniquement la reponse donnee dans context.answer par une nouvelle reponse naturelle.',
       'La nouvelle reponse doit rester coherente avec context.prompt.question, mais ne doit pas reprendre les labels deja presents dans context.prompt.answers.',
+      'Si context.ruleId vaut emotional-reconciliation, la reponse doit rester dans le meme type de choix emotionnel que context.prompt.question.',
       'Reponds avec un objet answer contenant id, label, needId et scores.'
     ].join(' ')
   }
@@ -107,8 +120,19 @@ function getTask(kind) {
   if (kind === 'question') {
     return [
       'Genere une question courte et 3 a 5 reponses naturelles. Chaque reponse doit contenir label, needId et scores.',
-      'Si context.phase vaut 2, la question doit approfondir discretement la prise de conscience selon context.phaseChoice.',
-      'Si context.phase vaut 3, la question doit etre plus orientee resolution de probleme, solution ou prise d acte, avec une force ajustee au profil Etre.'
+      'Evite les questions interchangeables: chaque question doit avoir un role net, une image mentale differente et un verbe principal different de la question precedente.',
+      'Avant de repondre, inspecte context.previousQuestions: si ta question pourrait etre confondue avec l une d elles, change d angle.',
+      'N utilise pas deux fois la meme ouverture dans une session, notamment "Dans ce moment", "En observant", "En regardant", "En quoi cette".',
+      'N utilise pas "doucement" dans la question si une question precedente le contient deja.',
+      'Si context.ruleId vaut emotional-reconciliation et context.phase vaut 0, genere uniquement des boutons de lexique emotionnel adaptes a context.phaseZeroStep.',
+      'Pour phaseZeroStep positive-emotion: 5 emotions positives longtemps non ressenties.',
+      'Pour phaseZeroStep negative-emotion: 5 emotions negatives qui submergent.',
+      'Pour phaseZeroStep opposite-positive-emotion: 5 emotions positives opposees a context.reconciliation.negativeEmotion, avec des nuances proches mais non synonymes plates.',
+      'Si context.ruleId vaut emotional-reconciliation et context.phase vaut 1, les 2 questions doivent cerner ce que procure context.reconciliation.positiveEmotion: une question sur le corps/etat interne, une question sur la relation au monde.',
+      'Si context.ruleId vaut emotional-reconciliation et context.phase vaut 2, les 2 questions doivent reconnaitre la part de soi qui n emet pas assez cette emotion comme une part un peu oubliee, jamais fautive.',
+      'Si context.ruleId vaut emotional-reconciliation et context.phase vaut 3, les 2 questions doivent reconnaitre la part qui emet l emotion negative opposee comme une part en manque d amour, chargee de signaler sans l avoir choisi, et inviter les deux parts main dans la main dans la vibration positive.',
+      'Si context.phase vaut 2 dans la regle default, la question doit approfondir discretement la prise de conscience selon context.phaseChoice.',
+      'Si context.phase vaut 3 dans la regle default, la question doit etre plus orientee resolution de probleme, solution ou prise d acte, avec une force ajustee au profil Etre.'
     ].join(' ')
   }
 

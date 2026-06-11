@@ -1,7 +1,31 @@
-import { QUESTION_BANK } from '../data/staticQuestions.js'
+import {
+  NEGATIVE_EMOTIONS,
+  OPPOSITE_POSITIVE_EMOTIONS,
+  POSITIVE_EMOTIONS,
+  QUESTION_BANK
+} from '../data/staticQuestions.js'
 import { generateAnswers } from './generateAnswers.js'
 
+const RECONCILIATION_PHASE_QUESTIONS = {
+  1: [
+    'Quand cette emotion positive est la, qu est-ce qu elle rend possible dans ton corps ou ton attitude ?',
+    'Qu est-ce que cette vibration positive change dans ta facon de te relier a toi ou au monde ?'
+  ],
+  2: [
+    'Quelle part de toi semble avoir porte cette emotion positive autrefois, puis etre un peu passee au second plan ?',
+    'Qu est-ce que cette part oubliee aurait besoin que tu reconnaisses pour recommencer a emettre cette vibration ?'
+  ],
+  3: [
+    'Si la part qui emet l emotion opposee n etait pas mauvaise mais chargee de signaler quelque chose, que chercherait-elle a proteger ?',
+    'Comment pourrais-tu offrir la meme vibration positive a la part qui la ressent deja et a celle qui appelle au secours ?'
+  ]
+}
+
 export function generateQuestion(context) {
+  if (context.ruleId === 'emotional-reconciliation' && context.phase === 0) {
+    return generateReconciliationChoiceQuestion(context)
+  }
+
   const dominantNeed = context.discovery?.dominantNeed || context.rankedNeeds?.[0]
   const stepIndex = context.phaseIndex ?? context.answers?.length ?? 0
   const phase = context.phase || 1
@@ -30,7 +54,40 @@ export function generateQuestion(context) {
   }
 }
 
+function generateReconciliationChoiceQuestion(context) {
+  const phaseZeroStep = context.phaseZeroStep || 'polarity'
+  const negativeEmotionId = context.reconciliation?.negativeEmotion?.id
+  const bank = phaseZeroStep === 'negative-emotion'
+    ? NEGATIVE_EMOTIONS
+    : phaseZeroStep === 'opposite-positive-emotion'
+      ? OPPOSITE_POSITIVE_EMOTIONS[negativeEmotionId] || OPPOSITE_POSITIVE_EMOTIONS.agitation
+      : POSITIVE_EMOTIONS
+
+  const questions = {
+    'positive-emotion': 'Quelle emotion positive n as-tu pas ressentie depuis longtemps ?',
+    'negative-emotion': 'Quelle emotion negative te submerge le plus en ce moment ?',
+    'opposite-positive-emotion': 'Quelle vibration positive opposee pourrait etre reanimee avec le mot le plus juste ?'
+  }
+
+  return {
+    id: `reconciliation-${phaseZeroStep}`,
+    question: questions[phaseZeroStep] || questions['positive-emotion'],
+    answers: bank.map((emotion, index) => ({
+      id: `${phaseZeroStep}-${emotion.id}`,
+      label: emotion.label,
+      needId: emotion.needId,
+      scores: emotion.scores,
+      optionIndex: index
+    })),
+    source: 'local'
+  }
+}
+
 function getPhaseQuestion({ phase, stepIndex, needId, question, phaseChoice, beingSettings }) {
+  if (phaseChoice?.ruleId === 'emotional-reconciliation') {
+    return RECONCILIATION_PHASE_QUESTIONS[phase]?.[stepIndex % 2] || question
+  }
+
   if (phase === 2) {
     const opening = phaseChoice?.label
       ? `Dans l'orientation "${phaseChoice.label}", `
