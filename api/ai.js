@@ -180,30 +180,101 @@ export default async function handler(request, response) {
 
   try {
     const model = process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL
-    const completion = await client.chat.completions.create({
-      model,
-      messages: buildPrompt(kind, context),
-      response_format: responseFormats[kind] || responseFormats.question,
-      temperature: 0.75
-    })
+    const result = await createValidatedAiResult(kind, context, model)
 
-    const content = completion.choices[0]?.message?.content
-    response.status(200).json(withDebug(JSON.parse(content), {
+    response.status(200).json(withDebug(result.payload, {
       source: 'ai',
       hasOpenAIKey: true,
       model,
-      finishReason: completion.choices[0]?.finish_reason || 'unknown'
+      finishReason: result.finishReason,
+      retryCount: result.retryCount
     }))
   } catch (error) {
     response.status(200).json(withDebug(getLocalResult(kind, context), {
       source: 'local',
-      fallbackReason: 'openai_request_failed',
+      fallbackReason: error?.code === 'invalid_ai_payload' ? 'openai_invalid_payload' : 'openai_request_failed',
       hasOpenAIKey: true,
       model: process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL,
       errorName: error?.name || 'Error',
-      errorMessage: error?.message || 'Unknown OpenAI error'
+      errorMessage: error?.message || 'Unknown OpenAI error',
+      invalidPayloadKeys: error?.payloadKeys?.join(', ') || 'none',
+      retryCount: error?.retryCount ?? 0
     }))
   }
+}
+
+async function createValidatedAiResult(kind, context, model) {
+  const attempts = [buildPrompt(kind, context), buildPrompt(kind, context)]
+  attempts[1] = [
+    ...attempts[1],
+    {
+      role: 'user',
+      content: [
+        'La reponse precedente etait invalide ou ressemblait a un schema JSON.',
+        getShapeInstruction(kind),
+        'Ne renvoie jamais les champs type, properties, schema ou json_schema comme objet principal.',
+        'Renvoie uniquement les donnees finales utilisables par le wizard.'
+      ].join(' ')
+    }
+  ]
+
+  let lastError = null
+
+  for (const [attemptIndex, messages] of attempts.entries()) {
+    const completion = await client.chat.completions.create({
+      model,
+      messages,
+      response_format: responseFormats[kind] || responseFormats.question,
+      temperature: 0.75
+    })
+
+    const content = completion.choices[0]?.message?.content || '{}'
+    const payload = JSON.parse(content)
+    const validationError = validateAiPayload(kind, payload)
+
+    if (!validationError) {
+      return {
+        payload,
+        finishReason: completion.choices[0]?.finish_reason || 'unknown',
+        retryCount: attemptIndex
+      }
+    }
+
+    lastError = validationError
+    lastError.retryCount = attemptIndex
+  }
+
+  throw lastError
+}
+
+function validateAiPayload(kind, payload) {
+  const validators = {
+    answer: (value) => Boolean(value?.answer?.label && value.answer.needId && value.answer.scores),
+    question: (value) => Boolean(value?.question && Array.isArray(value.answers) && value.answers.length >= 3),
+    discovery: (value) => Boolean(value?.text),
+    links: (value) => Array.isArray(value?.needLinks) || Array.isArray(value?.pathLinks),
+    settings: (value) => Boolean(value?.slider?.id && value.slider.label),
+    flow: (value) => Array.isArray(value?.words)
+  }
+
+  const isValid = (validators[kind] || validators.question)(payload)
+  if (isValid) return null
+
+  const error = new Error(`Invalid AI ${kind} payload: ${Object.keys(payload || {}).join(', ') || 'empty object'}`)
+  error.name = 'InvalidAIResponseError'
+  error.code = 'invalid_ai_payload'
+  error.payloadKeys = Object.keys(payload || {})
+  return error
+}
+
+function getShapeInstruction(kind) {
+  if (kind === 'answer') return 'Format attendu: { "answer": { "id": string, "label": string, "needId": string, "scores": object } }.'
+  if (kind === 'question') return 'Format attendu: { "question": string, "answers": [{ "id": string, "label": string, "needId": string, "scores": object }] }.'
+  if (kind === 'discovery') return 'Format attendu: { "text": string }.'
+  if (kind === 'links') return 'Format attendu: { "needLinks": array, "pathLinks": array }.'
+  if (kind === 'settings') return 'Format attendu: { "slider": { "id": string, "label": string, "left": string, "right": string, "value": number } }.'
+  if (kind === 'flow') return 'Format attendu: { "words": array, "conclusion": string }.'
+  return 'Format attendu: un objet JSON de donnees finales, pas un schema.'
 }
 
 function getLocalResult(kind, context) {

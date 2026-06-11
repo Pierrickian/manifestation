@@ -303,10 +303,15 @@ function getDebugRows(prompt) {
         ['debug.source', prompt.debug.source || 'unknown'],
         ['hasOpenAIKey', String(prompt.debug.hasOpenAIKey ?? 'unknown')],
         ['fallbackReason', prompt.debug.fallbackReason || 'none'],
+        ['endpoint', prompt.debug.endpoint || 'unknown'],
+        ['kind', prompt.debug.kind || 'unknown'],
         ['model', prompt.debug.model || 'unknown'],
         ['finishReason', prompt.debug.finishReason || 'unknown'],
         ['errorName', prompt.debug.errorName || 'none'],
         ['errorMessage', prompt.debug.errorMessage || 'none'],
+        ['invalidPayloadKeys', prompt.debug.invalidPayloadKeys || 'none'],
+        ['retryCount', String(prompt.debug.retryCount ?? 'unknown')],
+        ['timestamp', prompt.debug.timestamp || 'unknown'],
         ['questionId', prompt.id || 'none'],
         ['answerIds', answers.map((answer) => answer.id).join(', ') || 'none']
       ]

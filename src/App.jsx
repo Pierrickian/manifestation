@@ -1,5 +1,5 @@
-import { ManifestationWizard } from './components/ManifestationWizard'
+import AppShell from './app/App'
 
 export default function App() {
-  return <ManifestationWizard />
+  return <AppShell />
 }

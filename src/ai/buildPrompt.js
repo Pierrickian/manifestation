@@ -38,7 +38,9 @@ export function buildPrompt(kind, context) {
         `Profil utilisateur Etre:\n${beingSettingsRules.map((rule) => `- ${rule}`).join('\n')}`,
         `Regles de ton:\n${toneRules.map((rule) => `- ${rule}`).join('\n')}`,
         `Regles de variation des questions:\n${questionVariationRules.map((rule) => `- ${rule}`).join('\n')}`,
-        'Reponds uniquement en JSON valide, sans Markdown.'
+        'Reponds uniquement en JSON valide, sans Markdown.',
+        'Renvoie les donnees finales demandees, jamais un schema JSON.',
+        'Ne renvoie jamais les champs type, properties, schema ou json_schema comme objet principal.'
       ].join('\n\n')
     },
     {
@@ -46,6 +48,7 @@ export function buildPrompt(kind, context) {
       content: JSON.stringify({
         kind,
         task: getTask(kind),
+        expectedShape: getExpectedShape(kind),
         context
       })
     }
@@ -165,4 +168,14 @@ function getTask(kind) {
   }
 
   return 'Genere une variation utile pour le wizard.'
+}
+
+function getExpectedShape(kind) {
+  if (kind === 'answer') return { answer: { id: 'string', label: 'string', needId: 'string', scores: { needId: 'number' } } }
+  if (kind === 'question') return { question: 'string', answers: [{ id: 'string', label: 'string', needId: 'string', scores: { needId: 'number' } }] }
+  if (kind === 'discovery') return { text: 'string' }
+  if (kind === 'links') return { needLinks: [], pathLinks: [] }
+  if (kind === 'settings') return { slider: { id: 'string', label: 'string', left: 'string', right: 'string', value: 'number' } }
+  if (kind === 'flow') return { words: [], conclusion: 'string' }
+  return { result: 'object' }
 }
