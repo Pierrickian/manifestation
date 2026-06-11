@@ -1174,9 +1174,9 @@ function WizardMenu({
 
       </details>
 
-      {debugRows.length ? (
-        <details className="ai-submenu ai-debug-panel">
-          <summary>Debug IA</summary>
+      <details className="ai-submenu ai-debug-panel">
+        <summary>Debug IA</summary>
+        {debugRows.length ? (
           <dl>
             {debugRows.map(([label, value]) => (
               <div key={label}>
@@ -1185,8 +1185,10 @@ function WizardMenu({
               </div>
             ))}
           </dl>
-        </details>
-      ) : null}
+        ) : (
+          <p className="ai-debug-empty">Aucune donnee IA pour le moment.</p>
+        )}
+      </details>
 
       <details className="ai-submenu">
         <summary>Etre</summary>
