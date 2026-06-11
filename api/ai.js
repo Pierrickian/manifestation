@@ -125,6 +125,54 @@ const responseFormats = {
       }
     }
   },
+  narratia_child_choices: {
+    type: 'json_schema',
+    json_schema: {
+      name: 'narratia_child_choices',
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['childChoices'],
+        properties: {
+          childChoices: {
+            type: 'array',
+            minItems: 6,
+            maxItems: 12,
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['id', 'label', 'category'],
+              properties: {
+                id: { type: 'string' },
+                label: { type: 'string' },
+                category: { type: 'string', enum: ['object', 'creature', 'place', 'magic', 'atmosphere'] }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  narratia_story_package: {
+    type: 'json_schema',
+    json_schema: {
+      name: 'narratia_story_package',
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['id', 'title', 'narrators', 'milestones', 'segments', 'endings', 'metadata'],
+        properties: {
+          id: { type: 'string' },
+          title: { type: 'string' },
+          narrators: { type: 'array', items: { type: 'object', additionalProperties: true } },
+          milestones: { type: 'array', minItems: 3, maxItems: 5, items: { type: 'object', additionalProperties: true } },
+          segments: { type: 'array', minItems: 2, maxItems: 4, items: { type: 'object', additionalProperties: true } },
+          endings: { type: 'array', minItems: 3, maxItems: 3, items: { type: 'object', additionalProperties: true } },
+          metadata: { type: 'object', additionalProperties: true }
+        }
+      }
+    }
+  },
   flow: {
     type: 'json_schema',
     json_schema: {
@@ -254,7 +302,9 @@ function validateAiPayload(kind, payload) {
     discovery: (value) => Boolean(value?.text),
     links: (value) => Array.isArray(value?.needLinks) || Array.isArray(value?.pathLinks),
     settings: (value) => Boolean(value?.slider?.id && value.slider.label),
-    flow: (value) => Array.isArray(value?.words)
+    flow: (value) => Array.isArray(value?.words),
+    narratia_child_choices: (value) => Array.isArray(value?.childChoices) && value.childChoices.length >= 6,
+    narratia_story_package: (value) => Boolean(value?.title && Array.isArray(value.milestones) && Array.isArray(value.segments) && Array.isArray(value.endings) && value.endings.length === 3)
   }
 
   const isValid = (validators[kind] || validators.question)(payload)
@@ -274,6 +324,8 @@ function getShapeInstruction(kind) {
   if (kind === 'links') return 'Format attendu: { "needLinks": array, "pathLinks": array }.'
   if (kind === 'settings') return 'Format attendu: { "slider": { "id": string, "label": string, "left": string, "right": string, "value": number } }.'
   if (kind === 'flow') return 'Format attendu: { "words": array, "conclusion": string }.'
+  if (kind === 'narratia_child_choices') return 'Expected format: { "childChoices": [{ "id": string, "label": string, "category": string }] }.'
+  if (kind === 'narratia_story_package') return 'Expected format: { "id": string, "title": string, "narrators": array, "milestones": array, "segments": array, "endings": array, "metadata": object }.'
   return 'Format attendu: un objet JSON de donnees finales, pas un schema.'
 }
 
@@ -302,6 +354,45 @@ function getLocalResult(kind, context) {
         right: 'Traverser',
         value: 50
       }
+    }
+  }
+  if (kind === 'narratia_child_choices') {
+    return {
+      childChoices: [
+        { id: 'cle_mysterieuse', label: 'Une clé mystérieuse', category: 'object' },
+        { id: 'renard_endormi', label: 'Un renard endormi', category: 'creature' },
+        { id: 'train_lumineux', label: 'Un train lumineux', category: 'magic' },
+        { id: 'cabane_cachee', label: 'Une cabane cachée', category: 'place' },
+        { id: 'nuage_suiveur', label: 'Un nuage de pluie qui suit les gens', category: 'atmosphere' },
+        { id: 'arbre_geant', label: 'Un arbre géant', category: 'place' }
+      ]
+    }
+  }
+  if (kind === 'narratia_story_package') {
+    return {
+      id: `local-narratia-${Date.now()}`,
+      title: 'La clé sous l’arbre',
+      narrators: [
+        { id: 'virtual_child_a', displayName: 'Mira', personality: 'Curieuse et attentive.', voiceHint: 'douce et vive' },
+        { id: 'virtual_child_b', displayName: 'Noé', personality: 'Rêveur et calme.', voiceHint: 'lent et chaleureux' },
+        { id: 'player_child', displayName: 'Toi', personality: 'L’enfant qui choisit la couleur de la fin.', voiceHint: 'ouvert' },
+        { id: 'parent', displayName: 'Lecteur adulte', personality: 'Stable et rassurant.', voiceHint: 'calme' }
+      ],
+      milestones: [
+        { id: 1, title: 'La clé tiède', text: 'L’enfant trouve une clé tiède sous un vieil arbre.', visualHint: 'Une clé lumineuse sous des racines' },
+        { id: 2, title: 'Le renard endormi', text: 'Un renard endormi se réveille et montre une cabane cachée.', visualHint: 'Un renard près d’un chemin de lanternes' },
+        { id: 3, title: 'Les trois portes', text: 'Dans la cabane, trois portes douces attendent un choix.', visualHint: 'Trois portes rondes' }
+      ],
+      segments: [
+        { id: 'segment_1', from: 1, to: 2, narrator: 'virtual_child_a', narratorDisplayName: 'Mira', text: 'Mira remarque que la clé chante seulement quand tout le monde avance avec gentillesse. L’arbre penche une branche vers le sentier, comme s’il était fier d’aider.', mood: 'curieuse' },
+        { id: 'segment_2', from: 2, to: 3, narrator: 'virtual_child_b', narratorDisplayName: 'Noé', text: 'Noé imagine que le renard rêve le chemin avant qu’il apparaisse. Chaque trace de patte brille doucement, et la cabane attend sans se presser.', mood: 'rêveur' }
+      ],
+      endings: [
+        { id: 'lanterne_heureuse', title: 'La lanterne heureuse', emotion: 'heureuse', text: 'La porte choisie s’ouvre sur une lanterne qui se souvient de chaque pas gentil. Elle éclaire le retour et garde une petite lueur pour demain.', visualHint: 'Une lanterne près d’un lit' },
+        { id: 'secret_calme', title: 'Le secret calme', emotion: 'mystérieuse', text: 'La porte s’ouvre sur un chuchotement qui dit que certaines merveilles peuvent attendre. L’enfant sourit : le secret sera prêt quand la prochaine histoire commencera.', visualHint: 'Un rideau avec de la lumière d’étoiles' },
+        { id: 'porte_qui_rit', title: 'La porte qui rit', emotion: 'drôle', text: 'La porte glousse avant même qu’on la touche. Même le renard rit en dormant, et la clé devient une lune en forme de biscuit.', visualHint: 'Une lune qui rit' }
+      ],
+      metadata: { duration: 'short', readingMode: 'mixed_narration', ageRange: 'autour de 7 ans', createdAt: new Date().toISOString() }
     }
   }
   if (kind === 'flow') {

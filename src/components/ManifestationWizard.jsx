@@ -8,6 +8,7 @@ import { DynamicQuestionStep } from './DynamicQuestionStep'
 import { FeelingStep } from './FeelingStep'
 import { HistoryPanel } from './HistoryPanel'
 import { NeedMap } from './NeedMap'
+import { NarratiaApp } from '../features/narratia/NarratiaApp'
 
 const PHASE_PASSAGES = {
   1: 4,
@@ -21,6 +22,7 @@ const RULE_SETTINGS_KEY = 'manifestation:rule'
 const DEFAULT_RULE_ID = 'default'
 const RECONCILIATION_RULE_ID = 'emotional-reconciliation'
 const FLOW_RULE_ID = 'flow'
+const NARRATIA_RULE_ID = 'narratia'
 const DEFAULT_AI_SETTINGS = {
   intensity: 28,
   grounding: 35,
@@ -43,6 +45,11 @@ const WIZARD_RULES = [
     id: FLOW_RULE_ID,
     label: 'Flow',
     description: 'Naviguer dans des mots qui filent, choisir ceux qui appellent, puis laisser l IA orienter la suite.'
+  },
+  {
+    id: NARRATIA_RULE_ID,
+    label: 'Narratia',
+    description: 'Partager une histoire guidée entre parent, enfant et deux compagnons narrateurs.'
   }
 ]
 const DEFAULT_BEING_SETTINGS = {
@@ -375,6 +382,7 @@ export function ManifestationWizard() {
   const phaseZeroStep = activeRuleId === RECONCILIATION_RULE_ID ? getReconciliationPromptStep(reconciliation) : null
   const needsPhaseZero = activeRuleId === RECONCILIATION_RULE_ID && Boolean(phaseZeroStep)
   const isFlowRule = activeRuleId === FLOW_RULE_ID
+  const isNarratiaRule = activeRuleId === NARRATIA_RULE_ID
   const isPhaseDone = Boolean(feeling && currentPhaseAnswers.length >= currentPhaseTotal)
   const needsPhaseChoice = activeRuleId === DEFAULT_RULE_ID && isPhaseDone && phase < 3
   const isComplete = Boolean(feeling && phase === 3 && isPhaseDone)
@@ -893,8 +901,9 @@ export function ManifestationWizard() {
         debugRows={getDebugRows(currentPrompt)}
       />
 
-      {!isFlowRule ? <NeedMap steps={steps} discovery={discovery} links={links} /> : null}
+      {!isFlowRule && !isNarratiaRule ? <NeedMap steps={steps} discovery={discovery} links={links} /> : null}
 
+      {isNarratiaRule ? <NarratiaApp /> : (
       <AnimatePresence mode="wait">
         {isFlowRule ? (
           <FlowStep
@@ -958,8 +967,9 @@ export function ManifestationWizard() {
           />
         )}
       </AnimatePresence>
+      )}
 
-      {!isFlowRule ? <HistoryPanel history={history} /> : null}
+      {!isFlowRule && !isNarratiaRule ? <HistoryPanel history={history} /> : null}
     </main>
   )
 }
