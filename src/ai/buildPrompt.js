@@ -5,6 +5,7 @@ const toneRules = [
   'Ne jamais ecrire "tu es" ou "la verite est".',
   'Utiliser des formulations comme "il semble peut-etre", "une piste possible", "ce chemin peut pointer vers".',
   'Rester doux, intelligent, sensible, concret, non intrusif.',
+  'Tutoyer le joueur dans tous les modes. Ne jamais utiliser "vous", "votre" ou "vos".',
   'Eviter les cliches spirituels, les promesses et le ton de gourou.',
   'Eviter les tics de langage repetes: pas de suite de questions construites sur "dans ce moment", "en observant", "en regardant", "quelle petite", "pourrait doucement".',
   'Utiliser les mots "doucement", "petit/petite", "lumiere" et "interieur" avec parcimonie: jamais comme structure automatique.'
@@ -142,6 +143,25 @@ function getTask(kind) {
 
   if (kind === 'links') {
     return 'Propose 2 a 4 liens possibles entre les besoins dominants et les reponses du chemin.'
+  }
+
+  if (kind === 'settings') {
+    return [
+      'Renouvelle un curseur de personnalisation.',
+      'Reponds avec slider: id identique a context.slider.id, label court, left et right comme deux extremes opposes, value entre 0 et 100.',
+      'Les extremes doivent etre utiles pour personnaliser l experience, pas seulement decoratifs.',
+      'Le curseur doit tutoyer implicitement le joueur sans employer "vous".'
+    ].join(' ')
+  }
+
+  if (kind === 'flow') {
+    return [
+      'Genere un buffer de 12 a 18 mots courts pour un mode Flow plein ecran.',
+      'Les mots doivent reagir aux mots deja choisis dans context.selectedWords et anticiper 2 ou 3 questions implicites que le joueur pourrait se poser.',
+      'Chaque item contient id, word, question, x, y, size, duration et delay.',
+      'x et y sont des nombres entre 0 et 100, size entre 0.75 et 1.35, duration entre 6 et 13, delay entre -5 et 0.',
+      'Ajoute conclusion seulement si context.selectedWords contient au moins 10 choix; conclusion tient en une phrase et tutoie.'
+    ].join(' ')
   }
 
   return 'Genere une variation utile pour le wizard.'

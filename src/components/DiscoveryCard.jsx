@@ -6,7 +6,7 @@ function formatList(items) {
   return `${items.slice(0, -1).join(', ')} et ${items.at(-1)}`
 }
 
-export function DiscoveryCard({ steps, discovery, discoveryText, links, onRestart }) {
+export function DiscoveryCard({ steps, discovery, discoveryText, links, onContinue, onBack, onRestart }) {
   const { dominantNeed, linkedNeeds } = discovery
 
   if (!dominantNeed) return null
@@ -49,9 +49,11 @@ export function DiscoveryCard({ steps, discovery, discoveryText, links, onRestar
       <p className="soft-note">
         Ce n’est pas une vérité absolue. C’est une piste sensible : créer, ici, c’est découvrir ce que tu crées en toi.
       </p>
-      <button type="button" className="primary-action" onClick={onRestart}>
-        Explorer un autre chemin
-      </button>
+      <div className="end-actions">
+        <button type="button" className="primary-action" onClick={onContinue}>Continue</button>
+        <button type="button" className="ghost-action" onClick={onBack}>Retour</button>
+        <button type="button" className="ghost-action" onClick={onRestart}>Un autre</button>
+      </div>
     </motion.section>
   )
 }
