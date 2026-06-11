@@ -72,6 +72,36 @@ async function requestAI(kind, context) {
   }
 }
 
+function createFallbackDebug(kind, fallbackReason, error, extra = {}) {
+  return {
+    source: 'local',
+    fallbackReason,
+    endpoint: AI_ENDPOINT,
+    kind,
+    errorName: error?.name || 'none',
+    errorMessage: error?.message || 'none',
+    timestamp: new Date().toISOString(),
+    ...extra
+  }
+}
+
+function withFallbackDebug(payload, kind, fallbackReason, error, extra) {
+  const debug = createFallbackDebug(kind, fallbackReason, error, extra)
+
+  return {
+    ...payload,
+    source: payload?.source || 'local',
+    debug: {
+      ...debug,
+      ...(payload?.debug || {})
+    }
+  }
+}
+
+function createInvalidAiPayloadError(kind, result) {
+  return new Error(`Invalid AI ${kind} payload: ${Object.keys(result || {}).join(', ') || 'empty object'}`)
+}
+
 function localSliderSuggestion(context = {}) {
   const sliderId = context.slider?.id || 'intensity'
   const pool = FALLBACK_SLIDER_PAIRS[sliderId] || FALLBACK_SLIDER_PAIRS.intensity
@@ -243,22 +273,27 @@ export async function getDynamicQuestion(context) {
     if (result?.question && Array.isArray(result.answers)) {
       return repairQuestionIfNeeded({
         ...result,
-        source: result.source || result.debug?.source || 'ai'
+        source: result.source || result.debug?.source || 'ai',
+        debug: {
+          source: 'ai',
+          fallbackReason: 'none',
+          endpoint: AI_ENDPOINT,
+          kind: 'question',
+          ...(result.debug || {})
+        }
       }, context)
     }
+
+    return withFallbackDebug(
+      localQuestion(context),
+      'question',
+      'invalid_ai_payload',
+      createInvalidAiPayloadError('question', result)
+    )
   } catch (error) {
     // The local engine keeps the wizard alive when the server key is absent.
-    return {
-      ...localQuestion(context),
-      debug: {
-        source: 'local',
-        fallbackReason: 'client_request_failed',
-        errorMessage: error?.message || 'Unable to reach /api/ai'
-      }
-    }
+    return withFallbackDebug(localQuestion(context), 'question', 'client_request_failed', error)
   }
-
-  return localQuestion(context)
 }
 
 export async function getReplacementAnswer(context) {
