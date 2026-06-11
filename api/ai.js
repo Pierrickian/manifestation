@@ -97,6 +97,65 @@ const responseFormats = {
         }
       }
     }
+  },
+  settings: {
+    type: 'json_schema',
+    json_schema: {
+      name: 'wizard_setting_slider',
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['slider'],
+        properties: {
+          slider: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['id', 'label', 'left', 'right', 'value'],
+            properties: {
+              id: { type: 'string' },
+              label: { type: 'string' },
+              left: { type: 'string' },
+              right: { type: 'string' },
+              value: { type: 'number' }
+            }
+          }
+        }
+      }
+    }
+  },
+  flow: {
+    type: 'json_schema',
+    json_schema: {
+      name: 'wizard_flow',
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['words', 'conclusion'],
+        properties: {
+          words: {
+            type: 'array',
+            minItems: 8,
+            maxItems: 18,
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['id', 'word', 'question', 'x', 'y', 'size', 'duration', 'delay'],
+              properties: {
+                id: { type: 'string' },
+                word: { type: 'string' },
+                question: { type: 'string' },
+                x: { type: 'number' },
+                y: { type: 'number' },
+                size: { type: 'number' },
+                duration: { type: 'number' },
+                delay: { type: 'number' }
+              }
+            }
+          },
+          conclusion: { type: 'string' }
+        }
+      }
+    }
   }
 }
 
@@ -161,6 +220,32 @@ function getLocalResult(kind, context) {
 
   if (kind === 'discovery') return { text: generateDiscovery(context) }
   if (kind === 'links') return generateLinks(context)
+  if (kind === 'settings') {
+    return {
+      slider: {
+        id: context?.slider?.id || 'intensity',
+        label: context?.slider?.label || 'Nuance',
+        left: 'Retenir',
+        right: 'Traverser',
+        value: 50
+      }
+    }
+  }
+  if (kind === 'flow') {
+    return {
+      words: ['sens', 'corps', 'choix', 'lien', 'limite', 'appui', 'route', 'envie', 'place', 'souffle', 'clarte', 'pas'].map((word, index) => ({
+        id: `local-flow-${index}-${word}`,
+        word,
+        question: `Qu est-ce que "${word}" ouvre pour toi ?`,
+        x: 12 + ((index * 17) % 76),
+        y: 10 + ((index * 23) % 78),
+        size: 0.85 + ((index % 5) * 0.08),
+        duration: 7 + (index % 6),
+        delay: -1 * (index % 5)
+      })),
+      conclusion: ''
+    }
+  }
   return generateQuestion(context)
 }
 

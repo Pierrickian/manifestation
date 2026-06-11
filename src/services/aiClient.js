@@ -2,6 +2,51 @@ import { generateDiscovery as localDiscovery } from '../ai/generateDiscovery'
 import { generateLinks as localLinks } from '../ai/generateLinks'
 import { generateQuestion as localQuestion } from '../ai/generateQuestion'
 
+const FALLBACK_SLIDER_PAIRS = {
+  intensity: [
+    { label: 'Relief', left: 'Apaiser', right: 'Traverser', value: 44 },
+    { label: 'Impact', left: 'Effleurer', right: 'Bousculer', value: 38 }
+  ],
+  grounding: [
+    { label: 'Matiere', left: 'Concrete', right: 'Symbolique', value: 48 },
+    { label: 'Langage', left: 'Pratique', right: 'Visionnaire', value: 42 }
+  ],
+  focus: [
+    { label: 'Lecture', left: 'Besoin nu', right: 'Emotion vive', value: 55 },
+    { label: 'Boussole', left: 'Structure', right: 'Ressenti', value: 62 }
+  ],
+  register: [
+    { label: 'Voix', left: 'Brute', right: 'Delicate', value: 68 },
+    { label: 'Style', left: 'Direct', right: 'Soigne', value: 72 }
+  ],
+  commitment: [
+    { label: 'Elan', left: 'Observer', right: 'Agir', value: 46 },
+    { label: 'Decision', left: 'Rester libre', right: 'Assumer', value: 52 }
+  ],
+  openness: [
+    { label: 'Champ', left: 'Connu', right: 'Inconnu', value: 58 },
+    { label: 'Exploration', left: 'Proteger', right: 'Explorer', value: 64 }
+  ],
+  sensitivity: [
+    { label: 'Peau', left: 'Dense', right: 'Fine', value: 57 },
+    { label: 'Reception', left: 'Stable', right: 'Poreuse', value: 61 }
+  ],
+  autonomy: [
+    { label: 'Guidage', left: 'Accepte aide', right: 'Choisis seul', value: 66 },
+    { label: 'Souverainete', left: 'Etre accompagne', right: 'Tenir cap', value: 63 }
+  ]
+}
+
+const FLOW_WORDS_BY_NEED = {
+  violet: ['sens', 'silence', 'axe', 'vision', 'clarte', 'reliance', 'trace', 'hauteur'],
+  indigo: ['intuition', 'signal', 'route', 'image', 'hypothese', 'reve', 'cap', 'ecoute'],
+  blue: ['limite', 'parole', 'espace', 'souffle', 'franchise', 'demande', 'liberte', 'voix'],
+  green: ['lien', 'tendresse', 'appui', 'reception', 'paix', 'coeur', 'alliance', 'presence'],
+  yellow: ['place', 'valeur', 'audace', 'fierte', 'rayon', 'dignite', 'estime', 'legitimite'],
+  orange: ['envie', 'jeu', 'essai', 'mouvement', 'creation', 'chaleur', 'curiosite', 'desir'],
+  red: ['base', 'sol', 'rythme', 'corps', 'securite', 'pas', 'ancrage', 'force']
+}
+
 async function requestAI(kind, context) {
   const response = await fetch('/api/ai', {
     method: 'POST',
@@ -14,6 +59,61 @@ async function requestAI(kind, context) {
   }
 
   return response.json()
+}
+
+function localSliderSuggestion(context = {}) {
+  const sliderId = context.slider?.id || 'intensity'
+  const pool = FALLBACK_SLIDER_PAIRS[sliderId] || FALLBACK_SLIDER_PAIRS.intensity
+  const index = ((context.refreshCount || 0) + Math.floor(Date.now() / 1000)) % pool.length
+
+  return {
+    slider: {
+      id: sliderId,
+      ...pool[index]
+    },
+    source: 'local',
+    debug: {
+      source: 'local',
+      fallbackReason: 'local_slider_suggestion'
+    }
+  }
+}
+
+function makeFlowItem(word, index, seed = 0) {
+  return {
+    id: `flow-${Date.now()}-${index}-${word}`,
+    word,
+    question: `Qu est-ce que "${word}" ouvre pour toi ?`,
+    x: (13 + ((index * 19 + seed) % 72)),
+    y: (8 + ((index * 29 + seed) % 78)),
+    size: 0.86 + (((index + seed) % 5) * 0.08),
+    duration: 7 + ((index + seed) % 6),
+    delay: ((index + seed) % 4) * -1.2
+  }
+}
+
+function localFlowWords(context = {}) {
+  const dominantNeedId = context.discovery?.dominantNeed?.id || context.dominantNeed?.id || 'red'
+  const selected = (context.selectedWords || []).map((item) => item.word || item).filter(Boolean)
+  const baseWords = [
+    ...(FLOW_WORDS_BY_NEED[dominantNeedId] || FLOW_WORDS_BY_NEED.red),
+    ...selected.slice(-5),
+    ...(context.answers || []).slice(-4).map((answer) => answer.label)
+  ].filter(Boolean)
+  const uniqueWords = [...new Set(baseWords)].slice(0, 18)
+  const seed = selected.join('').length + Number(context.batch || 0)
+
+  return {
+    words: uniqueWords.map((word, index) => makeFlowItem(word, index, seed)),
+    conclusion: selected.length >= 10
+      ? `Une piste revient: tu sembles chercher un mouvement entre ${selected.slice(-3).join(', ')}.`
+      : '',
+    source: 'local',
+    debug: {
+      source: 'local',
+      fallbackReason: 'local_flow_words'
+    }
+  }
 }
 
 const QUESTION_STOPWORDS = new Set([
@@ -157,6 +257,38 @@ export async function getReplacementAnswer(context) {
     ...result,
     source: result.source || result.debug?.source || 'ai'
   }
+}
+
+export async function getSliderSuggestion(context) {
+  try {
+    const result = await requestAI('settings', context)
+    if (result?.slider) {
+      return {
+        ...result,
+        source: result.source || result.debug?.source || 'ai'
+      }
+    }
+  } catch {
+    // Local suggestions keep customization available without waiting on the API.
+  }
+
+  return localSliderSuggestion(context)
+}
+
+export async function getFlowWords(context) {
+  try {
+    const result = await requestAI('flow', context)
+    if (Array.isArray(result?.words)) {
+      return {
+        ...result,
+        source: result.source || result.debug?.source || 'ai'
+      }
+    }
+  } catch {
+    // Flow must stay continuous, so local words are used silently.
+  }
+
+  return localFlowWords(context)
 }
 
 export async function getDynamicDiscovery(context) {

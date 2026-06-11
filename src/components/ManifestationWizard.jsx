@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { createSessionSnapshot, getWizardDiscovery } from '../logic/wizardScoring'
-import { getDynamicDiscovery, getDynamicLinks, getDynamicQuestion, getReplacementAnswer } from '../services/aiClient'
+import { getDynamicDiscovery, getDynamicLinks, getDynamicQuestion, getFlowWords, getReplacementAnswer, getSliderSuggestion } from '../services/aiClient'
 import { NEGATIVE_EMOTIONS, OPPOSITE_POSITIVE_EMOTIONS, POSITIVE_EMOTIONS } from '../data/staticQuestions'
 import { DiscoveryCard } from './DiscoveryCard'
 import { DynamicQuestionStep } from './DynamicQuestionStep'
@@ -20,6 +20,7 @@ const BEING_SETTINGS_KEY = 'manifestation:being-settings'
 const RULE_SETTINGS_KEY = 'manifestation:rule'
 const DEFAULT_RULE_ID = 'default'
 const RECONCILIATION_RULE_ID = 'emotional-reconciliation'
+const FLOW_RULE_ID = 'flow'
 const DEFAULT_AI_SETTINGS = {
   intensity: 28,
   grounding: 35,
@@ -37,6 +38,11 @@ const WIZARD_RULES = [
     id: RECONCILIATION_RULE_ID,
     label: 'Reconciliation emotionnelle',
     description: 'Retrouver une vibration positive et relier la part qui la porte a celle qui signale le negatif.'
+  },
+  {
+    id: FLOW_RULE_ID,
+    label: 'Flow',
+    description: 'Naviguer dans des mots qui filent, choisir ceux qui appellent, puis laisser l IA orienter la suite.'
   }
 ]
 const DEFAULT_BEING_SETTINGS = {
@@ -99,6 +105,32 @@ const BEING_SLIDERS = [
     right: 'Souverain'
   }
 ]
+
+const AI_SLIDER_CONFIG_KEY = 'manifestation:ai-slider-configs'
+const BEING_SLIDER_CONFIG_KEY = 'manifestation:being-slider-configs'
+const FLOW_CONCLUSION_COUNT = 12
+const INITIAL_FLOW_WORDS = ['sens', 'corps', 'choix', 'lien', 'limite', 'appui', 'route', 'envie', 'place', 'souffle', 'clarte', 'pas'].map((word, index) => ({
+  id: `initial-flow-${index}-${word}`,
+  word,
+  question: `Qu est-ce que "${word}" ouvre pour toi ?`,
+  x: 14 + ((index * 17) % 74),
+  y: 12 + ((index * 23) % 76),
+  size: 0.88 + ((index % 5) * 0.08),
+  duration: 7 + (index % 6),
+  delay: -1 * (index % 5)
+}))
+
+function readSliderConfigs(key, fallback) {
+  try {
+    const savedConfigs = JSON.parse(localStorage.getItem(key) || '[]')
+    return fallback.map((slider) => ({
+      ...slider,
+      ...(savedConfigs.find((savedSlider) => savedSlider.id === slider.id) || {})
+    }))
+  } catch {
+    return fallback
+  }
+}
 
 function createSessionId() {
   return `session-${Date.now()}-${Math.random().toString(16).slice(2)}`
@@ -293,6 +325,9 @@ export function ManifestationWizard() {
   const [history, setHistory] = useState(readHistory)
   const [aiSettings, setAiSettings] = useState(readAiSettings)
   const [beingSettings, setBeingSettings] = useState(readBeingSettings)
+  const [aiSliders, setAiSliders] = useState(() => readSliderConfigs(AI_SLIDER_CONFIG_KEY, AI_SLIDERS))
+  const [beingSliders, setBeingSliders] = useState(() => readSliderConfigs(BEING_SLIDER_CONFIG_KEY, BEING_SLIDERS))
+  const [refreshingSettingId, setRefreshingSettingId] = useState(null)
   const [activeRuleId, setActiveRuleId] = useState(readActiveRuleId)
   const [reconciliation, setReconciliation] = useState({ polarity: null, positiveEmotion: null, negativeEmotion: null })
   const [phaseZeroPrompt, setPhaseZeroPrompt] = useState(null)
@@ -300,6 +335,11 @@ export function ManifestationWizard() {
   const [refreshingPhaseZeroId, setRefreshingPhaseZeroId] = useState(null)
   const [phase, setPhase] = useState(1)
   const [phaseChoices, setPhaseChoices] = useState({})
+  const [extraPassages, setExtraPassages] = useState(0)
+  const [flowWords, setFlowWords] = useState([])
+  const [selectedFlowWords, setSelectedFlowWords] = useState([])
+  const [flowConclusion, setFlowConclusion] = useState('')
+  const [flowBatch, setFlowBatch] = useState(0)
   const savedSessionRef = useRef(null)
 
   const steps = useMemo(() => {
@@ -326,9 +366,10 @@ export function ManifestationWizard() {
 
   const discovery = useMemo(() => getWizardDiscovery(steps), [steps])
   const currentPhaseAnswers = useMemo(() => getPhaseAnswers(answers, phase), [answers, phase])
-  const currentPhaseTotal = getPhaseTotal(activeRuleId, phase)
+  const currentPhaseTotal = getPhaseTotal(activeRuleId, phase) + (phase === 3 ? extraPassages : 0)
   const phaseZeroStep = activeRuleId === RECONCILIATION_RULE_ID ? getReconciliationPromptStep(reconciliation) : null
   const needsPhaseZero = activeRuleId === RECONCILIATION_RULE_ID && Boolean(phaseZeroStep)
+  const isFlowRule = activeRuleId === FLOW_RULE_ID
   const isPhaseDone = Boolean(feeling && currentPhaseAnswers.length >= currentPhaseTotal)
   const needsPhaseChoice = activeRuleId === DEFAULT_RULE_ID && isPhaseDone && phase < 3
   const isComplete = Boolean(feeling && phase === 3 && isPhaseDone)
@@ -356,9 +397,11 @@ export function ManifestationWizard() {
     dominantNeed: discovery.dominantNeed,
     linkedNeeds: discovery.linkedNeeds,
     pathLength: answers.length,
+    selectedWords: selectedFlowWords,
+    flowBatch,
     aiSettings,
     beingSettings
-  }), [activeRuleId, aiSettings, answers, beingSettings, currentPhaseAnswers.length, discovery, feeling, phase, phaseChoices, phaseZeroStep, reconciliation, sessionId, steps])
+  }), [activeRuleId, aiSettings, answers, beingSettings, currentPhaseAnswers.length, discovery, feeling, flowBatch, phase, phaseChoices, phaseZeroStep, reconciliation, selectedFlowWords, sessionId, steps])
 
   function updateAiSetting(id, value) {
     setAiSettings((currentSettings) => {
@@ -394,11 +437,24 @@ export function ManifestationWizard() {
     setLinks({ needLinks: [], pathLinks: [] })
     setPhase(1)
     setPhaseChoices({})
+    setExtraPassages(0)
+    setFlowWords([])
+    setSelectedFlowWords([])
+    setFlowConclusion('')
+    setFlowBatch(0)
     setReconciliation({ polarity: null, positiveEmotion: null, negativeEmotion: null })
     setPhaseZeroPrompt(null)
     setIsLoadingPhaseZeroPrompt(false)
     setRefreshingPhaseZeroId(null)
     savedSessionRef.current = null
+  }
+
+  function resetFlow() {
+    setSessionId(createSessionId())
+    setFlowWords([])
+    setSelectedFlowWords([])
+    setFlowConclusion('')
+    setFlowBatch((currentBatch) => currentBatch + 1)
   }
 
   function chooseRule(ruleId) {
@@ -411,7 +467,7 @@ export function ManifestationWizard() {
     let isActive = true
 
     async function loadQuestion() {
-      if (!feeling || isComplete || needsPhaseChoice || isPhaseDone || currentPrompt) return
+      if (isFlowRule || !feeling || isComplete || needsPhaseChoice || isPhaseDone || currentPrompt) return
 
       setIsLoadingPrompt(true)
       const prompt = await getDynamicQuestion(aiContext)
@@ -427,7 +483,45 @@ export function ManifestationWizard() {
     return () => {
       isActive = false
     }
-  }, [aiContext, currentPrompt, feeling, isComplete, isPhaseDone, needsPhaseChoice])
+  }, [aiContext, currentPrompt, feeling, isComplete, isFlowRule, isPhaseDone, needsPhaseChoice])
+
+  useEffect(() => {
+    let isActive = true
+
+    async function loadFlowBuffer() {
+      if (!isFlowRule || flowConclusion || flowWords.length > 8) return
+
+      const result = await getFlowWords({
+        ...aiContext,
+        batch: flowBatch,
+        selectedWords: selectedFlowWords
+      })
+
+      if (!isActive) return
+
+      setFlowWords((currentWords) => {
+        const knownIds = new Set(currentWords.map((word) => word.id))
+        const nextWords = (result.words || []).filter((word) => !knownIds.has(word.id))
+        return [...currentWords, ...nextWords].slice(-24)
+      })
+
+      if (result.conclusion && selectedFlowWords.length >= FLOW_CONCLUSION_COUNT) {
+        setFlowConclusion(result.conclusion)
+      }
+    }
+
+    loadFlowBuffer()
+
+    return () => {
+      isActive = false
+    }
+  }, [aiContext, flowBatch, flowConclusion, flowWords.length, isFlowRule, selectedFlowWords])
+
+  useEffect(() => {
+    if (!isFlowRule || flowConclusion || selectedFlowWords.length < FLOW_CONCLUSION_COUNT) return
+
+    setFlowConclusion(`Une piste se dessine: tu sembles tourner autour de ${selectedFlowWords.slice(-3).map((item) => item.word).join(', ')}.`)
+  }, [flowConclusion, isFlowRule, selectedFlowWords])
 
   useEffect(() => {
     let isActive = true
@@ -514,8 +608,82 @@ export function ManifestationWizard() {
     setLinks({ needLinks: [], pathLinks: [] })
     setPhase(1)
     setPhaseChoices({})
+    setExtraPassages(0)
+    setFlowWords([])
+    setSelectedFlowWords([])
+    setFlowConclusion('')
+    setFlowBatch(0)
     setPhaseZeroPrompt(null)
     setRefreshingPhaseZeroId(null)
+    savedSessionRef.current = null
+  }
+
+  async function refreshSetting(group, slider) {
+    if (refreshingSettingId) return
+
+    const storageKey = group === 'ai' ? AI_SLIDER_CONFIG_KEY : BEING_SLIDER_CONFIG_KEY
+    const setSliders = group === 'ai' ? setAiSliders : setBeingSliders
+    const settingUpdater = group === 'ai' ? updateAiSetting : updateBeingSetting
+
+    setRefreshingSettingId(`${group}:${slider.id}`)
+
+    try {
+      const result = await getSliderSuggestion({
+        ...aiContext,
+        group,
+        slider,
+        refreshCount: Date.now()
+      })
+      const nextSlider = result.slider
+      const boundedValue = Math.max(0, Math.min(100, Number(nextSlider.value ?? 50)))
+
+      setSliders((currentSliders) => {
+        const updatedSliders = currentSliders.map((currentSlider) => (
+          currentSlider.id === slider.id
+            ? {
+                ...currentSlider,
+                label: nextSlider.label || currentSlider.label,
+                left: nextSlider.left || currentSlider.left,
+                right: nextSlider.right || currentSlider.right
+              }
+            : currentSlider
+        ))
+
+        localStorage.setItem(storageKey, JSON.stringify(updatedSliders))
+        return updatedSliders
+      })
+
+      settingUpdater(slider.id, boundedValue)
+    } finally {
+      setRefreshingSettingId(null)
+    }
+  }
+
+  function chooseFlowWord(word) {
+    setSelectedFlowWords((currentWords) => [
+      ...currentWords,
+      {
+        ...word,
+        chosenAt: Date.now()
+      }
+    ])
+    setFlowWords((currentWords) => currentWords.filter((currentWord) => currentWord.id !== word.id))
+
+    if (flowWords.length < 10) {
+      setFlowBatch((currentBatch) => currentBatch + 1)
+    }
+  }
+
+  function continueFlow() {
+    setFlowConclusion('')
+    setFlowBatch((currentBatch) => currentBatch + 1)
+  }
+
+  function continueJourney() {
+    setDiscoveryText('')
+    setLinks({ needLinks: [], pathLinks: [] })
+    setExtraPassages((currentExtraPassages) => currentExtraPassages + 1)
+    setCurrentPrompt(null)
     savedSessionRef.current = null
   }
 
@@ -709,17 +877,32 @@ export function ManifestationWizard() {
         rules={WIZARD_RULES}
         activeRuleId={activeRuleId}
         onRuleChange={chooseRule}
+        aiSliders={aiSliders}
         aiSettings={aiSettings}
+        beingSliders={beingSliders}
         beingSettings={beingSettings}
         onAiSettingChange={updateAiSetting}
         onBeingSettingChange={updateBeingSetting}
+        onRefreshSetting={refreshSetting}
+        refreshingSettingId={refreshingSettingId}
         debugRows={getDebugRows(currentPrompt)}
       />
 
-      <NeedMap steps={steps} discovery={discovery} links={links} />
+      {!isFlowRule ? <NeedMap steps={steps} discovery={discovery} links={links} /> : null}
 
       <AnimatePresence mode="wait">
-        {needsPhaseZero ? (
+        {isFlowRule ? (
+          <FlowStep
+            key="flow-step"
+            words={flowWords}
+            selectedWords={selectedFlowWords}
+            conclusion={flowConclusion}
+            onChooseWord={chooseFlowWord}
+            onContinue={continueFlow}
+            onBack={resetJourney}
+            onReset={resetFlow}
+          />
+        ) : needsPhaseZero ? (
           <ReconciliationStep
             key={`reconciliation-${phaseZeroStep}`}
             step={phaseZeroStep}
@@ -764,13 +947,71 @@ export function ManifestationWizard() {
             discovery={discovery}
             discoveryText={discoveryText}
             links={links}
+            onContinue={continueJourney}
+            onBack={resetJourney}
             onRestart={restart}
           />
         )}
       </AnimatePresence>
 
-      <HistoryPanel history={history} />
+      {!isFlowRule ? <HistoryPanel history={history} /> : null}
     </main>
+  )
+}
+
+function FlowStep({ words, selectedWords, conclusion, onChooseWord, onContinue, onBack, onReset }) {
+  const selectedIds = new Set(selectedWords.map((item) => item.id))
+  const visibleWords = (words.length ? words : INITIAL_FLOW_WORDS).filter((item) => !selectedIds.has(item.id))
+
+  return (
+    <section className="flow-stage" aria-labelledby="flow-title">
+      <div className="flow-hud">
+        <div>
+          <p className="eyebrow">Flow</p>
+          <h2 id="flow-title">Attrape les mots qui t appellent.</h2>
+        </div>
+        <strong>{selectedWords.length}</strong>
+      </div>
+
+      <div className="flow-sky" aria-label="Mots en mouvement">
+        {visibleWords.map((item) => (
+          <button
+            type="button"
+            className="flow-word"
+            key={item.id}
+            onClick={() => onChooseWord(item)}
+            style={{
+              '--flow-x': `${item.x ?? 50}%`,
+              '--flow-y': `${item.y ?? 50}%`,
+              '--flow-size': item.size ?? 1,
+              '--flow-duration': `${item.duration ?? 9}s`,
+              '--flow-delay': `${item.delay ?? 0}s`
+            }}
+            title={item.question}
+          >
+            {item.word}
+          </button>
+        ))}
+      </div>
+
+      <div className="flow-trail" aria-label="Mots choisis">
+        {selectedWords.slice(-8).map((item) => (
+          <span key={`${item.id}-${item.chosenAt}`}>{item.word}</span>
+        ))}
+      </div>
+
+      {conclusion ? (
+        <div className="flow-conclusion" role="dialog" aria-modal="true" aria-labelledby="flow-conclusion-title">
+          <p className="eyebrow">Conclusion</p>
+          <h2 id="flow-conclusion-title">{conclusion}</h2>
+          <div className="flow-actions">
+            <button type="button" className="primary-action" onClick={onContinue}>Continue</button>
+            <button type="button" className="ghost-action" onClick={onBack}>Retour</button>
+            <button type="button" className="ghost-action" onClick={onReset}>Un autre</button>
+          </div>
+        </div>
+      ) : null}
+    </section>
   )
 }
 
@@ -880,10 +1121,14 @@ function WizardMenu({
   rules,
   activeRuleId,
   onRuleChange,
+  aiSliders,
   aiSettings,
+  beingSliders,
   beingSettings,
   onAiSettingChange,
   onBeingSettingChange,
+  onRefreshSetting,
+  refreshingSettingId,
   debugRows
 }) {
   return (
@@ -913,21 +1158,17 @@ function WizardMenu({
         <summary>AI</summary>
 
         <div className="ai-settings-grid">
-          {AI_SLIDERS.map((slider) => (
-            <label className="ai-setting" key={slider.id}>
-              <span>{slider.label}</span>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={aiSettings[slider.id]}
-                onChange={(event) => onAiSettingChange(slider.id, event.target.value)}
-              />
-              <small>
-                <span>{slider.left}</span>
-                <span>{slider.right}</span>
-              </small>
-            </label>
+          {aiSliders.map((slider) => (
+            <SliderSetting
+              key={slider.id}
+              group="ai"
+              slider={slider}
+              value={aiSettings[slider.id]}
+              onChange={onAiSettingChange}
+              onRefresh={onRefreshSetting}
+              isRefreshing={refreshingSettingId === `ai:${slider.id}`}
+              isDisabled={Boolean(refreshingSettingId)}
+            />
           ))}
         </div>
 
@@ -950,24 +1191,51 @@ function WizardMenu({
         <summary>Etre</summary>
 
         <div className="ai-settings-grid">
-          {BEING_SLIDERS.map((slider) => (
-            <label className="ai-setting" key={slider.id}>
-              <span>{slider.label}</span>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={beingSettings[slider.id]}
-                onChange={(event) => onBeingSettingChange(slider.id, event.target.value)}
-              />
-              <small>
-                <span>{slider.left}</span>
-                <span>{slider.right}</span>
-              </small>
-            </label>
+          {beingSliders.map((slider) => (
+            <SliderSetting
+              key={slider.id}
+              group="being"
+              slider={slider}
+              value={beingSettings[slider.id]}
+              onChange={onBeingSettingChange}
+              onRefresh={onRefreshSetting}
+              isRefreshing={refreshingSettingId === `being:${slider.id}`}
+              isDisabled={Boolean(refreshingSettingId)}
+            />
           ))}
         </div>
       </details>
     </details>
+  )
+}
+
+function SliderSetting({ group, slider, value, onChange, onRefresh, isRefreshing, isDisabled }) {
+  return (
+    <div className="ai-setting-row">
+      <label className="ai-setting">
+        <span>{slider.label}</span>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          value={value}
+          onChange={(event) => onChange(slider.id, event.target.value)}
+        />
+        <small>
+          <span>{slider.left}</span>
+          <span>{slider.right}</span>
+        </small>
+      </label>
+      <button
+        type="button"
+        className="refresh-answer-action setting-refresh-action"
+        onClick={() => onRefresh(group, slider)}
+        disabled={isDisabled}
+        aria-label={`Renouveler le curseur ${slider.label} avec l IA`}
+        title="Renouveler ce curseur avec l'IA"
+      >
+        {isRefreshing ? '...' : 'AI+'}
+      </button>
+    </div>
   )
 }
