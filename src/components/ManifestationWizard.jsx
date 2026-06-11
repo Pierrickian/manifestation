@@ -309,6 +309,8 @@ function getDebugRows(prompt) {
         ['finishReason', prompt.debug.finishReason || 'unknown'],
         ['errorName', prompt.debug.errorName || 'none'],
         ['errorMessage', prompt.debug.errorMessage || 'none'],
+        ['invalidPayloadKeys', prompt.debug.invalidPayloadKeys || 'none'],
+        ['retryCount', String(prompt.debug.retryCount ?? 'unknown')],
         ['timestamp', prompt.debug.timestamp || 'unknown'],
         ['questionId', prompt.id || 'none'],
         ['answerIds', answers.map((answer) => answer.id).join(', ') || 'none']
