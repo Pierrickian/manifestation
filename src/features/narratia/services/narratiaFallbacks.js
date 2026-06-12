@@ -48,6 +48,7 @@ export function localStoryPackage({ parentConfiguration = {}, childSelection = {
   const id = `narratia_${Date.now()}`
   const duration = parentConfiguration.duration || 'short'
   const readingMode = parentConfiguration.readingMode || 'mixed_narration'
+  const ageRange = parentConfiguration.ageRange || '6-8'
 
   return {
     id,
@@ -67,7 +68,7 @@ export function localStoryPackage({ parentConfiguration = {}, childSelection = {
       { id: 'fenetre_secrete', title: 'La fenêtre secrète', emotion: 'mystérieuse', text: 'Derrière la porte, une fenêtre montre demain de très loin. Personne n’a besoin de tout comprendre maintenant. L’enfant referme doucement le rideau et garde un petit mystère pour les rêves.', visualHint: 'Une fenêtre ronde avec des étoiles' },
       { id: 'chemin_qui_rit', title: 'Le chemin qui rit', emotion: 'drôle', text: 'La porte éternue, le sentier glousse, et même le signe silencieux remue comme une nouille. Tout le monde rit si fort que l’aventure décide de se glisser dans un oreiller pour revenir plus tard.', visualHint: 'Un chemin joueur comme un ruban' }
     ],
-    metadata: { duration, readingMode, ageRange: 'autour de 7 ans', createdAt: new Date().toISOString() },
+    metadata: { duration, readingMode, ageRange, createdAt: new Date().toISOString() },
     source: 'local'
   }
 }

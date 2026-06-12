@@ -9,6 +9,8 @@ import { FeelingStep } from './FeelingStep'
 import { HistoryPanel } from './HistoryPanel'
 import { NeedMap } from './NeedMap'
 import { NarratiaApp } from '../features/narratia/NarratiaApp'
+import { DEFAULT_RULE_ID, FLOW_RULE_ID, NARRATIA_RULE_ID, RECONCILIATION_RULE_ID, getRules, hasRule, isGuidedJourneyRule } from '../core/engine/ruleRegistry'
+import { getInitialRuleIdFromUrl, useRuleUrlSync } from '../hooks/useRuleUrlSync'
 
 const PHASE_PASSAGES = {
   1: 4,
@@ -19,10 +21,7 @@ const HISTORY_KEY = 'manifestation:paths'
 const AI_SETTINGS_KEY = 'manifestation:ai-settings'
 const BEING_SETTINGS_KEY = 'manifestation:being-settings'
 const RULE_SETTINGS_KEY = 'manifestation:rule'
-const DEFAULT_RULE_ID = 'default'
-const RECONCILIATION_RULE_ID = 'emotional-reconciliation'
-const FLOW_RULE_ID = 'flow'
-const NARRATIA_RULE_ID = 'narratia'
+const WIZARD_RULES = getRules()
 const DEFAULT_AI_SETTINGS = {
   intensity: 28,
   grounding: 35,
@@ -30,28 +29,6 @@ const DEFAULT_AI_SETTINGS = {
   register: 76
 }
 
-const WIZARD_RULES = [
-  {
-    id: DEFAULT_RULE_ID,
-    label: 'Exploration par defaut',
-    description: 'La regle actuelle: partir d un ressenti, lire les besoins, puis orienter les phases.'
-  },
-  {
-    id: RECONCILIATION_RULE_ID,
-    label: 'Reconciliation emotionnelle',
-    description: 'Retrouver une vibration positive et relier la part qui la porte a celle qui signale le negatif.'
-  },
-  {
-    id: FLOW_RULE_ID,
-    label: 'Flow',
-    description: 'Naviguer dans des mots qui filent, choisir ceux qui appellent, puis laisser l IA orienter la suite.'
-  },
-  {
-    id: NARRATIA_RULE_ID,
-    label: 'Narratia',
-    description: 'Partager une histoire guidée entre parent, enfant et deux compagnons narrateurs.'
-  }
-]
 const DEFAULT_BEING_SETTINGS = {
   commitment: 34,
   openness: 58,
@@ -173,13 +150,20 @@ function readBeingSettings() {
   }
 }
 
-function readActiveRuleId() {
+function readStoredRuleId() {
   try {
     const ruleId = localStorage.getItem(RULE_SETTINGS_KEY) || DEFAULT_RULE_ID
-    return WIZARD_RULES.some((rule) => rule.id === ruleId) ? ruleId : DEFAULT_RULE_ID
+    return hasRule(ruleId) ? ruleId : DEFAULT_RULE_ID
   } catch {
     return DEFAULT_RULE_ID
   }
+}
+
+function readActiveRuleId() {
+  return getInitialRuleIdFromUrl({
+    fallbackRuleId: readStoredRuleId(),
+    isKnownRule: hasRule
+  })
 }
 
 function getPhaseTotal(ruleId, phase) {
@@ -384,7 +368,7 @@ export function ManifestationWizard() {
   const isFlowRule = activeRuleId === FLOW_RULE_ID
   const isNarratiaRule = activeRuleId === NARRATIA_RULE_ID
   const isPhaseDone = Boolean(feeling && currentPhaseAnswers.length >= currentPhaseTotal)
-  const needsPhaseChoice = activeRuleId === DEFAULT_RULE_ID && isPhaseDone && phase < 3
+  const needsPhaseChoice = isGuidedJourneyRule(activeRuleId) && isPhaseDone && phase < 3
   const isComplete = Boolean(feeling && phase === 3 && isPhaseDone)
   const orientationChoices = useMemo(() => createOrientationChoices({
     phase: phase + 1,
@@ -471,10 +455,26 @@ export function ManifestationWizard() {
   }
 
   function chooseRule(ruleId) {
+    if (!hasRule(ruleId)) return
+
     setActiveRuleId(ruleId)
     localStorage.setItem(RULE_SETTINGS_KEY, ruleId)
     resetJourney()
   }
+
+  const { selectRuleFromUi } = useRuleUrlSync({
+    activeRuleId,
+    onRuleChange: chooseRule,
+    isKnownRule: hasRule
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(RULE_SETTINGS_KEY, activeRuleId)
+    } catch {
+      // Ignore unavailable storage; URL state remains the source of truth for shared links.
+    }
+  }, [activeRuleId])
 
   useEffect(() => {
     let isActive = true
@@ -889,7 +889,7 @@ export function ManifestationWizard() {
       <WizardMenu
         rules={WIZARD_RULES}
         activeRuleId={activeRuleId}
-        onRuleChange={chooseRule}
+        onRuleChange={selectRuleFromUi}
         aiSliders={aiSliders}
         aiSettings={aiSettings}
         beingSliders={beingSliders}

@@ -1,6 +1,7 @@
 export const NARRATIA_STORAGE_KEY = 'manifestation:narratia-session'
 
 export const defaultParentConfiguration = {
+  ageRange: '6-8',
   duration: 'short',
   emotionalTones: ['reassuring'],
   themes: ['friendship', 'imagination'],
@@ -63,6 +64,16 @@ function normalizeNarratiaState(saved) {
 
   if (!VALID_SCREENS.has(state.screen)) state.screen = state.storyPackage ? 'intro' : 'intro'
   if (!state.storyPackage && !['intro', 'parent', 'child'].includes(state.screen)) state.screen = 'intro'
+
+  state.parentConfiguration = {
+    ...defaultParentConfiguration,
+    ...(state.parentConfiguration || {})
+  }
+
+  state.childSelection = {
+    ...initialNarratiaState.childSelection,
+    ...(state.childSelection || {})
+  }
 
   state.segmentNarratorChoices = state.segmentNarratorChoices || {}
   state.revealedSegmentIds = getNormalizedRevealedSegmentIds(

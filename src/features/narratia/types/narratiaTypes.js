@@ -1,4 +1,5 @@
 /**
+ * @typedef {'2-3' | '4-5' | '6-8' | '9-12'} AgeRange
  * @typedef {'short' | 'medium' | 'long'} StoryDuration
  * @typedef {'very_soft' | 'balanced' | 'intense_imagination'} StoryIntensity
  * @typedef {'parent_reads' | 'mixed_narration' | 'ai_children_narrate'} ReadingMode
@@ -6,6 +7,7 @@
  * @typedef {'virtual_child_a' | 'virtual_child_b' | 'player_child' | 'parent'} NarratorId
  *
  * @typedef {Object} ParentConfiguration
+ * @property {AgeRange} ageRange
  * @property {StoryDuration} duration
  * @property {string[]} emotionalTones
  * @property {string[]} themes
@@ -58,7 +60,7 @@
  * @property {StoryMilestone[]} milestones
  * @property {StorySegment[]} segments
  * @property {StoryEnding[]} endings
- * @property {{duration: StoryDuration, readingMode: ReadingMode, ageRange: string, createdAt: string}} metadata
+ * @property {{duration: StoryDuration, readingMode: ReadingMode, ageRange: AgeRange, createdAt: string}} metadata
  */
 
 export const NARRATIA_TYPE_MARKER = 'narratia-types'

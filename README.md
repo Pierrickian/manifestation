@@ -77,6 +77,17 @@ Tu peux aussi définir le modèle serveur :
 OPENAI_MODEL=gpt-5.4-mini
 ```
 
+
+## Partage de règles par URL
+
+Les règles peuvent être ouvertes directement depuis une URL stable. Au chargement de l’application, le paramètre `rule` est lu dans l’URL et, s’il correspond à une règle enregistrée, l’interface démarre avec cette règle active comme si elle avait été choisie depuis le menu.
+
+### Rule URLs
+
+- Open Narratia directly: https://manifestation-liard.vercel.app/?rule=narratia
+
+Les paramètres futurs pourront configurer des modes et comportements additionnels sans changer le format principal, par exemple `mode`, `theme` ou `spread`.
+
 ## Scripts
 
 ```bash
