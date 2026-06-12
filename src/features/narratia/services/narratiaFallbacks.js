@@ -1,32 +1,34 @@
 import { createSlug } from '../utils/narratiaValidation'
 
 export const defaultNarrators = [
-  { id: 'virtual_child_a', displayName: 'Mira', personality: 'Curieuse, attentive, elle remarque les petits indices.', voiceHint: 'douce et vive' },
-  { id: 'virtual_child_b', displayName: 'Noé', personality: 'Rêveur, calme, il aime les images tendres.', voiceHint: 'lent et chaleureux' },
-  { id: 'player_child', displayName: 'Toi', personality: 'L’enfant qui donne à l’histoire son dernier élan.', voiceHint: 'ouvert' },
-  { id: 'parent', displayName: 'Lecteur adulte', personality: 'Stable, rassurant et présent.', voiceHint: 'calme' }
+  { id: 'virtual_child_a', displayName: 'Mira', personality: 'Apprentie chevalière douce, curieuse et attentive aux petits indices lumineux.', voiceHint: 'douce et vive' },
+  { id: 'virtual_child_b', displayName: 'Noé', personality: 'Jeune gardien des cartes, rêveur et calme, qui transforme les mystères en images tendres.', voiceHint: 'lent et chaleureux' },
+  { id: 'player_child', displayName: 'Toi', personality: 'L’enfant explorateur ou exploratrice qui donne à l’histoire son dernier élan courageux et gentil.', voiceHint: 'ouvert' },
+  { id: 'parent', displayName: 'Lecteur adulte', personality: 'Présence stable et rassurante, comme une lanterne tenue sur le chemin.', voiceHint: 'calme' }
 ]
 
 const choicePools = {
-  courage: ['Une lanterne qui brille quand quelqu’un est gentil', 'Un petit bouclier en clair de lune'],
-  friendship: ['Un nuage timide qui cherche un ami', 'Deux tasses qui s’entendent de très loin'],
-  fear: ['Une cabane de couvertures avec une porte secrète', 'Une petite cloche qui adoucit les ombres'],
-  discovery: ['Une carte oubliée', 'Un escalier caché sous un tapis'],
-  forgiveness: ['Une tasse fêlée qui rechante', 'Une lettre qui a attendu longtemps'],
-  growing_up: ['Des chaussures qui grandissent avec le courage', 'Un pont fait de petits pas'],
-  secrets: ['Un tiroir qui chuchote', 'Une enveloppe aux bords tièdes'],
-  helping_others: ['Une étoile perdue dans un bocal', 'Un géant fatigué qui cherche son chemin'],
-  imagination: ['Un train lumineux', 'Un pinceau qui ouvre des fenêtres'],
-  nature: ['Un arbre géant', 'Un renard endormi']
+  courage: ['Une lanterne de lune qui brille quand quelqu’un ose avec douceur', 'Un petit bouclier de mousse pour protéger les fleurs du château'],
+  friendship: ['Un mini-dragon qui partage toujours son goûter', 'Deux tasses de soupe qui tintent quand des amis approchent'],
+  fear: ['Une clochette violette qui rend les ombres toutes petites', 'Une cape-couverture portée par un apprenti chevalier rassurant'],
+  discovery: ['Une carte dorée vers une bibliothèque cachée', 'Un vieux pont qui fredonne quand on choisit un chemin'],
+  forgiveness: ['Une bannière recousue qui danse à nouveau au vent', 'Une lettre tiède gardée par une chouette messagère'],
+  growing_up: ['Des bottes d’aventure qui grandissent avec le courage', 'Une porte ancienne qui s’ouvre aux petits pas patients'],
+  secrets: ['Un jardin secret derrière une pierre à symbole', 'Un tiroir de cartographe rempli d’étoiles animées'],
+  helping_others: ['Un géant forgeron très doux qui répare les lanternes', 'Une étoile perdue dans un bocal de confiture'],
+  imagination: ['Un écureuil inventeur avec une montgolfière en feuille', 'Un pinceau magique qui dessine des chemins enchantés'],
+  nature: ['Un village perché dans un arbre géant', 'Une rivière lumineuse qui raconte des histoires aux cailloux']
 }
 
 export function localChildChoices(parentConfiguration = {}) {
   const themes = parentConfiguration.themes?.length ? parentConfiguration.themes : ['imagination', 'friendship', 'nature']
   const labels = themes.flatMap((theme) => choicePools[theme] || []).concat([
-    'Une clé mystérieuse',
-    'Une cabane cachée',
-    'Un nuage de pluie qui suit les gens',
-    'Une lune de poche'
+    'Une clé en forme de soleil',
+    'Une auberge avec soupe et bougies',
+    'Un nuage en forme de dragon gentil',
+    'Une tour d’observatoire pleine d’étoiles',
+    'Des lucioles qui indiquent les sentiers',
+    'Un château doux sur une colline bleue'
   ])
 
   const categories = ['magic', 'creature', 'object', 'place', 'atmosphere']
@@ -42,9 +44,9 @@ export function localChildChoices(parentConfiguration = {}) {
 
 export function localStoryPackage({ parentConfiguration = {}, childSelection = {}, selectedChoices = [] } = {}) {
   const choiceLabels = selectedChoices.map((choice) => choice.label)
-  const mainObject = choiceLabels[0] || 'une clé mystérieuse'
-  const mainPlace = choiceLabels.find((label) => /cabane|arbre|train|pont|escalier|couvertures/i.test(label)) || 'un arbre géant'
-  const gentleWonder = choiceLabels[1] || 'un renard endormi'
+  const mainObject = choiceLabels[0] || 'une lanterne de lune'
+  const mainPlace = choiceLabels.find((label) => /auberge|arbre|village|pont|bibliothèque|jardin|château|tour|porte|rivière/i.test(label)) || 'un village perché dans un arbre géant'
+  const gentleWonder = choiceLabels[1] || 'un mini-dragon qui partage toujours son goûter'
   const id = `narratia_${Date.now()}`
   const duration = parentConfiguration.duration || 'short'
   const readingMode = parentConfiguration.readingMode || 'mixed_narration'
@@ -55,18 +57,18 @@ export function localStoryPackage({ parentConfiguration = {}, childSelection = {
     title: `La promesse de ${mainObject.replace(/^Une /, '').replace(/^Un /, '')}`,
     narrators: defaultNarrators,
     milestones: [
-      { id: 1, title: 'La première trouvaille', text: `L’enfant découvre ${mainObject.toLowerCase()} près de ${mainPlace.toLowerCase()}.`, visualHint: 'Une lumière douce autour du premier indice' },
-      { id: 2, title: 'Le signe silencieux', text: `Tous les chemins deviennent immobiles jusqu’à ce que ${gentleWonder.toLowerCase()} ouvre un œil.`, visualHint: 'Une pause calme dans un lieu magique' },
-      { id: 3, title: 'La porte qui attend', text: 'Une petite porte apparaît là où personne n’avait pensé à regarder.', visualHint: 'Une porte ronde avec une lumière chaude dessous' }
+      { id: 1, title: 'La lanterne trouvée', text: `L’enfant découvre ${mainObject.toLowerCase()} près de ${mainPlace.toLowerCase()}, pendant qu’un château doux brille sur la colline.`, visualHint: 'Conte illustré, or chaud et bleu profond, lanternes, mousse, bannière au vent' },
+      { id: 2, title: 'Le pont des amis', text: `Un vieux pont fredonne doucement lorsque ${gentleWonder.toLowerCase()} invite tout le monde à traverser ensemble.`, visualHint: 'Pont ancien, rivière lumineuse, lucioles, forêt verte et brume légère' },
+      { id: 3, title: 'La porte aux symboles', text: 'Une porte ancienne couverte de signes violets apparaît dans un jardin secret et attend un choix gentil.', visualHint: 'Porte ronde gravée, jardin secret, particules magiques, coucher de soleil orange' }
     ],
     segments: [
-      { id: 'segment_1', from: 1, to: 2, narrator: 'virtual_child_a', narratorDisplayName: 'Mira', text: `Mira se penche vers le chemin et remarque que ${mainObject.toLowerCase()} est tiède, comme si elle attendait des mains gentilles. Elle propose d’avancer lentement, en comptant chaque son ami, jusqu’à ce que le silence ressemble à un jeu.`, mood: 'curieuse' },
-      { id: 'segment_2', from: 2, to: 3, narrator: 'virtual_child_b', narratorDisplayName: 'Noé', text: `Noé imagine l’air aussi doux qu’une couverture. Quand ${gentleWonder.toLowerCase()} ouvre un œil, les feuilles laissent passer un petit sentier. Le sentier ne presse personne : il invite seulement les pieds courageux à essayer un pas, puis un autre.`, mood: 'rêveur' }
+      { id: 'segment_1', from: 1, to: 2, narrator: 'virtual_child_a', narratorDisplayName: 'Mira', text: `Mira, apprentie chevalière au foulard doré, se penche vers le chemin et remarque que ${mainObject.toLowerCase()} est tiède, comme une petite promesse. Elle n’a besoin de rien de brusque : elle lève simplement la lanterne. Des lucioles répondent, les bannières du village-arbre remuent, et le sentier semble dire : « viens voir, je suis gentil ».`, mood: 'curieuse' },
+      { id: 'segment_2', from: 2, to: 3, narrator: 'virtual_child_b', narratorDisplayName: 'Noé', text: `Noé déplie sa carte de gardien rêveur. Quand ${gentleWonder.toLowerCase()} fait un petit signe, le vieux pont se met à fredonner comme une auberge pleine de soupe chaude. De l’autre côté, une rivière lumineuse dessine des étoiles sur les pierres et montre la porte du jardin secret. Personne ne presse l’enfant : chaque pas compte déjà comme du courage.`, mood: 'rêveur' }
     ],
     endings: [
-      { id: 'maison_tiede', title: 'Le retour tout chaud', emotion: 'heureuse', text: 'La porte s’ouvre sur une pièce remplie de voix familières. La clé devient une petite lampe pour le soir, et l’enfant comprend que les pas courageux peuvent aussi ramener vers la douceur.', visualHint: 'Une chambre chaude avec une lampe' },
-      { id: 'fenetre_secrete', title: 'La fenêtre secrète', emotion: 'mystérieuse', text: 'Derrière la porte, une fenêtre montre demain de très loin. Personne n’a besoin de tout comprendre maintenant. L’enfant referme doucement le rideau et garde un petit mystère pour les rêves.', visualHint: 'Une fenêtre ronde avec des étoiles' },
-      { id: 'chemin_qui_rit', title: 'Le chemin qui rit', emotion: 'drôle', text: 'La porte éternue, le sentier glousse, et même le signe silencieux remue comme une nouille. Tout le monde rit si fort que l’aventure décide de se glisser dans un oreiller pour revenir plus tard.', visualHint: 'Un chemin joueur comme un ruban' }
+      { id: 'banquet_des_lanternes', title: 'Le banquet des lanternes', emotion: 'heureuse', text: 'La porte s’ouvre sur une petite taverne aux bougies, où le géant forgeron sert une soupe dorée dans des bols minuscules. La lanterne devient l’étoile de la table, et l’enfant comprend qu’une aventure peut rendre le retour encore plus chaud.', visualHint: 'Auberge médiévale douce, soupe, bougies, lanternes dorées, amis souriants' },
+      { id: 'jardin_des_etoiles', title: 'Le jardin des étoiles', emotion: 'mystérieuse', text: 'Derrière la porte, un jardin secret laisse pousser des étoiles animées entre les fleurs violettes. La chouette messagère chuchote qu’il restera toujours un petit mystère pour demain. L’enfant garde ce secret dans sa poche, sans avoir besoin de tout résoudre ce soir.', visualHint: 'Jardin secret violet, étoiles animées, chouette douce, brume légère' },
+      { id: 'dragon_nuage', title: 'Le dragon-nuage', emotion: 'drôle', text: 'La porte éternue si fort qu’un nuage en forme de dragon fait une roulade dans le ciel. Le mini-dragon rit, le pont fredonne faux, et même les bannières applaudissent. L’aventure promet de revenir quand quelqu’un aura encore envie d’explorer.', visualHint: 'Ciel orange, nuage dragon amical, bannières au vent, village joyeux' }
     ],
     metadata: { duration, readingMode, ageRange, createdAt: new Date().toISOString() },
     source: 'local'
