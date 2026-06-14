@@ -39,7 +39,7 @@ export function ChildWizard({ choices, selection, onChange, onSubmit, isLoading 
       eyebrow="Choix de l’enfant"
       title="Choisis ce qui doit briller dans l’histoire"
       intro="Prends quelques ingrédients préférés. Ils vont aider l’aventure à trouver sa forme."
-      footer={<button className="primary-action" type="button" onClick={onSubmit} disabled={isLoading || selection.choiceIds.length < 2}>{isLoading ? 'Ouverture de l’histoire...' : 'Ouvrir l’histoire'}</button>}
+      footer={<button className="primary-action" type="button" onClick={onSubmit} disabled={isLoading || selection.choiceIds.length < 1}>{isLoading ? 'Ouverture de l’histoire...' : 'Ouvrir l’histoire'}</button>}
     >
       <div className="narratia-fieldset">
         <strong>Qu’est-ce qui doit apparaître dans l’histoire ?</strong>
