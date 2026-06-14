@@ -25,7 +25,7 @@ const BEING_SETTINGS_KEY = 'manifestation:being-settings'
 const RULE_SETTINGS_KEY = 'manifestation:rule'
 const WIZARD_RULES = getRules()
 const CREATE_YOUR_APP_CONFIG = {
-  repo: 'owner/repo',
+  repo: 'Pierrickian/manifestation',
   mode: 'issue',
   defaultTitle: 'Proposition de nouvelle app'
 }
@@ -1216,7 +1216,7 @@ function AppChooser({ rules, activeRuleId, onRuleChange, onCreateYourApp }) {
           onClick={onCreateYourApp}
         >
           <span>Crée ton App</span>
-          <small>Propose une nouvelle app et prépare une demande GitHub pour l’intégrer au portail.</small>
+          <small>Propose une nouvelle app et prépare sa demande d’intégration au portail.</small>
         </button>
       </div>
     </section>

@@ -96,14 +96,14 @@ export function CreateYourApp({
 
   async function submitRequest() {
     setStatus('submitting')
-    setMessage('Préparation de la demande GitHub…')
+    setMessage('Préparation de la demande…')
     setGithubUrl(null)
 
     try {
       const result = await submitCreateYourAppRequest({ config, requestText, context })
       setStatus('success')
       setGithubUrl(result.url || null)
-      setMessage(result.url ? 'Demande prête dans GitHub.' : `Demande créée${result.number ? ` #${result.number}` : ''}.`)
+      setMessage(result.url ? 'Demande prête.' : `Demande créée${result.number ? ` #${result.number}` : ''}.`)
       onSuccess?.(result)
     } catch (error) {
       setStatus('error')
@@ -117,7 +117,7 @@ export function CreateYourApp({
       <div className="create-app-header">
         <p className="eyebrow">Portail d’inspiration</p>
         <h2 id="create-app-title">Crée ton App</h2>
-        <p>Propose une app complète ou une évolution produit. La demande sera transformée en issue GitHub prête pour un agent IA/codegen.</p>
+        <p>Propose une app complète ou une évolution produit. Ta demande sera préparée pour rejoindre le portail de création.</p>
       </div>
 
       <label className="create-app-field">
@@ -125,7 +125,7 @@ export function CreateYourApp({
         <textarea
           value={requestText}
           onChange={(event) => setRequestText(event.target.value)}
-          placeholder="Ex: Je veux une app pour créer des routines du matin avec IA, choix vocaux, historique et suggestions personnalisées…"
+          placeholder="Ex: Je veux une app pour créer des routines du matin, avec choix vocaux, historique et suggestions personnalisées…"
           rows={9}
         />
       </label>
@@ -135,14 +135,14 @@ export function CreateYourApp({
           {isListening ? '● Écoute…' : '🎙️ Micro'}
         </button>
         <button type="button" className="primary-action" onClick={submitRequest} disabled={status === 'submitting'}>
-          {status === 'submitting' ? 'Envoi…' : 'Envoyer vers GitHub'}
+          {status === 'submitting' ? 'Envoi…' : 'Envoyer'}
         </button>
       </div>
 
       <div className={`create-app-status ${status}`} role="status">
         <strong>{status}</strong>
         <span>{message}</span>
-        {githubUrl ? <a href={githubUrl} target="_blank" rel="noreferrer">Ouvrir GitHub</a> : null}
+        {githubUrl ? <a href={githubUrl} target="_blank" rel="noreferrer">Ouvrir la demande</a> : null}
       </div>
 
       <button type="button" className="ghost-action" onClick={onClose}>Retour</button>
