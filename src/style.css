@@ -50,6 +50,7 @@ button:focus-visible {
 }
 
 .wizard-hero,
+.app-chooser,
 .wizard-card,
 .discovery-card,
 .need-map,
@@ -61,9 +62,22 @@ button:focus-visible {
   backdrop-filter: blur(12px);
 }
 
-.wizard-hero {
+.wizard-hero,
+.app-chooser {
   border-radius: 24px;
   padding: 22px;
+}
+
+.wizard-hero h1 {
+  margin-bottom: 0;
+}
+
+.app-chooser-header h2 {
+  margin-bottom: 0;
+}
+
+.app-options {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
 .wizard-card,
@@ -81,6 +95,48 @@ button:focus-visible {
 
 .wizard-menu {
   color: rgba(255, 250, 244, 0.84);
+}
+
+.compact-menu {
+  justify-self: end;
+  width: fit-content;
+  min-width: 74px;
+}
+
+.compact-menu > summary {
+  list-style: none;
+}
+
+.compact-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.hamburger-icon {
+  width: 28px;
+  display: grid;
+  gap: 5px;
+}
+
+.hamburger-icon span {
+  display: block;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 250, 244, 0.88);
+}
+
+.debug-toggle {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.debug-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: #fff2ad;
 }
 
 .wizard-menu > summary,
@@ -332,6 +388,13 @@ p {
 
 .wizard-option:hover {
   background: rgba(255, 255, 255, 0.14);
+}
+
+.ai-debug-footer {
+  position: sticky;
+  bottom: max(8px, env(safe-area-inset-bottom));
+  z-index: 20;
+  padding: 14px;
 }
 
 .ai-debug-panel {

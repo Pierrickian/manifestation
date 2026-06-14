@@ -342,6 +342,8 @@ export function ManifestationWizard() {
   const [flowConclusion, setFlowConclusion] = useState('')
   const [flowBatch, setFlowBatch] = useState(0)
   const [mesQuestionsDebug, setMesQuestionsDebug] = useState(null)
+  const [hasConfiguredApp, setHasConfiguredApp] = useState(false)
+  const [showAiDebug, setShowAiDebug] = useState(false)
   const savedSessionRef = useRef(null)
 
   const steps = useMemo(() => {
@@ -374,6 +376,7 @@ export function ManifestationWizard() {
   const isFlowRule = activeRuleId === FLOW_RULE_ID
   const isNarratiaRule = activeRuleId === NARRATIA_RULE_ID
   const isMesQuestionsRule = activeRuleId === MES_QUESTIONS_RULE_ID
+  const needsAppSetup = [DEFAULT_RULE_ID, RECONCILIATION_RULE_ID, FLOW_RULE_ID].includes(activeRuleId) && !hasConfiguredApp && !feeling && !selectedFlowWords.length
   const isPhaseDone = Boolean(feeling && currentPhaseAnswers.length >= currentPhaseTotal)
   const needsPhaseChoice = isGuidedJourneyRule(activeRuleId) && isPhaseDone && phase < 3
   const isComplete = Boolean(feeling && phase === 3 && isPhaseDone)
@@ -467,6 +470,7 @@ export function ManifestationWizard() {
     setActiveRuleId(ruleId)
     localStorage.setItem(RULE_SETTINGS_KEY, ruleId)
     resetJourney()
+    setHasConfiguredApp(false)
   }
 
   const { selectRuleFromUi } = useRuleUrlSync({
@@ -885,18 +889,16 @@ export function ManifestationWizard() {
   return (
     <main className="manifestation-shell">
       <section className="wizard-hero">
-        <p className="eyebrow">Manifestation</p>
-        <h1>Carte intérieure vivante</h1>
-        <p>
-          Pars d’un ressenti, observe les besoins qui se colorent, puis laisse apparaître un chemin possible.
-          Rien n’est imposé : chaque étape propose une piste à explorer.
-        </p>
+        <h1>Portail de Création</h1>
       </section>
 
-      <WizardMenu
+      <AppChooser
         rules={WIZARD_RULES}
         activeRuleId={activeRuleId}
         onRuleChange={selectRuleFromUi}
+      />
+
+      <WizardMenu
         aiSliders={aiSliders}
         aiSettings={aiSettings}
         beingSliders={beingSliders}
@@ -905,14 +907,28 @@ export function ManifestationWizard() {
         onBeingSettingChange={updateBeingSetting}
         onRefreshSetting={refreshSetting}
         refreshingSettingId={refreshingSettingId}
-        debugRows={getDebugRows(currentPrompt, isMesQuestionsRule ? mesQuestionsDebug : null)}
+        showAiDebug={showAiDebug}
+        onShowAiDebugChange={setShowAiDebug}
       />
 
       {!isFlowRule && !isNarratiaRule && !isMesQuestionsRule ? <NeedMap steps={steps} discovery={discovery} links={links} /> : null}
 
       {isMesQuestionsRule ? <MesQuestionsApp onAiDebug={setMesQuestionsDebug} /> : isNarratiaRule ? <NarratiaApp /> : (
       <AnimatePresence mode="wait">
-        {isFlowRule ? (
+        {needsAppSetup ? (
+          <AppSetupStep
+            key={`app-setup-${activeRuleId}`}
+            aiSliders={aiSliders}
+            aiSettings={aiSettings}
+            beingSliders={beingSliders}
+            beingSettings={beingSettings}
+            onAiSettingChange={updateAiSetting}
+            onBeingSettingChange={updateBeingSetting}
+            onRefreshSetting={refreshSetting}
+            refreshingSettingId={refreshingSettingId}
+            onStart={() => setHasConfiguredApp(true)}
+          />
+        ) : isFlowRule ? (
           <FlowStep
             key="flow-step"
             words={flowWords}
@@ -977,6 +993,8 @@ export function ManifestationWizard() {
       )}
 
       {!isFlowRule && !isNarratiaRule && !isMesQuestionsRule ? <HistoryPanel history={history} /> : null}
+
+      {showAiDebug ? <AiDebugFooter debugRows={getDebugRows(currentPrompt, isMesQuestionsRule ? mesQuestionsDebug : null)} /> : null}
     </main>
   )
 }
@@ -1139,10 +1157,32 @@ function ReconciliationStep({
   )
 }
 
-function WizardMenu({
-  rules,
-  activeRuleId,
-  onRuleChange,
+function AppChooser({ rules, activeRuleId, onRuleChange }) {
+  return (
+    <section className="app-chooser" aria-labelledby="app-chooser-title">
+      <div className="app-chooser-header">
+        <p className="eyebrow">Apps</p>
+        <h2 id="app-chooser-title">Choisis ton app.</h2>
+      </div>
+      <div className="rule-options app-options" role="list">
+        {rules.map((rule) => (
+          <button
+            type="button"
+            className={`rule-option${rule.id === activeRuleId ? ' active' : ''}`}
+            key={rule.id}
+            onClick={() => onRuleChange(rule.id)}
+            aria-pressed={rule.id === activeRuleId}
+          >
+            <span>{rule.label}</span>
+            <small>{rule.description}</small>
+          </button>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function AppSetupStep({
   aiSliders,
   aiSettings,
   beingSliders,
@@ -1151,34 +1191,15 @@ function WizardMenu({
   onBeingSettingChange,
   onRefreshSetting,
   refreshingSettingId,
-  debugRows
+  onStart
 }) {
   return (
-    <details className="wizard-menu">
-      <summary>Menu</summary>
+    <section className="wizard-card app-setup" aria-labelledby="app-setup-title">
+      <p className="eyebrow">Préparation</p>
+      <h2 id="app-setup-title">Ajuste l’IA et le Soi avant de commencer.</h2>
 
-      <details className="ai-submenu">
-        <summary>Regles</summary>
-
-        <div className="rule-options" role="list">
-          {rules.map((rule) => (
-            <button
-              type="button"
-              className={`rule-option${rule.id === activeRuleId ? ' active' : ''}`}
-              key={rule.id}
-              onClick={() => onRuleChange(rule.id)}
-              aria-pressed={rule.id === activeRuleId}
-            >
-              <span>{rule.label}</span>
-              <small>{rule.description}</small>
-            </button>
-          ))}
-        </div>
-      </details>
-
-      <details className="ai-submenu">
+      <details className="ai-submenu" open>
         <summary>AI</summary>
-
         <div className="ai-settings-grid">
           {aiSliders.map((slider) => (
             <SliderSetting
@@ -1193,28 +1214,10 @@ function WizardMenu({
             />
           ))}
         </div>
-
       </details>
 
-      <details className="ai-submenu ai-debug-panel">
-        <summary>Debug IA</summary>
-        {debugRows.length ? (
-          <dl>
-            {debugRows.map(([label, value]) => (
-              <div key={label}>
-                <dt>{label}</dt>
-                <dd>{value}</dd>
-              </div>
-            ))}
-          </dl>
-        ) : (
-          <p className="ai-debug-empty">Aucune donnee IA pour le moment.</p>
-        )}
-      </details>
-
-      <details className="ai-submenu">
-        <summary>Etre</summary>
-
+      <details className="ai-submenu" open>
+        <summary>Soi</summary>
         <div className="ai-settings-grid">
           {beingSliders.map((slider) => (
             <SliderSetting
@@ -1230,7 +1233,51 @@ function WizardMenu({
           ))}
         </div>
       </details>
+
+      <button type="button" className="primary-action" onClick={onStart}>Commencer</button>
+    </section>
+  )
+}
+
+function WizardMenu({
+  showAiDebug,
+  onShowAiDebugChange
+}) {
+  return (
+    <details className="wizard-menu compact-menu">
+      <summary aria-label="Menu" title="Menu">
+        <span className="hamburger-icon" aria-hidden="true"><span /><span /><span /></span>
+      </summary>
+
+      <label className="debug-toggle">
+        <input
+          type="checkbox"
+          checked={showAiDebug}
+          onChange={(event) => onShowAiDebugChange(event.target.checked)}
+        />
+        <span>Debug IA</span>
+      </label>
     </details>
+  )
+}
+
+function AiDebugFooter({ debugRows }) {
+  return (
+    <footer className="ai-debug-footer ai-debug-panel" aria-live="polite">
+      <strong>Debug IA</strong>
+      {debugRows.length ? (
+        <dl>
+          {debugRows.map(([label, value]) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
+        <p className="ai-debug-empty">Aucune donnee IA pour le moment.</p>
+      )}
+    </footer>
   )
 }
 

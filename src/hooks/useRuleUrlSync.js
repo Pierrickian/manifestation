@@ -17,7 +17,7 @@ function getRuleFromPath(pathname) {
 export function readRuleUrlState(location = window.location) {
   const searchParams = new URLSearchParams(location.search)
   const params = Object.fromEntries(searchParams.entries())
-  const queryRule = normalizeRuleId(searchParams.get('rule'))
+  const queryRule = normalizeRuleId(searchParams.get('rule') || searchParams.get('rule?'))
   const pathRule = getRuleFromPath(location.pathname)
 
   return {

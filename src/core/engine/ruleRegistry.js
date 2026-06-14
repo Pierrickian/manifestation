@@ -7,14 +7,14 @@ export const MES_QUESTIONS_RULE_ID = 'mes-questions'
 export const ruleRegistry = {
   [DEFAULT_RULE_ID]: {
     id: DEFAULT_RULE_ID,
-    label: 'Exploration par defaut',
+    label: 'Mes Besoins',
     description: 'La regle actuelle: partir d un ressenti, lire les besoins, puis orienter les phases.',
     family: 'guided-journey',
     isEnabled: () => true
   },
   [RECONCILIATION_RULE_ID]: {
     id: RECONCILIATION_RULE_ID,
-    label: 'Reconciliation emotionnelle',
+    label: 'Mes Emotions',
     description: 'Retrouver une vibration positive et relier la part qui la porte a celle qui signale le negatif.',
     family: 'reconciliation',
     isEnabled: () => true
