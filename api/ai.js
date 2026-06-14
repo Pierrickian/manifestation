@@ -206,6 +206,49 @@ const responseFormats = {
         }
       }
     }
+  },
+  mes_questions_quiz: {
+    type: 'json_schema',
+    json_schema: {
+      name: 'mes_questions_quiz',
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['questions'],
+        properties: {
+          questions: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 10,
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['id', 'subject', 'question', 'answers', 'correctAnswerId'],
+              properties: {
+                id: { type: 'string' },
+                subject: { type: 'string' },
+                question: { type: 'string' },
+                answers: {
+                  type: 'array',
+                  minItems: 3,
+                  maxItems: 3,
+                  items: {
+                    type: 'object',
+                    additionalProperties: false,
+                    required: ['id', 'text'],
+                    properties: {
+                      id: { type: 'string' },
+                      text: { type: 'string' }
+                    }
+                  }
+                },
+                correctAnswerId: { type: 'string' }
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }
 
@@ -304,7 +347,8 @@ function validateAiPayload(kind, payload) {
     settings: (value) => Boolean(value?.slider?.id && value.slider.label),
     flow: (value) => Array.isArray(value?.words),
     narratia_child_choices: (value) => Array.isArray(value?.childChoices) && value.childChoices.length >= 6,
-    narratia_story_package: (value) => Boolean(value?.title && Array.isArray(value.milestones) && Array.isArray(value.segments) && Array.isArray(value.endings) && value.endings.length === 3)
+    narratia_story_package: (value) => Boolean(value?.title && Array.isArray(value.milestones) && Array.isArray(value.segments) && Array.isArray(value.endings) && value.endings.length === 3),
+    mes_questions_quiz: (value) => Array.isArray(value?.questions) && value.questions.length === Number(context?.questionCount || value.questions.length) && value.questions.every((question) => question?.id && question.subject && question.question && Array.isArray(question.answers) && question.answers.length === 3 && question.answers.some((answer) => answer.id === question.correctAnswerId))
   }
 
   const isValid = (validators[kind] || validators.question)(payload)
@@ -326,6 +370,7 @@ function getShapeInstruction(kind) {
   if (kind === 'flow') return 'Format attendu: { "words": array, "conclusion": string }.'
   if (kind === 'narratia_child_choices') return 'Expected format: { "childChoices": [{ "id": string, "label": string, "category": string }] }.'
   if (kind === 'narratia_story_package') return 'Expected format: { "id": string, "title": string, "narrators": array, "milestones": array, "segments": array, "endings": array, "metadata": object }.'
+  if (kind === 'mes_questions_quiz') return 'Format attendu: { "questions": [{ "id": string, "subject": string, "question": string, "answers": [{ "id": string, "text": string }], "correctAnswerId": string }] }.'
   return 'Format attendu: un objet JSON de donnees finales, pas un schema.'
 }
 
@@ -394,6 +439,28 @@ function getLocalResult(kind, context) {
       ],
       metadata: { duration: 'short', readingMode: 'mixed_narration', ageRange: 'autour de 7 ans', createdAt: new Date().toISOString() }
     }
+  }
+
+  if (kind === 'mes_questions_quiz') {
+    const subjects = context?.subjects?.length ? context.subjects : ['mathematiques']
+    const count = Number(context?.questionCount || 5)
+    const bank = Array.from({ length: count }, (_, index) => {
+      const subject = subjects[index % subjects.length]
+      const a = index + 2
+      const b = index + 3
+      return {
+        id: `q${index + 1}`,
+        subject,
+        question: subject === 'mathematiques' ? `Combien font ${a} + ${b} ?` : `Quel choix convient le mieux pour ${subject} ?`,
+        answers: [
+          { id: 'a', text: String(a + b - 1) },
+          { id: 'b', text: String(a + b) },
+          { id: 'c', text: String(a + b + 1) }
+        ],
+        correctAnswerId: 'b'
+      }
+    })
+    return { questions: bank }
   }
   if (kind === 'flow') {
     return {

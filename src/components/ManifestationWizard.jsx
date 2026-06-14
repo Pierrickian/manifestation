@@ -9,7 +9,8 @@ import { FeelingStep } from './FeelingStep'
 import { HistoryPanel } from './HistoryPanel'
 import { NeedMap } from './NeedMap'
 import { NarratiaApp } from '../features/narratia/NarratiaApp'
-import { DEFAULT_RULE_ID, FLOW_RULE_ID, NARRATIA_RULE_ID, RECONCILIATION_RULE_ID, getRules, hasRule, isGuidedJourneyRule } from '../core/engine/ruleRegistry'
+import { MesQuestionsApp } from '../features/MesQuestionsApp'
+import { DEFAULT_RULE_ID, FLOW_RULE_ID, MES_QUESTIONS_RULE_ID, NARRATIA_RULE_ID, RECONCILIATION_RULE_ID, getRules, hasRule, isGuidedJourneyRule } from '../core/engine/ruleRegistry'
 import { getInitialRuleIdFromUrl, useRuleUrlSync } from '../hooks/useRuleUrlSync'
 
 const PHASE_PASSAGES = {
@@ -367,6 +368,7 @@ export function ManifestationWizard() {
   const needsPhaseZero = activeRuleId === RECONCILIATION_RULE_ID && Boolean(phaseZeroStep)
   const isFlowRule = activeRuleId === FLOW_RULE_ID
   const isNarratiaRule = activeRuleId === NARRATIA_RULE_ID
+  const isMesQuestionsRule = activeRuleId === MES_QUESTIONS_RULE_ID
   const isPhaseDone = Boolean(feeling && currentPhaseAnswers.length >= currentPhaseTotal)
   const needsPhaseChoice = isGuidedJourneyRule(activeRuleId) && isPhaseDone && phase < 3
   const isComplete = Boolean(feeling && phase === 3 && isPhaseDone)
@@ -901,9 +903,9 @@ export function ManifestationWizard() {
         debugRows={getDebugRows(currentPrompt)}
       />
 
-      {!isFlowRule && !isNarratiaRule ? <NeedMap steps={steps} discovery={discovery} links={links} /> : null}
+      {!isFlowRule && !isNarratiaRule && !isMesQuestionsRule ? <NeedMap steps={steps} discovery={discovery} links={links} /> : null}
 
-      {isNarratiaRule ? <NarratiaApp /> : (
+      {isMesQuestionsRule ? <MesQuestionsApp /> : isNarratiaRule ? <NarratiaApp /> : (
       <AnimatePresence mode="wait">
         {isFlowRule ? (
           <FlowStep
@@ -969,7 +971,7 @@ export function ManifestationWizard() {
       </AnimatePresence>
       )}
 
-      {!isFlowRule && !isNarratiaRule ? <HistoryPanel history={history} /> : null}
+      {!isFlowRule && !isNarratiaRule && !isMesQuestionsRule ? <HistoryPanel history={history} /> : null}
     </main>
   )
 }

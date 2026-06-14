@@ -22,6 +22,7 @@ const questionVariationRules = [
 
 export function buildPrompt(kind, context) {
   if (kind?.startsWith('narratia_')) return buildNarratiaPrompt(context)
+  if (kind === 'mes_questions_quiz') return buildMesQuestionsPrompt(context)
   const needsSummary = NEEDS.map((need) => {
     return `${need.name}: ${need.needs.join(', ')}`
   }).join('\n')
@@ -191,6 +192,48 @@ function buildNarratiaPrompt(context = {}) {
     {
       role: 'user',
       content: JSON.stringify(context.prompt || {}, null, 2)
+    }
+  ]
+}
+
+
+function buildMesQuestionsPrompt(context = {}) {
+  return [
+    {
+      role: 'system',
+      content: [
+        'Tu crées un quiz éducatif en français pour enfant.',
+        'Réponds uniquement en JSON valide, sans Markdown.',
+        'Génère exactement le nombre de questions demandé.',
+        'Chaque question doit être adaptée à l’âge, bienveillante, claire, et avoir exactement 3 réponses possibles.',
+        'Ne donne jamais la bonne réponse dans l’énoncé.',
+        'Champs obligatoires: id, subject, question, answers, correctAnswerId.',
+        'answers contient exactement trois objets { id, text }; correctAnswerId correspond à un id existant.'
+      ].join('\n')
+    },
+    {
+      role: 'user',
+      content: JSON.stringify({
+        task: 'Créer un quiz Mes Questions.',
+        age: context.age,
+        questionCount: context.questionCount,
+        subjects: context.subjects,
+        expectedShape: {
+          questions: [
+            {
+              id: 'q1',
+              subject: 'mathematiques',
+              question: 'Combien font 3 + 4 ?',
+              answers: [
+                { id: 'a', text: '6' },
+                { id: 'b', text: '7' },
+                { id: 'c', text: '8' }
+              ],
+              correctAnswerId: 'b'
+            }
+          ]
+        }
+      })
     }
   ]
 }

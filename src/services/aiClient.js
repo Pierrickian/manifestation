@@ -358,3 +358,17 @@ export async function getDynamicLinks(context) {
 
   return localLinks(context)
 }
+
+
+export async function getMesQuestionsQuiz(context) {
+  const result = await requestAI('mes_questions_quiz', context)
+
+  if (!Array.isArray(result?.questions)) {
+    throw createInvalidAiPayloadError('mes_questions_quiz', result)
+  }
+
+  return {
+    ...result,
+    source: result.source || result.debug?.source || 'ai'
+  }
+}
