@@ -10,8 +10,9 @@ import { HistoryPanel } from './HistoryPanel'
 import { NeedMap } from './NeedMap'
 import { NarratiaApp } from '../features/narratia/NarratiaApp'
 import { MesQuestionsApp } from '../features/MesQuestionsApp'
+import { CreateYourApp } from '../features/create-your-app/CreateYourApp'
 import { DEFAULT_RULE_ID, FLOW_RULE_ID, MES_QUESTIONS_RULE_ID, NARRATIA_RULE_ID, RECONCILIATION_RULE_ID, getRules, hasRule, isGuidedJourneyRule } from '../core/engine/ruleRegistry'
-import { getInitialRuleIdFromUrl, useRuleUrlSync } from '../hooks/useRuleUrlSync'
+import { getInitialRuleIdFromUrl, readRuleUrlState, useRuleUrlSync } from '../hooks/useRuleUrlSync'
 
 const PHASE_PASSAGES = {
   1: 4,
@@ -23,6 +24,11 @@ const AI_SETTINGS_KEY = 'manifestation:ai-settings'
 const BEING_SETTINGS_KEY = 'manifestation:being-settings'
 const RULE_SETTINGS_KEY = 'manifestation:rule'
 const WIZARD_RULES = getRules()
+const CREATE_YOUR_APP_CONFIG = {
+  repo: 'owner/repo',
+  mode: 'issue',
+  defaultTitle: 'Proposition de nouvelle app'
+}
 const DEFAULT_AI_SETTINGS = {
   intensity: 28,
   grounding: 35,
@@ -165,6 +171,12 @@ function readActiveRuleId() {
     fallbackRuleId: readStoredRuleId(),
     isKnownRule: hasRule
   })
+}
+
+function readInitialPortalView() {
+  if (typeof window === 'undefined') return 'home'
+  const { ruleId } = readRuleUrlState(window.location)
+  return ruleId && hasRule(ruleId) ? 'app' : 'home'
 }
 
 function getPhaseTotal(ruleId, phase) {
@@ -344,6 +356,7 @@ export function ManifestationWizard() {
   const [mesQuestionsDebug, setMesQuestionsDebug] = useState(null)
   const [hasConfiguredApp, setHasConfiguredApp] = useState(false)
   const [showAiDebug, setShowAiDebug] = useState(false)
+  const [portalView, setPortalView] = useState(readInitialPortalView)
   const savedSessionRef = useRef(null)
 
   const steps = useMemo(() => {
@@ -471,6 +484,19 @@ export function ManifestationWizard() {
     localStorage.setItem(RULE_SETTINGS_KEY, ruleId)
     resetJourney()
     setHasConfiguredApp(false)
+    setPortalView('app')
+  }
+
+  function goHome() {
+    resetJourney()
+    setHasConfiguredApp(false)
+    setPortalView('home')
+  }
+
+  function openCreateYourApp() {
+    resetJourney()
+    setHasConfiguredApp(false)
+    setPortalView('create-app')
   }
 
   const { selectRuleFromUi } = useRuleUrlSync({
@@ -888,29 +914,33 @@ export function ManifestationWizard() {
 
   return (
     <main className="manifestation-shell">
-      <section className="wizard-hero">
-        <h1>Portail de Création</h1>
-      </section>
-
-      <AppChooser
-        rules={WIZARD_RULES}
-        activeRuleId={activeRuleId}
-        onRuleChange={selectRuleFromUi}
-      />
-
       <WizardMenu
-        aiSliders={aiSliders}
-        aiSettings={aiSettings}
-        beingSliders={beingSliders}
-        beingSettings={beingSettings}
-        onAiSettingChange={updateAiSetting}
-        onBeingSettingChange={updateBeingSetting}
-        onRefreshSetting={refreshSetting}
-        refreshingSettingId={refreshingSettingId}
+        onHome={goHome}
         showAiDebug={showAiDebug}
         onShowAiDebugChange={setShowAiDebug}
       />
 
+      {portalView === 'home' ? (
+        <>
+          <section className="wizard-hero">
+            <h1>Portail de Création</h1>
+          </section>
+
+          <AppChooser
+            rules={WIZARD_RULES}
+            activeRuleId={activeRuleId}
+            onRuleChange={selectRuleFromUi}
+            onCreateYourApp={openCreateYourApp}
+          />
+        </>
+      ) : portalView === 'create-app' ? (
+        <CreateYourApp
+          config={CREATE_YOUR_APP_CONFIG}
+          context={{ source: 'portal', activeRuleId }}
+          onClose={goHome}
+        />
+      ) : (
+        <>
       {!isFlowRule && !isNarratiaRule && !isMesQuestionsRule ? <NeedMap steps={steps} discovery={discovery} links={links} /> : null}
 
       {isMesQuestionsRule ? <MesQuestionsApp onAiDebug={setMesQuestionsDebug} /> : isNarratiaRule ? <NarratiaApp /> : (
@@ -993,6 +1023,9 @@ export function ManifestationWizard() {
       )}
 
       {!isFlowRule && !isNarratiaRule && !isMesQuestionsRule ? <HistoryPanel history={history} /> : null}
+
+        </>
+      )}
 
       {showAiDebug ? <AiDebugFooter debugRows={getDebugRows(currentPrompt, isMesQuestionsRule ? mesQuestionsDebug : null)} /> : null}
     </main>
@@ -1157,7 +1190,7 @@ function ReconciliationStep({
   )
 }
 
-function AppChooser({ rules, activeRuleId, onRuleChange }) {
+function AppChooser({ rules, activeRuleId, onRuleChange, onCreateYourApp }) {
   return (
     <section className="app-chooser" aria-labelledby="app-chooser-title">
       <div className="app-chooser-header">
@@ -1177,6 +1210,14 @@ function AppChooser({ rules, activeRuleId, onRuleChange }) {
             <small>{rule.description}</small>
           </button>
         ))}
+        <button
+          type="button"
+          className="rule-option create-app-option"
+          onClick={onCreateYourApp}
+        >
+          <span>Crée ton App</span>
+          <small>Propose une nouvelle app et prépare une demande GitHub pour l’intégrer au portail.</small>
+        </button>
       </div>
     </section>
   )
@@ -1240,6 +1281,7 @@ function AppSetupStep({
 }
 
 function WizardMenu({
+  onHome,
   showAiDebug,
   onShowAiDebugChange
 }) {
@@ -1248,6 +1290,10 @@ function WizardMenu({
       <summary aria-label="Menu" title="Menu">
         <span className="hamburger-icon" aria-hidden="true"><span /><span /><span /></span>
       </summary>
+
+      <div className="menu-actions">
+        <button type="button" className="menu-home-action" onClick={onHome}>Accueil</button>
+      </div>
 
       <label className="debug-toggle">
         <input
