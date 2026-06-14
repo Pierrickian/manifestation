@@ -357,7 +357,7 @@ async function createValidatedAiResult(kind, context, model) {
 
     const content = completion.choices[0]?.message?.content || '{}'
     const payload = JSON.parse(content)
-    const validationError = validateAiPayload(kind, payload)
+    const validationError = validateAiPayload(kind, payload, context)
 
     if (!validationError) {
       return {
@@ -374,7 +374,7 @@ async function createValidatedAiResult(kind, context, model) {
   throw lastError
 }
 
-function validateAiPayload(kind, payload) {
+function validateAiPayload(kind, payload, context = {}) {
   const validators = {
     answer: (value) => Boolean(value?.answer?.label && value.answer.needId && value.answer.scores),
     question: (value) => Boolean(value?.question && Array.isArray(value.answers) && value.answers.length >= 3),
