@@ -444,23 +444,44 @@ function getLocalResult(kind, context) {
   if (kind === 'mes_questions_quiz') {
     const subjects = context?.subjects?.length ? context.subjects : ['mathematiques']
     const count = Number(context?.questionCount || 5)
-    const bank = Array.from({ length: count }, (_, index) => {
+    const subjectBanks = {
+      orthographe: [
+        { question: 'Quel mot est écrit correctement ?', answers: [{ id: 'a', text: 'chato' }, { id: 'b', text: 'château' }, { id: 'c', text: 'chatô' }], correctAnswerId: 'b' },
+        { question: 'Quel mot prend deux “p” ?', answers: [{ id: 'a', text: 'pomme' }, { id: 'b', text: 'pome' }, { id: 'c', text: 'paume' }], correctAnswerId: 'a' }
+      ],
+      grammaire: [
+        { question: 'Dans “Le petit chien dort”, quel mot est le verbe ?', answers: [{ id: 'a', text: 'petit' }, { id: 'b', text: 'chien' }, { id: 'c', text: 'dort' }], correctAnswerId: 'c' },
+        { question: 'Quel déterminant convient : ___ étoile brille ?', answers: [{ id: 'a', text: 'Une' }, { id: 'b', text: 'Un' }, { id: 'c', text: 'Des' }], correctAnswerId: 'a' }
+      ],
+      conjugaison: [
+        { question: 'Quelle forme complète : “Nous ___ au parc” ?', answers: [{ id: 'a', text: 'allons' }, { id: 'b', text: 'allez' }, { id: 'c', text: 'vont' }], correctAnswerId: 'a' },
+        { question: 'Quelle forme complète : “Je ___ une histoire” ?', answers: [{ id: 'a', text: 'lis' }, { id: 'b', text: 'lit' }, { id: 'c', text: 'lisez' }], correctAnswerId: 'a' }
+      ],
+      mathematiques: [
+        { question: 'Combien font 3 + 4 ?', answers: [{ id: 'a', text: '6' }, { id: 'b', text: '7' }, { id: 'c', text: '8' }], correctAnswerId: 'b' },
+        { question: 'Combien font 5 × 2 ?', answers: [{ id: 'a', text: '7' }, { id: 'b', text: '10' }, { id: 'c', text: '12' }], correctAnswerId: 'b' }
+      ],
+      animaux: [
+        { question: 'Quel animal miaule ?', answers: [{ id: 'a', text: 'Le chat' }, { id: 'b', text: 'La poule' }, { id: 'c', text: 'Le cheval' }], correctAnswerId: 'a' },
+        { question: 'Quel animal vit souvent dans une ruche ?', answers: [{ id: 'a', text: 'La grenouille' }, { id: 'b', text: 'L’abeille' }, { id: 'c', text: 'Le lapin' }], correctAnswerId: 'b' }
+      ],
+      sciences: [
+        { question: 'De quoi une plante a-t-elle besoin pour pousser ?', answers: [{ id: 'a', text: 'D’eau et de lumière' }, { id: 'b', text: 'De chocolat' }, { id: 'c', text: 'De sable sec seulement' }], correctAnswerId: 'a' },
+        { question: 'Quelle planète est appelée la planète rouge ?', answers: [{ id: 'a', text: 'Vénus' }, { id: 'b', text: 'Mars' }, { id: 'c', text: 'Jupiter' }], correctAnswerId: 'b' }
+      ]
+    }
+    const questions = Array.from({ length: count }, (_, index) => {
       const subject = subjects[index % subjects.length]
-      const a = index + 2
-      const b = index + 3
+      const bank = subjectBanks[subject] || subjectBanks.mathematiques
+      const template = bank[Math.floor(index / subjects.length) % bank.length]
       return {
+        ...template,
         id: `q${index + 1}`,
         subject,
-        question: subject === 'mathematiques' ? `Combien font ${a} + ${b} ?` : `Quel choix convient le mieux pour ${subject} ?`,
-        answers: [
-          { id: 'a', text: String(a + b - 1) },
-          { id: 'b', text: String(a + b) },
-          { id: 'c', text: String(a + b + 1) }
-        ],
-        correctAnswerId: 'b'
+        answers: template.answers.map((answer) => ({ ...answer }))
       }
     })
-    return { questions: bank }
+    return { questions }
   }
   if (kind === 'flow') {
     return {

@@ -126,11 +126,17 @@ export function MesQuestionsApp() {
   }
 
   const correctAnswer = currentQuestion.answers.find((answer) => answer.id === currentQuestion.correctAnswerId)
+  const feedbackText = isAnswered
+    ? currentAnswerId === currentQuestion.correctAnswerId
+      ? 'Bravo ! C’est la bonne réponse.'
+      : `Presque ! Réponse : ${correctAnswer?.text}.`
+    : 'Choisis une réponse.'
 
   return (
-    <section className="wizard-card mes-card">
+    <section className="wizard-card mes-card mes-game-card">
       <p className="eyebrow">Question {currentIndex + 1} / {questions.length} · {currentQuestion.subject}</p>
       <h2>{currentQuestion.question}</h2>
+      <p className={`mes-feedback${isAnswered ? '' : ' waiting'}`}>{feedbackText}</p>
       <div className="mes-answers">
         <AnimatePresence>
           {currentQuestion.answers.map((answer) => {
@@ -139,7 +145,6 @@ export function MesQuestionsApp() {
           })}
         </AnimatePresence>
       </div>
-      {isAnswered ? <p className="mes-feedback">{currentAnswerId === currentQuestion.correctAnswerId ? 'Bravo, étoile brillante ! C’est la bonne réponse.' : `Presque ! La bonne réponse était : ${correctAnswer?.text}. On apprend en essayant.`}</p> : null}
       <div className="mes-nav"><button type="button" className="ghost-action" onClick={() => setCurrentIndex((value) => Math.max(0, value - 1))} disabled={currentIndex === 0}>Retour</button><button type="button" className="ghost-action" onClick={restart}>Accueil</button><button type="button" className="primary-action" onClick={() => currentIndex === questions.length - 1 ? setScreen('score') : setCurrentIndex((value) => value + 1)} disabled={!isAnswered}>Suivant</button></div>
     </section>
   )

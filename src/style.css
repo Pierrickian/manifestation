@@ -1482,3 +1482,71 @@ p {
   from { transform: rotate(-2deg) scale(0.96); opacity: 0.78; }
   to { transform: rotate(2deg) scale(1.05); opacity: 1; }
 }
+
+.mes-game-card {
+  min-height: auto;
+  gap: 8px;
+  padding: 16px;
+}
+
+.mes-game-card h2 {
+  margin-bottom: 2px;
+  font-size: clamp(1.25rem, 6vw, 1.9rem);
+}
+
+.mes-game-card .eyebrow {
+  margin-bottom: 0;
+}
+
+.mes-game-card .mes-answers {
+  gap: 8px;
+}
+
+.mes-game-card .mes-answer {
+  min-height: 48px;
+  padding: 11px 13px;
+}
+
+.mes-game-card .mes-feedback {
+  min-height: 44px;
+  margin: 0;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  line-height: 1.25;
+}
+
+.mes-game-card .mes-feedback.waiting {
+  color: rgba(255, 250, 244, 0.54);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.mes-game-card .mes-nav {
+  gap: 8px;
+}
+
+.mes-game-card .ghost-action,
+.mes-game-card .primary-action {
+  min-height: 48px;
+  padding: 11px 10px;
+  text-align: center;
+}
+
+@media (max-height: 740px) {
+  .mes-game-card {
+    padding: 14px;
+    gap: 7px;
+  }
+
+  .mes-game-card .mes-answer,
+  .mes-game-card .ghost-action,
+  .mes-game-card .primary-action {
+    min-height: 44px;
+    padding-block: 9px;
+  }
+
+  .mes-game-card .mes-feedback {
+    min-height: 40px;
+    padding-block: 8px;
+  }
+}
