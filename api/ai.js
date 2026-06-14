@@ -206,6 +206,74 @@ const responseFormats = {
         }
       }
     }
+  },
+  mes_questions_quiz: {
+    type: 'json_schema',
+    json_schema: {
+      name: 'mes_questions_quiz',
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['questions'],
+        properties: {
+          questions: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 10,
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['id', 'subject', 'question', 'answers', 'correctAnswerId'],
+              properties: {
+                id: { type: 'string' },
+                subject: { type: 'string' },
+                question: { type: 'string' },
+                answers: {
+                  type: 'array',
+                  minItems: 3,
+                  maxItems: 3,
+                  items: {
+                    type: 'object',
+                    additionalProperties: false,
+                    required: ['id', 'text'],
+                    properties: {
+                      id: { type: 'string' },
+                      text: { type: 'string' }
+                    }
+                  }
+                },
+                correctAnswerId: { type: 'string' }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+
+function getResponseFormat(kind, context) {
+  if (kind !== 'mes_questions_quiz') return responseFormats[kind] || responseFormats.question
+
+  const exactQuestionCount = Math.max(1, Math.min(10, Number(context?.questionCount || 5)))
+
+  return {
+    type: 'json_schema',
+    json_schema: {
+      ...responseFormats.mes_questions_quiz.json_schema,
+      strict: true,
+      schema: {
+        ...responseFormats.mes_questions_quiz.json_schema.schema,
+        properties: {
+          questions: {
+            ...responseFormats.mes_questions_quiz.json_schema.schema.properties.questions,
+            minItems: exactQuestionCount,
+            maxItems: exactQuestionCount
+          }
+        }
+      }
+    }
   }
 }
 
@@ -238,8 +306,8 @@ export default async function handler(request, response) {
       retryCount: result.retryCount
     }))
   } catch (error) {
-    response.status(200).json(withDebug(getLocalResult(kind, context), {
-      source: 'local',
+    const debug = {
+      source: 'ai',
       fallbackReason: error?.code === 'invalid_ai_payload' ? 'openai_invalid_payload' : 'openai_request_failed',
       hasOpenAIKey: true,
       model: process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL,
@@ -247,7 +315,18 @@ export default async function handler(request, response) {
       errorMessage: error?.message || 'Unknown OpenAI error',
       invalidPayloadKeys: error?.payloadKeys?.join(', ') || 'none',
       retryCount: error?.retryCount ?? 0
-    }))
+    }
+
+    if (kind === 'mes_questions_quiz') {
+      response.status(502).json({
+        error: 'AI quiz generation failed',
+        message: 'La génération IA du quiz a échoué. Relance la génération dans quelques instants.',
+        debug
+      })
+      return
+    }
+
+    response.status(200).json(withDebug(getLocalResult(kind, context), debug))
   }
 }
 
@@ -272,13 +351,13 @@ async function createValidatedAiResult(kind, context, model) {
     const completion = await client.chat.completions.create({
       model,
       messages,
-      response_format: responseFormats[kind] || responseFormats.question,
+      response_format: getResponseFormat(kind, context),
       temperature: 0.75
     })
 
     const content = completion.choices[0]?.message?.content || '{}'
     const payload = JSON.parse(content)
-    const validationError = validateAiPayload(kind, payload)
+    const validationError = validateAiPayload(kind, payload, context)
 
     if (!validationError) {
       return {
@@ -295,7 +374,7 @@ async function createValidatedAiResult(kind, context, model) {
   throw lastError
 }
 
-function validateAiPayload(kind, payload) {
+function validateAiPayload(kind, payload, context = {}) {
   const validators = {
     answer: (value) => Boolean(value?.answer?.label && value.answer.needId && value.answer.scores),
     question: (value) => Boolean(value?.question && Array.isArray(value.answers) && value.answers.length >= 3),
@@ -304,7 +383,8 @@ function validateAiPayload(kind, payload) {
     settings: (value) => Boolean(value?.slider?.id && value.slider.label),
     flow: (value) => Array.isArray(value?.words),
     narratia_child_choices: (value) => Array.isArray(value?.childChoices) && value.childChoices.length >= 6,
-    narratia_story_package: (value) => Boolean(value?.title && Array.isArray(value.milestones) && Array.isArray(value.segments) && Array.isArray(value.endings) && value.endings.length === 3)
+    narratia_story_package: (value) => Boolean(value?.title && Array.isArray(value.milestones) && Array.isArray(value.segments) && Array.isArray(value.endings) && value.endings.length === 3),
+    mes_questions_quiz: (value) => Array.isArray(value?.questions) && value.questions.length === Number(context?.questionCount || value.questions.length) && value.questions.every((question) => question?.id && question.subject && question.question && Array.isArray(question.answers) && question.answers.length === 3 && question.answers.some((answer) => answer.id === question.correctAnswerId))
   }
 
   const isValid = (validators[kind] || validators.question)(payload)
@@ -326,6 +406,7 @@ function getShapeInstruction(kind) {
   if (kind === 'flow') return 'Format attendu: { "words": array, "conclusion": string }.'
   if (kind === 'narratia_child_choices') return 'Expected format: { "childChoices": [{ "id": string, "label": string, "category": string }] }.'
   if (kind === 'narratia_story_package') return 'Expected format: { "id": string, "title": string, "narrators": array, "milestones": array, "segments": array, "endings": array, "metadata": object }.'
+  if (kind === 'mes_questions_quiz') return 'Format attendu: { "questions": [{ "id": string, "subject": string, "question": string, "answers": [{ "id": string, "text": string }], "correctAnswerId": string }] }.'
   return 'Format attendu: un objet JSON de donnees finales, pas un schema.'
 }
 
@@ -394,6 +475,49 @@ function getLocalResult(kind, context) {
       ],
       metadata: { duration: 'short', readingMode: 'mixed_narration', ageRange: 'autour de 7 ans', createdAt: new Date().toISOString() }
     }
+  }
+
+  if (kind === 'mes_questions_quiz') {
+    const subjects = context?.subjects?.length ? context.subjects : ['mathematiques']
+    const count = Number(context?.questionCount || 5)
+    const subjectBanks = {
+      orthographe: [
+        { question: 'Quel mot est écrit correctement ?', answers: [{ id: 'a', text: 'chato' }, { id: 'b', text: 'château' }, { id: 'c', text: 'chatô' }], correctAnswerId: 'b' },
+        { question: 'Quel mot prend deux “p” ?', answers: [{ id: 'a', text: 'pomme' }, { id: 'b', text: 'pome' }, { id: 'c', text: 'paume' }], correctAnswerId: 'a' }
+      ],
+      grammaire: [
+        { question: 'Dans “Le petit chien dort”, quel mot est le verbe ?', answers: [{ id: 'a', text: 'petit' }, { id: 'b', text: 'chien' }, { id: 'c', text: 'dort' }], correctAnswerId: 'c' },
+        { question: 'Quel déterminant convient : ___ étoile brille ?', answers: [{ id: 'a', text: 'Une' }, { id: 'b', text: 'Un' }, { id: 'c', text: 'Des' }], correctAnswerId: 'a' }
+      ],
+      conjugaison: [
+        { question: 'Quelle forme complète : “Nous ___ au parc” ?', answers: [{ id: 'a', text: 'allons' }, { id: 'b', text: 'allez' }, { id: 'c', text: 'vont' }], correctAnswerId: 'a' },
+        { question: 'Quelle forme complète : “Je ___ une histoire” ?', answers: [{ id: 'a', text: 'lis' }, { id: 'b', text: 'lit' }, { id: 'c', text: 'lisez' }], correctAnswerId: 'a' }
+      ],
+      mathematiques: [
+        { question: 'Combien font 3 + 4 ?', answers: [{ id: 'a', text: '6' }, { id: 'b', text: '7' }, { id: 'c', text: '8' }], correctAnswerId: 'b' },
+        { question: 'Combien font 5 × 2 ?', answers: [{ id: 'a', text: '7' }, { id: 'b', text: '10' }, { id: 'c', text: '12' }], correctAnswerId: 'b' }
+      ],
+      animaux: [
+        { question: 'Quel animal miaule ?', answers: [{ id: 'a', text: 'Le chat' }, { id: 'b', text: 'La poule' }, { id: 'c', text: 'Le cheval' }], correctAnswerId: 'a' },
+        { question: 'Quel animal vit souvent dans une ruche ?', answers: [{ id: 'a', text: 'La grenouille' }, { id: 'b', text: 'L’abeille' }, { id: 'c', text: 'Le lapin' }], correctAnswerId: 'b' }
+      ],
+      sciences: [
+        { question: 'De quoi une plante a-t-elle besoin pour pousser ?', answers: [{ id: 'a', text: 'D’eau et de lumière' }, { id: 'b', text: 'De chocolat' }, { id: 'c', text: 'De sable sec seulement' }], correctAnswerId: 'a' },
+        { question: 'Quelle planète est appelée la planète rouge ?', answers: [{ id: 'a', text: 'Vénus' }, { id: 'b', text: 'Mars' }, { id: 'c', text: 'Jupiter' }], correctAnswerId: 'b' }
+      ]
+    }
+    const questions = Array.from({ length: count }, (_, index) => {
+      const subject = subjects[index % subjects.length]
+      const bank = subjectBanks[subject] || subjectBanks.mathematiques
+      const template = bank[Math.floor(index / subjects.length) % bank.length]
+      return {
+        ...template,
+        id: `q${index + 1}`,
+        subject,
+        answers: template.answers.map((answer) => ({ ...answer }))
+      }
+    })
+    return { questions }
   }
   if (kind === 'flow') {
     return {

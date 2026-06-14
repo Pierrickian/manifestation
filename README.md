@@ -95,3 +95,31 @@ npm run dev
 npm run build
 npm run preview
 ```
+
+## Règle Mes Questions
+
+La règle **Mes Questions** est accessible depuis le sous-menu **Menu > Règles**. Elle ouvre d’abord un splash screen plein écran, joyeux et magique, avec le titre animé “Mes Questions”; toute la surface est cliquable/tappable pour passer en douceur à la configuration.
+
+L’écran de configuration permet de choisir l’âge avec une roue numérique mobile, le nombre de questions, puis une ou plusieurs matières: orthographe, grammaire, conjugaison, mathématiques, animaux et sciences. Les matières sont affichées comme des cartes toggle avec un état actif clair.
+
+Au lancement, l’app appelle l’IA et attend un JSON strictement exploitable contenant exactement le nombre de questions demandé:
+
+```json
+{
+  "questions": [
+    {
+      "id": "q1",
+      "subject": "mathematiques",
+      "question": "Combien font 3 + 4 ?",
+      "answers": [
+        { "id": "a", "text": "6" },
+        { "id": "b", "text": "7" },
+        { "id": "c", "text": "8" }
+      ],
+      "correctAnswerId": "b"
+    }
+  ]
+}
+```
+
+Pendant le jeu, une seule question s’affiche à la fois avec trois boutons de réponse. La bonne réponse n’est jamais exposée avant le choix de l’enfant; après réponse, l’interface verrouille la question, valorise la bonne réponse, invalide les autres, affiche un retour encourageant ou doux, puis permet de passer à la suite. La fin de partie affiche le score, le pourcentage de réussite et le détail par question, avec un bouton pour recommencer.

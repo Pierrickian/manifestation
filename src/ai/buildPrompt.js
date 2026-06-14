@@ -22,6 +22,7 @@ const questionVariationRules = [
 
 export function buildPrompt(kind, context) {
   if (kind?.startsWith('narratia_')) return buildNarratiaPrompt(context)
+  if (kind === 'mes_questions_quiz') return buildMesQuestionsPrompt(context)
   const needsSummary = NEEDS.map((need) => {
     return `${need.name}: ${need.needs.join(', ')}`
   }).join('\n')
@@ -191,6 +192,51 @@ function buildNarratiaPrompt(context = {}) {
     {
       role: 'user',
       content: JSON.stringify(context.prompt || {}, null, 2)
+    }
+  ]
+}
+
+
+function buildMesQuestionsPrompt(context = {}) {
+  return [
+    {
+      role: 'system',
+      content: [
+        'Tu crées un quiz éducatif en français pour enfant.',
+        'Réponds uniquement en JSON valide, sans Markdown.',
+        `Génère exactement ${Number(context.questionCount || 5)} questions, pas une de plus ni une de moins.`,
+        `Chaque question doit être adaptée à un enfant de ${Number(context.age || 7)} ans, bienveillante, claire, et avoir exactement 3 réponses possibles.`,
+        'Ne donne jamais la bonne réponse dans l’énoncé.',
+        'Champs obligatoires: id, subject, question, answers, correctAnswerId.',
+        'answers contient exactement trois objets { id, text }; correctAnswerId correspond à un id existant.',
+        'Répartis les questions sur les matières demandées et reste pertinent pour chaque matière.',
+        'Ne réutilise pas les exemples ci-dessous comme contenu sauf si le sujet mathématiques le justifie.'
+      ].join('\n')
+    },
+    {
+      role: 'user',
+      content: JSON.stringify({
+        kind: 'mes_questions_quiz',
+        task: 'Créer un quiz Mes Questions en utilisant l’IA, avec des questions originales et adaptées.',
+        age: context.age,
+        questionCount: context.questionCount,
+        subjects: context.subjects,
+        expectedShape: {
+          questions: [
+            {
+              id: 'q1',
+              subject: 'mathematiques',
+              question: 'Combien font 3 + 4 ?',
+              answers: [
+                { id: 'a', text: '6' },
+                { id: 'b', text: '7' },
+                { id: 'c', text: '8' }
+              ],
+              correctAnswerId: 'b'
+            }
+          ]
+        }
+      })
     }
   ]
 }

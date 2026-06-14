@@ -9,7 +9,8 @@ import { FeelingStep } from './FeelingStep'
 import { HistoryPanel } from './HistoryPanel'
 import { NeedMap } from './NeedMap'
 import { NarratiaApp } from '../features/narratia/NarratiaApp'
-import { DEFAULT_RULE_ID, FLOW_RULE_ID, NARRATIA_RULE_ID, RECONCILIATION_RULE_ID, getRules, hasRule, isGuidedJourneyRule } from '../core/engine/ruleRegistry'
+import { MesQuestionsApp } from '../features/MesQuestionsApp'
+import { DEFAULT_RULE_ID, FLOW_RULE_ID, MES_QUESTIONS_RULE_ID, NARRATIA_RULE_ID, RECONCILIATION_RULE_ID, getRules, hasRule, isGuidedJourneyRule } from '../core/engine/ruleRegistry'
 import { getInitialRuleIdFromUrl, useRuleUrlSync } from '../hooks/useRuleUrlSync'
 
 const PHASE_PASSAGES = {
@@ -285,7 +286,11 @@ function createOrientationChoices({ phase, discovery, answers, beingSettings }) 
   }))
 }
 
-function getDebugRows(prompt) {
+function getDebugRows(prompt, externalDebug = null) {
+  if (externalDebug) {
+    return Object.entries(externalDebug).map(([label, value]) => [label, String(value ?? 'none')])
+  }
+
   const answers = prompt?.answers || []
 
   return prompt?.debug
@@ -336,6 +341,7 @@ export function ManifestationWizard() {
   const [selectedFlowWords, setSelectedFlowWords] = useState([])
   const [flowConclusion, setFlowConclusion] = useState('')
   const [flowBatch, setFlowBatch] = useState(0)
+  const [mesQuestionsDebug, setMesQuestionsDebug] = useState(null)
   const savedSessionRef = useRef(null)
 
   const steps = useMemo(() => {
@@ -367,6 +373,7 @@ export function ManifestationWizard() {
   const needsPhaseZero = activeRuleId === RECONCILIATION_RULE_ID && Boolean(phaseZeroStep)
   const isFlowRule = activeRuleId === FLOW_RULE_ID
   const isNarratiaRule = activeRuleId === NARRATIA_RULE_ID
+  const isMesQuestionsRule = activeRuleId === MES_QUESTIONS_RULE_ID
   const isPhaseDone = Boolean(feeling && currentPhaseAnswers.length >= currentPhaseTotal)
   const needsPhaseChoice = isGuidedJourneyRule(activeRuleId) && isPhaseDone && phase < 3
   const isComplete = Boolean(feeling && phase === 3 && isPhaseDone)
@@ -898,12 +905,12 @@ export function ManifestationWizard() {
         onBeingSettingChange={updateBeingSetting}
         onRefreshSetting={refreshSetting}
         refreshingSettingId={refreshingSettingId}
-        debugRows={getDebugRows(currentPrompt)}
+        debugRows={getDebugRows(currentPrompt, isMesQuestionsRule ? mesQuestionsDebug : null)}
       />
 
-      {!isFlowRule && !isNarratiaRule ? <NeedMap steps={steps} discovery={discovery} links={links} /> : null}
+      {!isFlowRule && !isNarratiaRule && !isMesQuestionsRule ? <NeedMap steps={steps} discovery={discovery} links={links} /> : null}
 
-      {isNarratiaRule ? <NarratiaApp /> : (
+      {isMesQuestionsRule ? <MesQuestionsApp onAiDebug={setMesQuestionsDebug} /> : isNarratiaRule ? <NarratiaApp /> : (
       <AnimatePresence mode="wait">
         {isFlowRule ? (
           <FlowStep
@@ -969,7 +976,7 @@ export function ManifestationWizard() {
       </AnimatePresence>
       )}
 
-      {!isFlowRule && !isNarratiaRule ? <HistoryPanel history={history} /> : null}
+      {!isFlowRule && !isNarratiaRule && !isMesQuestionsRule ? <HistoryPanel history={history} /> : null}
     </main>
   )
 }
