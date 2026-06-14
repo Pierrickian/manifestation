@@ -252,6 +252,31 @@ const responseFormats = {
   }
 }
 
+
+function getResponseFormat(kind, context) {
+  if (kind !== 'mes_questions_quiz') return responseFormats[kind] || responseFormats.question
+
+  const exactQuestionCount = Math.max(1, Math.min(10, Number(context?.questionCount || 5)))
+
+  return {
+    type: 'json_schema',
+    json_schema: {
+      ...responseFormats.mes_questions_quiz.json_schema,
+      strict: true,
+      schema: {
+        ...responseFormats.mes_questions_quiz.json_schema.schema,
+        properties: {
+          questions: {
+            ...responseFormats.mes_questions_quiz.json_schema.schema.properties.questions,
+            minItems: exactQuestionCount,
+            maxItems: exactQuestionCount
+          }
+        }
+      }
+    }
+  }
+}
+
 export default async function handler(request, response) {
   if (request.method !== 'POST') {
     response.status(405).json({ error: 'Method not allowed' })
@@ -281,7 +306,7 @@ export default async function handler(request, response) {
       retryCount: result.retryCount
     }))
   } catch (error) {
-    response.status(200).json(withDebug(getLocalResult(kind, context), {
+    const debug = {
       source: 'local',
       fallbackReason: error?.code === 'invalid_ai_payload' ? 'openai_invalid_payload' : 'openai_request_failed',
       hasOpenAIKey: true,
@@ -290,7 +315,18 @@ export default async function handler(request, response) {
       errorMessage: error?.message || 'Unknown OpenAI error',
       invalidPayloadKeys: error?.payloadKeys?.join(', ') || 'none',
       retryCount: error?.retryCount ?? 0
-    }))
+    }
+
+    if (kind === 'mes_questions_quiz') {
+      response.status(502).json({
+        error: 'AI quiz generation failed',
+        message: 'La génération IA du quiz a échoué. Relance la génération dans quelques instants.',
+        debug
+      })
+      return
+    }
+
+    response.status(200).json(withDebug(getLocalResult(kind, context), debug))
   }
 }
 
@@ -315,7 +351,7 @@ async function createValidatedAiResult(kind, context, model) {
     const completion = await client.chat.completions.create({
       model,
       messages,
-      response_format: responseFormats[kind] || responseFormats.question,
+      response_format: getResponseFormat(kind, context),
       temperature: 0.75
     })
 

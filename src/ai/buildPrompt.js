@@ -204,17 +204,20 @@ function buildMesQuestionsPrompt(context = {}) {
       content: [
         'Tu crées un quiz éducatif en français pour enfant.',
         'Réponds uniquement en JSON valide, sans Markdown.',
-        'Génère exactement le nombre de questions demandé.',
-        'Chaque question doit être adaptée à l’âge, bienveillante, claire, et avoir exactement 3 réponses possibles.',
+        `Génère exactement ${Number(context.questionCount || 5)} questions, pas une de plus ni une de moins.`,
+        `Chaque question doit être adaptée à un enfant de ${Number(context.age || 7)} ans, bienveillante, claire, et avoir exactement 3 réponses possibles.`,
         'Ne donne jamais la bonne réponse dans l’énoncé.',
         'Champs obligatoires: id, subject, question, answers, correctAnswerId.',
-        'answers contient exactement trois objets { id, text }; correctAnswerId correspond à un id existant.'
+        'answers contient exactement trois objets { id, text }; correctAnswerId correspond à un id existant.',
+        'Répartis les questions sur les matières demandées et reste pertinent pour chaque matière.',
+        'Ne réutilise pas les exemples ci-dessous comme contenu sauf si le sujet mathématiques le justifie.'
       ].join('\n')
     },
     {
       role: 'user',
       content: JSON.stringify({
-        task: 'Créer un quiz Mes Questions.',
+        kind: 'mes_questions_quiz',
+        task: 'Créer un quiz Mes Questions en utilisant l’IA, avec des questions originales et adaptées.',
         age: context.age,
         questionCount: context.questionCount,
         subjects: context.subjects,
