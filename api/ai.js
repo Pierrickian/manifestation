@@ -307,7 +307,7 @@ export default async function handler(request, response) {
     }))
   } catch (error) {
     const debug = {
-      source: 'local',
+      source: 'ai',
       fallbackReason: error?.code === 'invalid_ai_payload' ? 'openai_invalid_payload' : 'openai_request_failed',
       hasOpenAIKey: true,
       model: process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL,

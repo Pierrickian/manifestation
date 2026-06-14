@@ -62,7 +62,19 @@ async function requestAI(kind, context) {
   const responseText = await response.text()
 
   if (!response.ok) {
-    throw new Error(`AI request failed: ${response.status} ${responseText.slice(0, 120)}`.trim())
+    let errorPayload = null
+    try {
+      errorPayload = JSON.parse(responseText)
+    } catch {
+      errorPayload = null
+    }
+
+    const error = new Error(errorPayload?.message || `AI request failed: ${response.status}`)
+    error.status = response.status
+    error.payload = errorPayload
+    error.debug = errorPayload?.debug || null
+    error.userMessage = errorPayload?.message || 'La génération IA a échoué. Relance dans quelques instants.'
+    throw error
   }
 
   try {

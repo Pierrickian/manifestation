@@ -286,7 +286,11 @@ function createOrientationChoices({ phase, discovery, answers, beingSettings }) 
   }))
 }
 
-function getDebugRows(prompt) {
+function getDebugRows(prompt, externalDebug = null) {
+  if (externalDebug) {
+    return Object.entries(externalDebug).map(([label, value]) => [label, String(value ?? 'none')])
+  }
+
   const answers = prompt?.answers || []
 
   return prompt?.debug
@@ -337,6 +341,7 @@ export function ManifestationWizard() {
   const [selectedFlowWords, setSelectedFlowWords] = useState([])
   const [flowConclusion, setFlowConclusion] = useState('')
   const [flowBatch, setFlowBatch] = useState(0)
+  const [mesQuestionsDebug, setMesQuestionsDebug] = useState(null)
   const savedSessionRef = useRef(null)
 
   const steps = useMemo(() => {
@@ -900,12 +905,12 @@ export function ManifestationWizard() {
         onBeingSettingChange={updateBeingSetting}
         onRefreshSetting={refreshSetting}
         refreshingSettingId={refreshingSettingId}
-        debugRows={getDebugRows(currentPrompt)}
+        debugRows={getDebugRows(currentPrompt, isMesQuestionsRule ? mesQuestionsDebug : null)}
       />
 
       {!isFlowRule && !isNarratiaRule && !isMesQuestionsRule ? <NeedMap steps={steps} discovery={discovery} links={links} /> : null}
 
-      {isMesQuestionsRule ? <MesQuestionsApp /> : isNarratiaRule ? <NarratiaApp /> : (
+      {isMesQuestionsRule ? <MesQuestionsApp onAiDebug={setMesQuestionsDebug} /> : isNarratiaRule ? <NarratiaApp /> : (
       <AnimatePresence mode="wait">
         {isFlowRule ? (
           <FlowStep

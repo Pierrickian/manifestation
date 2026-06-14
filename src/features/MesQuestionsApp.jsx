@@ -20,7 +20,7 @@ function normalizeQuestions(payload, expectedCount) {
   })
 }
 
-export function MesQuestionsApp() {
+export function MesQuestionsApp({ onAiDebug }) {
   const [screen, setScreen] = useState('splash')
   const [age, setAge] = useState(7)
   const [questionCount, setQuestionCount] = useState(5)
@@ -54,11 +54,24 @@ export function MesQuestionsApp() {
 
     try {
       const payload = await getMesQuestionsQuiz({ age, questionCount, subjects })
+      onAiDebug?.({
+        ...(payload.debug || {}),
+        source: payload.source || payload.debug?.source || 'ai',
+        kind: 'mes_questions_quiz',
+        questionCount,
+        subjects: subjects.join(', ')
+      })
       const nextQuestions = normalizeQuestions(payload, questionCount)
       setQuestions(nextQuestions)
       setScreen('game')
     } catch (error) {
-      setStatus({ loading: false, error: error?.message || 'Impossible de préparer les questions.' })
+      onAiDebug?.({
+        ...(error?.debug || error?.payload?.debug || {}),
+        source: error?.debug?.source || error?.payload?.debug?.source || 'ai',
+        kind: 'mes_questions_quiz',
+        status: error?.status || 'unknown'
+      })
+      setStatus({ loading: false, error: error?.userMessage || 'La génération IA du quiz a échoué. Relance la génération dans quelques instants.' })
       return
     }
 
