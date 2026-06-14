@@ -936,7 +936,12 @@ export function ManifestationWizard() {
       ) : portalView === 'create-app' ? (
         <CreateYourApp
           config={CREATE_YOUR_APP_CONFIG}
-          context={{ source: 'portal', activeRuleId }}
+          targetOptions={WIZARD_RULES.map((rule) => ({
+            id: rule.id,
+            label: rule.label,
+            description: rule.description
+          }))}
+          context={{ source: 'portal' }}
           onClose={goHome}
         />
       ) : (

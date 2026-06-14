@@ -15,16 +15,25 @@ type SpeechRecognition = {
   stop: () => void
 }
 
+type CreateYourAppTargetOption = {
+  id: string
+  label: string
+  description?: string
+}
+
 type CreateYourAppProps = {
   config: CreateYourAppConfig
   initialText?: string
   context?: CreateYourAppContext
+  targetOptions?: CreateYourAppTargetOption[]
   speechLang?: string
   onClose: () => void
   onSuccess?: (result: CreateYourAppSubmitResult) => void
 }
 
 type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error'
+
+const NEW_APP_TARGET_ID = 'new-app'
 
 function getSpeechRecognitionConstructor(): SpeechRecognitionConstructor | null {
   if (typeof window === 'undefined') return null
@@ -44,11 +53,13 @@ export function CreateYourApp({
   config,
   initialText = '',
   context,
+  targetOptions = [],
   speechLang = 'fr-FR',
   onClose,
   onSuccess
 }: CreateYourAppProps) {
   const [requestText, setRequestText] = useState(initialText)
+  const [targetId, setTargetId] = useState(NEW_APP_TARGET_ID)
   const [status, setStatus] = useState<SubmitStatus>('idle')
   const [message, setMessage] = useState('Décris l’app, son objectif, ses écrans et ce qu’elle doit éviter de casser.')
   const [githubUrl, setGithubUrl] = useState<string | null>(null)
@@ -94,13 +105,40 @@ export function CreateYourApp({
     recognition.start()
   }
 
+  function getSelectedTargetContext() {
+    if (targetId === NEW_APP_TARGET_ID) {
+      return {
+        requestTarget: {
+          type: 'new-app',
+          label: 'Nouvelle app'
+        }
+      }
+    }
+
+    const selectedTarget = targetOptions.find((option) => option.id === targetId)
+    return {
+      requestTarget: {
+        type: 'existing-app',
+        appId: targetId,
+        label: selectedTarget?.label || targetId
+      }
+    }
+  }
+
   async function submitRequest() {
     setStatus('submitting')
     setMessage('Préparation de la demande…')
     setGithubUrl(null)
 
     try {
-      const result = await submitCreateYourAppRequest({ config, requestText, context })
+      const result = await submitCreateYourAppRequest({
+        config,
+        requestText,
+        context: {
+          ...(context || {}),
+          ...getSelectedTargetContext()
+        }
+      })
       setStatus('success')
       setGithubUrl(result.url || null)
       setMessage(result.url ? 'Demande prête.' : `Demande créée${result.number ? ` #${result.number}` : ''}.`)
@@ -119,6 +157,17 @@ export function CreateYourApp({
         <h2 id="create-app-title">Crée ton App</h2>
         <p>Propose une app complète ou une évolution produit. Ta demande sera préparée pour rejoindre le portail de création.</p>
       </div>
+
+      <label className="create-app-field">
+        <span>Type de demande</span>
+        <select className="create-app-select" value={targetId} onChange={(event) => setTargetId(event.target.value)}>
+          <option value={NEW_APP_TARGET_ID}>Nouvelle app</option>
+          {targetOptions.map((option) => (
+            <option key={option.id} value={option.id}>{option.label}</option>
+          ))}
+        </select>
+        <small>{targetId === NEW_APP_TARGET_ID ? 'La demande indiquera clairement qu’il s’agit d’une nouvelle app.' : 'La demande indiquera clairement l’app existante concernée.'}</small>
+      </label>
 
       <label className="create-app-field">
         <span>Ton idée d’app</span>
@@ -140,7 +189,7 @@ export function CreateYourApp({
       </div>
 
       <div className={`create-app-status ${status}`} role="status">
-        <strong>{status}</strong>
+        <strong>{status === 'idle' ? 'Info' : status}</strong>
         <span>{message}</span>
         {githubUrl ? <a href={githubUrl} target="_blank" rel="noreferrer">Ouvrir la demande</a> : null}
       </div>

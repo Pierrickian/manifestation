@@ -44,6 +44,21 @@ export function buildCreateYourAppTitle(requestText: string, fallbackTitle: stri
   return `${cleanedTitle.slice(0, MAX_TITLE_LENGTH - 1).trimEnd()}…`
 }
 
+function formatRequestTarget(context?: CreateYourAppContext) {
+  const target = context?.requestTarget as { type?: string; appId?: string; label?: string } | undefined
+  if (!target) return ''
+
+  if (target.type === 'new-app') {
+    return '## Cible de la demande\nNouvelle app a integrer au portail.'
+  }
+
+  if (target.type === 'existing-app') {
+    return `## Cible de la demande\nEvolution de l app existante: ${target.label || target.appId || 'app non precisee'}${target.appId ? ` (id: ${target.appId})` : ''}.`
+  }
+
+  return ''
+}
+
 function formatContext(context?: CreateYourAppContext) {
   if (!context || Object.keys(context).length === 0) return ''
 
@@ -56,12 +71,15 @@ function formatContext(context?: CreateYourAppContext) {
 }
 
 export function buildCreateYourAppBody(requestText: string, context?: CreateYourAppContext) {
+  const targetBlock = formatRequestTarget(context)
   const contextBlock = formatContext(context)
 
   return [
     '## Demande utilisateur',
     requestText.trim(),
     '',
+    targetBlock,
+    targetBlock ? '' : null,
     contextBlock,
     contextBlock ? '' : null,
     '## Instructions pour l’agent IA/codegen',

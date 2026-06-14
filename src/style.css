@@ -1692,6 +1692,7 @@ p {
   color: rgba(255, 250, 244, 0.88);
 }
 
+.create-app-select,
 .create-app-field textarea {
   width: 100%;
   min-height: 220px;
@@ -1703,6 +1704,16 @@ p {
   color: #fffaf4;
   font: inherit;
   line-height: 1.45;
+}
+
+.create-app-select {
+  min-height: 52px;
+}
+
+.create-app-field small {
+  color: rgba(255, 250, 244, 0.58);
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 
 .create-app-field textarea::placeholder {
