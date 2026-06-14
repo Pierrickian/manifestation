@@ -30,6 +30,22 @@ export const initialNarratiaState = {
   error: ''
 }
 
+
+export function createFreshNarratiaState(overrides = {}) {
+  return {
+    ...initialNarratiaState,
+    parentConfiguration: { ...defaultParentConfiguration },
+    childSelection: {
+      ...initialNarratiaState.childSelection,
+      choiceIds: [...initialNarratiaState.childSelection.choiceIds]
+    },
+    childChoices: [],
+    revealedSegmentIds: [],
+    segmentNarratorChoices: {},
+    ...overrides
+  }
+}
+
 const VALID_SCREENS = new Set(['intro', 'parent', 'child', 'timeline', 'narration'])
 
 function getNormalizedRevealedSegmentIds(storyPackage, revealedSegmentIds = [], segmentNarratorChoices = {}) {
@@ -89,9 +105,9 @@ function normalizeNarratiaState(saved) {
 export function loadNarratiaState() {
   try {
     const saved = JSON.parse(localStorage.getItem(NARRATIA_STORAGE_KEY) || 'null')
-    return saved ? normalizeNarratiaState(saved) : initialNarratiaState
+    return saved ? normalizeNarratiaState(saved) : createFreshNarratiaState()
   } catch {
-    return initialNarratiaState
+    return createFreshNarratiaState()
   }
 }
 

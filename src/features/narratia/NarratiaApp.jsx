@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { generateNarratiaChildChoices, generateNarratiaStoryPackage } from './services/narratiaAiService'
-import { clearNarratiaState, defaultParentConfiguration, loadNarratiaState, saveNarratiaState } from './stores/narratiaStore'
+import { clearNarratiaState, createFreshNarratiaState, defaultParentConfiguration } from './stores/narratiaStore'
 import { ChildWizard } from './screens/ChildWizard'
 import { NarratiaIntro } from './screens/NarratiaIntro'
 import { NarrationView } from './screens/NarrationView'
@@ -12,11 +12,10 @@ const SEGMENT_REVEAL_DELAY = 700
 const ENDING_REVEAL_DELAY = 2000
 
 export function NarratiaApp() {
-  const [state, setState] = useState(() => loadNarratiaState())
-
-  useEffect(() => {
-    saveNarratiaState(state)
-  }, [state])
+  const [state, setState] = useState(() => {
+    clearNarratiaState()
+    return createFreshNarratiaState({ screen: 'parent' })
+  })
 
   function patchState(patch) {
     setState((current) => ({ ...current, ...patch }))
@@ -29,8 +28,7 @@ export function NarratiaApp() {
   function startNewStory() {
     clearNarratiaState()
     setState({
-      ...loadNarratiaState(),
-      screen: 'parent',
+      ...createFreshNarratiaState({ screen: 'parent' }),
       parentConfiguration: defaultParentConfiguration,
       childChoices: [],
       storyPackage: null,
@@ -46,7 +44,15 @@ export function NarratiaApp() {
   async function submitParentConfiguration() {
     patchState({ status: 'loading_choices', error: '' })
     const result = await generateNarratiaChildChoices(state.parentConfiguration)
-    patchState({ childChoices: result.childChoices, screen: 'child', status: 'idle' })
+    patchState({
+      childChoices: result.childChoices,
+      childSelection: {
+        ...state.childSelection,
+        choiceIds: result.childChoices[0]?.id ? [result.childChoices[0].id] : []
+      },
+      screen: 'child',
+      status: 'idle'
+    })
   }
 
   async function submitChildSelection() {
