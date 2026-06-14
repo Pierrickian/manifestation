@@ -50,6 +50,7 @@ button:focus-visible {
 }
 
 .wizard-hero,
+.app-chooser,
 .wizard-card,
 .discovery-card,
 .need-map,
@@ -61,9 +62,22 @@ button:focus-visible {
   backdrop-filter: blur(12px);
 }
 
-.wizard-hero {
+.wizard-hero,
+.app-chooser {
   border-radius: 24px;
   padding: 22px;
+}
+
+.wizard-hero h1 {
+  margin-bottom: 0;
+}
+
+.app-chooser-header h2 {
+  margin-bottom: 0;
+}
+
+.app-options {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
 .wizard-card,
@@ -81,6 +95,48 @@ button:focus-visible {
 
 .wizard-menu {
   color: rgba(255, 250, 244, 0.84);
+}
+
+.compact-menu {
+  justify-self: start;
+  width: fit-content;
+  min-width: 74px;
+}
+
+.compact-menu > summary {
+  list-style: none;
+}
+
+.compact-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.hamburger-icon {
+  width: 28px;
+  display: grid;
+  gap: 5px;
+}
+
+.hamburger-icon span {
+  display: block;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 250, 244, 0.88);
+}
+
+.debug-toggle {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.debug-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: #fff2ad;
 }
 
 .wizard-menu > summary,
@@ -332,6 +388,13 @@ p {
 
 .wizard-option:hover {
   background: rgba(255, 255, 255, 0.14);
+}
+
+.ai-debug-footer {
+  position: sticky;
+  bottom: max(8px, env(safe-area-inset-bottom));
+  z-index: 20;
+  padding: 14px;
 }
 
 .ai-debug-panel {
@@ -1548,5 +1611,176 @@ p {
   .mes-game-card .mes-feedback {
     min-height: 40px;
     padding-block: 8px;
+  }
+}
+
+.create-app-option {
+  border-color: rgba(143, 235, 255, 0.4);
+  background: linear-gradient(135deg, rgba(143, 235, 255, 0.16), rgba(255, 242, 173, 0.1));
+}
+
+@media (min-width: 520px) {
+  .create-app-option {
+    grid-column: 1 / -1;
+  }
+}
+
+.menu-actions {
+  margin-top: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.menu-home-action {
+  min-height: 42px;
+  border: 1px solid rgba(255, 250, 244, 0.14);
+  border-radius: 14px;
+  padding: 9px 12px;
+  background: rgba(255, 250, 244, 0.08);
+  color: rgba(255, 250, 244, 0.9);
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.create-app-panel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 28px;
+  padding: 22px;
+  display: grid;
+  gap: 16px;
+  background:
+    radial-gradient(circle at 15% 8%, rgba(143, 235, 255, 0.18), transparent 32%),
+    radial-gradient(circle at 90% 16%, rgba(255, 242, 173, 0.14), transparent 30%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.052));
+  box-shadow: 0 22px 62px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(12px);
+}
+
+.create-app-aurora {
+  position: absolute;
+  inset: -30% -20% auto auto;
+  width: 220px;
+  height: 220px;
+  border-radius: 999px;
+  background: rgba(255, 130, 204, 0.18);
+  filter: blur(22px);
+  pointer-events: none;
+}
+
+.create-app-header,
+.create-app-field,
+.create-app-actions,
+.create-app-status,
+.create-app-panel > .ghost-action {
+  position: relative;
+  z-index: 1;
+}
+
+.create-app-header h2 {
+  margin-bottom: 10px;
+}
+
+.create-app-field {
+  display: grid;
+  gap: 10px;
+}
+
+.create-app-field span {
+  font-weight: 900;
+  color: rgba(255, 250, 244, 0.88);
+}
+
+.create-app-select,
+.create-app-field textarea {
+  width: 100%;
+  min-height: 220px;
+  resize: vertical;
+  border: 1px solid rgba(255, 250, 244, 0.16);
+  border-radius: 20px;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.18);
+  color: #fffaf4;
+  font: inherit;
+  line-height: 1.45;
+}
+
+.create-app-select {
+  min-height: 52px;
+}
+
+.create-app-field small {
+  color: rgba(255, 250, 244, 0.58);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.create-app-field textarea::placeholder {
+  color: rgba(255, 250, 244, 0.42);
+}
+
+.create-app-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.create-app-actions .primary-action,
+.create-app-actions .ghost-action {
+  margin-top: 0;
+}
+
+.create-app-mic.is-listening {
+  border-color: rgba(255, 122, 214, 0.52);
+  background: rgba(255, 122, 214, 0.16);
+}
+
+.create-app-status {
+  border: 1px solid rgba(255, 250, 244, 0.12);
+  border-radius: 18px;
+  padding: 12px;
+  display: grid;
+  gap: 5px;
+  background: rgba(255, 250, 244, 0.07);
+  color: rgba(255, 250, 244, 0.74);
+  font-size: 0.85rem;
+}
+
+.create-app-status strong {
+  color: #fffaf4;
+  text-transform: capitalize;
+}
+
+.create-app-status.success {
+  border-color: rgba(120, 255, 186, 0.36);
+  background: rgba(120, 255, 186, 0.1);
+}
+
+.create-app-status.error {
+  border-color: rgba(255, 122, 122, 0.36);
+  background: rgba(255, 122, 122, 0.1);
+}
+
+.create-app-status a {
+  color: #fff2ad;
+  font-weight: 900;
+}
+
+.mes-splash,
+.mes-card {
+  max-width: 100%;
+  min-width: 0;
+  justify-self: stretch;
+}
+
+.mes-splash-title {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: clamp(3.1rem, 16vw, 6.2rem);
+}
+
+@media (min-width: 560px) {
+  .create-app-actions {
+    grid-template-columns: 0.7fr 1.3fr;
   }
 }
