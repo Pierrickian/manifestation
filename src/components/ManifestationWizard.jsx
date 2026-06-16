@@ -10,8 +10,9 @@ import { HistoryPanel } from './HistoryPanel'
 import { NeedMap } from './NeedMap'
 import { NarratiaApp } from '../features/narratia/NarratiaApp'
 import { MesQuestionsApp } from '../features/MesQuestionsApp'
+import { EnigmiaApp } from '../features/EnigmiaApp'
 import { CreateYourApp } from '../features/create-your-app/CreateYourApp'
-import { DEFAULT_RULE_ID, FLOW_RULE_ID, MES_QUESTIONS_RULE_ID, NARRATIA_RULE_ID, RECONCILIATION_RULE_ID, getRules, hasRule, isGuidedJourneyRule } from '../core/engine/ruleRegistry'
+import { DEFAULT_RULE_ID, ENIGMIA_RULE_ID, FLOW_RULE_ID, MES_QUESTIONS_RULE_ID, NARRATIA_RULE_ID, RECONCILIATION_RULE_ID, getRules, hasRule, isGuidedJourneyRule } from '../core/engine/ruleRegistry'
 import { getInitialRuleIdFromUrl, readRuleUrlState, useRuleUrlSync } from '../hooks/useRuleUrlSync'
 
 const PHASE_PASSAGES = {
@@ -354,6 +355,7 @@ export function ManifestationWizard() {
   const [flowConclusion, setFlowConclusion] = useState('')
   const [flowBatch, setFlowBatch] = useState(0)
   const [mesQuestionsDebug, setMesQuestionsDebug] = useState(null)
+  const [enigmiaDebug, setEnigmiaDebug] = useState(null)
   const [hasConfiguredApp, setHasConfiguredApp] = useState(false)
   const [showAiDebug, setShowAiDebug] = useState(false)
   const [portalView, setPortalView] = useState(readInitialPortalView)
@@ -389,6 +391,7 @@ export function ManifestationWizard() {
   const isFlowRule = activeRuleId === FLOW_RULE_ID
   const isNarratiaRule = activeRuleId === NARRATIA_RULE_ID
   const isMesQuestionsRule = activeRuleId === MES_QUESTIONS_RULE_ID
+  const isEnigmiaRule = activeRuleId === ENIGMIA_RULE_ID
   const needsAppSetup = [DEFAULT_RULE_ID, RECONCILIATION_RULE_ID, FLOW_RULE_ID].includes(activeRuleId) && !hasConfiguredApp && !feeling && !selectedFlowWords.length
   const isPhaseDone = Boolean(feeling && currentPhaseAnswers.length >= currentPhaseTotal)
   const needsPhaseChoice = isGuidedJourneyRule(activeRuleId) && isPhaseDone && phase < 3
@@ -946,9 +949,9 @@ export function ManifestationWizard() {
         />
       ) : (
         <>
-      {!isFlowRule && !isNarratiaRule && !isMesQuestionsRule ? <NeedMap steps={steps} discovery={discovery} links={links} /> : null}
+      {!isFlowRule && !isNarratiaRule && !isMesQuestionsRule && !isEnigmiaRule ? <NeedMap steps={steps} discovery={discovery} links={links} /> : null}
 
-      {isMesQuestionsRule ? <MesQuestionsApp onAiDebug={setMesQuestionsDebug} /> : isNarratiaRule ? <NarratiaApp /> : (
+      {isEnigmiaRule ? <EnigmiaApp onAiDebug={setEnigmiaDebug} /> : isMesQuestionsRule ? <MesQuestionsApp onAiDebug={setMesQuestionsDebug} /> : isNarratiaRule ? <NarratiaApp /> : (
       <AnimatePresence mode="wait">
         {needsAppSetup ? (
           <AppSetupStep
@@ -1027,12 +1030,12 @@ export function ManifestationWizard() {
       </AnimatePresence>
       )}
 
-      {!isFlowRule && !isNarratiaRule && !isMesQuestionsRule ? <HistoryPanel history={history} /> : null}
+      {!isFlowRule && !isNarratiaRule && !isMesQuestionsRule && !isEnigmiaRule ? <HistoryPanel history={history} /> : null}
 
         </>
       )}
 
-      {showAiDebug ? <AiDebugFooter debugRows={getDebugRows(currentPrompt, isMesQuestionsRule ? mesQuestionsDebug : null)} /> : null}
+      {showAiDebug ? <AiDebugFooter debugRows={getDebugRows(currentPrompt, isEnigmiaRule ? enigmiaDebug : isMesQuestionsRule ? mesQuestionsDebug : null)} /> : null}
     </main>
   )
 }

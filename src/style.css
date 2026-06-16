@@ -1784,3 +1784,118 @@ p {
     grid-template-columns: 0.7fr 1.3fr;
   }
 }
+
+.enigmia-card {
+  gap: 18px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(124, 255, 218, 0.18), transparent 34%),
+    radial-gradient(circle at 88% 8%, rgba(178, 115, 255, 0.2), transparent 30%),
+    linear-gradient(145deg, rgba(29, 31, 58, 0.94), rgba(18, 19, 38, 0.94));
+}
+
+.enigmia-loading::after {
+  content: '';
+  width: 72px;
+  height: 72px;
+  border: 2px solid rgba(255, 250, 244, 0.16);
+  border-top-color: #7cffda;
+  border-radius: 999px;
+  animation: enigmiaSpin 1s linear infinite;
+  justify-self: center;
+}
+
+.enigmia-header h2 {
+  margin-bottom: 8px;
+}
+
+.enigmia-header p:last-child {
+  color: rgba(255, 250, 244, 0.72);
+  line-height: 1.45;
+}
+
+.enigmia-statements,
+.enigmia-choices {
+  display: grid;
+  gap: 10px;
+}
+
+.enigmia-statements article {
+  border: 1px solid rgba(255, 250, 244, 0.13);
+  border-radius: 20px;
+  padding: 14px;
+  display: grid;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.075);
+}
+
+.enigmia-statements strong {
+  color: #7cffda;
+  text-transform: capitalize;
+}
+
+.enigmia-statements span {
+  color: rgba(255, 250, 244, 0.82);
+}
+
+.enigmia-choice {
+  min-height: 58px;
+  border: 1px solid rgba(255, 250, 244, 0.16);
+  border-radius: 20px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 250, 244, 0.08);
+  color: #fffaf4;
+  font-weight: 900;
+  text-align: left;
+  cursor: pointer;
+}
+
+.enigmia-choice span {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  display: inline-grid;
+  place-items: center;
+  background: rgba(124, 255, 218, 0.16);
+  color: #7cffda;
+}
+
+.enigmia-choice.correct {
+  border-color: rgba(120, 255, 186, 0.52);
+  background: rgba(120, 255, 186, 0.16);
+}
+
+.enigmia-choice.wrong {
+  border-color: rgba(255, 122, 122, 0.48);
+  background: rgba(255, 122, 122, 0.14);
+}
+
+.enigmia-choice.muted {
+  opacity: 0.58;
+}
+
+.enigmia-feedback,
+.enigmia-error {
+  border: 1px solid rgba(255, 250, 244, 0.13);
+  border-radius: 20px;
+  padding: 14px;
+  display: grid;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.enigmia-feedback.correct {
+  border-color: rgba(120, 255, 186, 0.38);
+}
+
+.enigmia-feedback.wrong,
+.enigmia-error {
+  border-color: rgba(255, 122, 122, 0.34);
+}
+
+@keyframes enigmiaSpin {
+  to { transform: rotate(360deg); }
+}
