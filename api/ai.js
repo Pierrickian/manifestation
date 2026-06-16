@@ -5,9 +5,10 @@ import { generateLinks } from '../src/ai/generateLinks.js'
 import { generateQuestion } from '../src/ai/generateQuestion.js'
 
 const DEFAULT_OPENAI_MODEL = 'gpt-5.4-mini'
+const OPENAI_REQUEST_TIMEOUT_MS = 20000
 
 const client = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: OPENAI_REQUEST_TIMEOUT_MS })
   : null
 
 const responseFormats = {
@@ -207,6 +208,56 @@ const responseFormats = {
       }
     }
   },
+  enigmia_riddle: {
+    type: 'json_schema',
+    json_schema: {
+      name: 'enigmia_riddle',
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['riddle'],
+        properties: {
+          riddle: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['theme', 'object', 'coordinate', 'table', 'columnReadings', 'containers', 'puzzle', 'statements', 'choices', 'solution', 'solutionContainerName', 'auditTrail'],
+            properties: {
+              theme: { type: 'string' },
+              object: { type: 'string' },
+              coordinate: {
+                type: 'object',
+                additionalProperties: false,
+                required: ['row', 'column'],
+                properties: {
+                  row: { type: 'string', enum: ['Objet=A', 'Objet=B', 'Objet=C'] },
+                  column: { type: 'string', enum: ['A', 'B', 'C'] }
+                }
+              },
+              table: {
+                type: 'array',
+                minItems: 3,
+                maxItems: 3,
+                items: {
+                  type: 'array',
+                  minItems: 3,
+                  maxItems: 3,
+                  items: { type: 'string', enum: ['V', 'F'] }
+                }
+              },
+              columnReadings: { type: 'array', items: { type: 'object', additionalProperties: true } },
+              containers: { type: 'array', minItems: 3, maxItems: 3, items: { type: 'object', additionalProperties: false, required: ['id', 'name'], properties: { id: { type: 'string' }, name: { type: 'string' } } } },
+              puzzle: { type: 'string' },
+              statements: { type: 'array', minItems: 3, maxItems: 3, items: { type: 'object', additionalProperties: false, required: ['containerId', 'containerName', 'text'], properties: { containerId: { type: 'string' }, containerName: { type: 'string' }, text: { type: 'string' } } } },
+              choices: { type: 'array', minItems: 3, maxItems: 3, items: { type: 'object', additionalProperties: false, required: ['id', 'containerName'], properties: { id: { type: 'string' }, containerName: { type: 'string' } } } },
+              solution: { type: 'string', enum: ['A', 'B', 'C'] },
+              solutionContainerName: { type: 'string' },
+              auditTrail: { type: 'array', items: { type: 'string' } }
+            }
+          }
+        }
+      }
+    }
+  },
   mes_questions_quiz: {
     type: 'json_schema',
     json_schema: {
@@ -317,7 +368,8 @@ export default async function handler(request, response) {
       retryCount: error?.retryCount ?? 0
     }
 
-    if (kind === 'mes_questions_quiz') {
+
+  if (kind === 'mes_questions_quiz') {
       response.status(502).json({
         error: 'AI quiz generation failed',
         message: 'La génération IA du quiz a échoué. Relance la génération dans quelques instants.',
@@ -356,7 +408,7 @@ async function createValidatedAiResult(kind, context, model) {
     })
 
     const content = completion.choices[0]?.message?.content || '{}'
-    const payload = JSON.parse(content)
+    const payload = normalizeAiPayload(kind, JSON.parse(content), context)
     const validationError = validateAiPayload(kind, payload, context)
 
     if (!validationError) {
@@ -384,6 +436,7 @@ function validateAiPayload(kind, payload, context = {}) {
     flow: (value) => Array.isArray(value?.words),
     narratia_child_choices: (value) => Array.isArray(value?.childChoices) && value.childChoices.length >= 6,
     narratia_story_package: (value) => Boolean(value?.title && Array.isArray(value.milestones) && Array.isArray(value.segments) && Array.isArray(value.endings) && value.endings.length === 3),
+    enigmia_riddle: (value) => validateEnigmiaRiddle(value?.riddle).isValid,
     mes_questions_quiz: (value) => Array.isArray(value?.questions) && value.questions.length === Number(context?.questionCount || value.questions.length) && value.questions.every((question) => question?.id && question.subject && question.question && Array.isArray(question.answers) && question.answers.length === 3 && question.answers.some((answer) => answer.id === question.correctAnswerId))
   }
 
@@ -397,6 +450,169 @@ function validateAiPayload(kind, payload, context = {}) {
   return error
 }
 
+function normalizeAiPayload(kind, payload, context = {}) {
+  if (kind !== 'enigmia_riddle') return payload
+  return normalizeEnigmiaPayload(payload, context)
+}
+
+const ENIGMIA_IDS = ['A', 'B', 'C']
+const ENIGMIA_ROWS = ['Objet=A', 'Objet=B', 'Objet=C']
+const ENIGMIA_STATEMENTS_BY_PATTERN = {
+  VFF: 'L’objet est dans A',
+  FVF: 'L’objet est dans B',
+  FFV: 'L’objet est dans C',
+  FVV: 'L’objet n’est pas dans A',
+  VFV: 'L’objet n’est pas dans B',
+  VVF: 'L’objet n’est pas dans C'
+}
+
+function normalizeTruthCell(cell) {
+  if (cell === true) return 'V'
+  if (cell === false) return 'F'
+  const normalized = String(cell || '').trim().toUpperCase()
+  return normalized === 'V' || normalized === 'TRUE' || normalized === 'VRAI' ? 'V' : 'F'
+}
+
+function normalizeEnigmiaPayload(payload, context = {}) {
+  const riddle = payload?.riddle
+  if (!riddle) return payload
+
+  const containers = ENIGMIA_IDS.map((id, index) => {
+    const container = riddle.containers?.find((item) => item?.id === id) || riddle.containers?.[index] || {}
+    return {
+      id,
+      name: container.name || `contenant ${id}`
+    }
+  })
+  const namesById = Object.fromEntries(containers.map((container) => [container.id, container.name]))
+  const table = Array.isArray(riddle.table)
+    ? ENIGMIA_ROWS.map((_, rowIndex) => ENIGMIA_IDS.map((__, colIndex) => normalizeTruthCell(riddle.table?.[rowIndex]?.[colIndex])))
+    : []
+  const previousSolution = getPreviousEnigmiaSolution(context)
+  const safeTable = validateEnigmiaTable(table).isValid && getEnigmiaSolution(table) !== previousSolution
+    ? table
+    : createEnigmiaTable(previousSolution)
+
+  const solutionIndex = getEnigmiaSolutionIndex(safeTable)
+  const solution = ENIGMIA_IDS[solutionIndex]
+  const solutionRow = safeTable[solutionIndex]
+  const coordinateColumn = ENIGMIA_IDS[solutionRow.findIndex((cell) => cell === 'V')]
+  const columnReadings = ENIGMIA_IDS.map((containerId, columnIndex) => {
+    const pattern = safeTable.map((row) => row[columnIndex]).join('')
+    const internalStatement = ENIGMIA_STATEMENTS_BY_PATTERN[pattern]
+    const convertedStatement = convertEnigmiaStatement(internalStatement, namesById)
+    return {
+      containerId,
+      pattern,
+      internalStatement,
+      convertedStatement
+    }
+  })
+
+  return {
+    ...payload,
+    riddle: {
+      ...riddle,
+      coordinate: { row: ENIGMIA_ROWS[solutionIndex], column: coordinateColumn },
+      table: safeTable,
+      columnReadings,
+      containers,
+      statements: columnReadings.map((reading) => ({
+        containerId: reading.containerId,
+        containerName: namesById[reading.containerId],
+        text: reading.convertedStatement
+      })),
+      choices: ENIGMIA_IDS.map((id) => ({ id, containerName: namesById[id] })),
+      solution,
+      solutionContainerName: namesById[solution],
+      auditTrail: [
+        ...(Array.isArray(riddle.auditTrail) ? riddle.auditTrail : []),
+        `Table validée côté API: lignes ${safeTable.map((row) => row.filter((cell) => cell === 'V').length).join('/')}, total 5 V.`,
+        'Inscriptions reconstruites côté API à partir des colonnes validées.'
+      ]
+    }
+  }
+}
+
+function getPreviousEnigmiaSolution(context = {}) {
+  const previousRiddles = Array.isArray(context.previousRiddles) ? context.previousRiddles : []
+  const lastSolution = previousRiddles.at(-1)?.solution
+  return ENIGMIA_IDS.includes(lastSolution) ? lastSolution : null
+}
+
+function getEnigmiaSolutionIndex(table) {
+  return table.findIndex((row) => row.filter((cell) => cell === 'V').length === 1)
+}
+
+function getEnigmiaSolution(table) {
+  const solutionIndex = getEnigmiaSolutionIndex(table)
+  return ENIGMIA_IDS[solutionIndex] || null
+}
+
+function createEnigmiaTable(excludedSolution = null) {
+  const validTables = []
+
+  for (let solutionIndex = 0; solutionIndex < ENIGMIA_IDS.length; solutionIndex += 1) {
+    for (let coordinateColumnIndex = 0; coordinateColumnIndex < ENIGMIA_IDS.length; coordinateColumnIndex += 1) {
+      for (let firstFalseColumn = 0; firstFalseColumn < ENIGMIA_IDS.length; firstFalseColumn += 1) {
+        for (let secondFalseColumn = 0; secondFalseColumn < ENIGMIA_IDS.length; secondFalseColumn += 1) {
+          const falseColumns = [firstFalseColumn, secondFalseColumn]
+          const rows = ENIGMIA_IDS.map((_, rowIndex) => {
+            if (rowIndex === solutionIndex) {
+              return ENIGMIA_IDS.map((__, columnIndex) => columnIndex === coordinateColumnIndex ? 'V' : 'F')
+            }
+
+            const falseColumnIndex = falseColumns.shift()
+            return ENIGMIA_IDS.map((__, columnIndex) => columnIndex === falseColumnIndex ? 'F' : 'V')
+          })
+
+          if (validateEnigmiaTable(rows).isValid && getEnigmiaSolution(rows) !== excludedSolution) validTables.push(rows)
+        }
+      }
+    }
+  }
+
+  const pool = validTables.length ? validTables : [createFallbackEnigmiaTable()]
+  return pool[Math.floor(Math.random() * pool.length)]
+}
+
+function createFallbackEnigmiaTable() {
+  return [['F', 'V', 'V'], ['F', 'F', 'V'], ['V', 'V', 'F']]
+}
+
+function convertEnigmiaStatement(statement, namesById) {
+  return ENIGMIA_IDS.reduce((text, id) => {
+    return text.replace(new RegExp(`\\b${id}\\b`, 'g'), `le ${namesById[id]}`)
+  }, statement)
+}
+
+function validateEnigmiaTable(table) {
+  if (!Array.isArray(table) || table.length !== 3 || table.some((row) => !Array.isArray(row) || row.length !== 3)) {
+    return { isValid: false, reason: 'invalid_table_shape' }
+  }
+
+  const rowCounts = table.map((row) => row.filter((cell) => cell === 'V').length)
+  const solutionRows = rowCounts.filter((count) => count === 1).length
+  const otherRows = rowCounts.filter((count) => count === 2).length
+  const total = rowCounts.reduce((sum, count) => sum + count, 0)
+  const patterns = ENIGMIA_IDS.map((_, columnIndex) => table.map((row) => row[columnIndex]).join(''))
+  const knownPatterns = patterns.every((pattern) => Boolean(ENIGMIA_STATEMENTS_BY_PATTERN[pattern]))
+  const uniquePatterns = new Set(patterns).size === 3
+
+  return {
+    isValid: solutionRows === 1 && otherRows === 2 && total === 5 && knownPatterns && uniquePatterns,
+    reason: 'invalid_truth_constraints'
+  }
+}
+
+function validateEnigmiaRiddle(riddle) {
+  if (!riddle?.theme || !riddle.object || !Array.isArray(riddle.statements) || riddle.statements.length !== 3 || !Array.isArray(riddle.choices) || riddle.choices.length !== 3 || !ENIGMIA_IDS.includes(riddle.solution)) {
+    return { isValid: false, reason: 'invalid_riddle_shape' }
+  }
+
+  return validateEnigmiaTable(riddle.table)
+}
+
 function getShapeInstruction(kind) {
   if (kind === 'answer') return 'Format attendu: { "answer": { "id": string, "label": string, "needId": string, "scores": object } }.'
   if (kind === 'question') return 'Format attendu: { "question": string, "answers": [{ "id": string, "label": string, "needId": string, "scores": object }] }.'
@@ -404,6 +620,7 @@ function getShapeInstruction(kind) {
   if (kind === 'links') return 'Format attendu: { "needLinks": array, "pathLinks": array }.'
   if (kind === 'settings') return 'Format attendu: { "slider": { "id": string, "label": string, "left": string, "right": string, "value": number } }.'
   if (kind === 'flow') return 'Format attendu: { "words": array, "conclusion": string }.'
+  if (kind === 'enigmia_riddle') return 'Format attendu: { \"riddle\": { \"theme\": string, \"object\": string, \"puzzle\": string, \"statements\": [{ \"containerId\": \"A\", \"containerName\": string, \"text\": string }], \"choices\": [{ \"id\": \"A\", \"containerName\": string }], \"solution\": \"A|B|C\" } }.'
   if (kind === 'narratia_child_choices') return 'Expected format: { "childChoices": [{ "id": string, "label": string, "category": string }] }.'
   if (kind === 'narratia_story_package') return 'Expected format: { "id": string, "title": string, "narrators": array, "milestones": array, "segments": array, "endings": array, "metadata": object }.'
   if (kind === 'mes_questions_quiz') return 'Format attendu: { "questions": [{ "id": string, "subject": string, "question": string, "answers": [{ "id": string, "text": string }], "correctAnswerId": string }] }.'
@@ -436,6 +653,40 @@ function getLocalResult(kind, context) {
         value: 50
       }
     }
+  }
+  if (kind === 'enigmia_riddle') {
+    return normalizeEnigmiaPayload({
+      riddle: {
+        theme: 'observatoire lunaire',
+        object: 'le prisme d’aurore',
+        coordinate: { row: 'Objet=B', column: 'C' },
+        table: createEnigmiaTable(getPreviousEnigmiaSolution(context)),
+        columnReadings: [
+          { containerId: 'A', pattern: 'FFV', internalStatement: 'L’objet est dans C', convertedStatement: 'L’objet est dans l’urne étoilée' },
+          { containerId: 'B', pattern: 'VFV', internalStatement: 'L’objet n’est pas dans B', convertedStatement: 'L’objet n’est pas dans l’écrin argenté' },
+          { containerId: 'C', pattern: 'VVF', internalStatement: 'L’objet n’est pas dans C', convertedStatement: 'L’objet n’est pas dans l’urne étoilée' }
+        ],
+        containers: [
+          { id: 'A', name: 'coffret de basalte' },
+          { id: 'B', name: 'écrin argenté' },
+          { id: 'C', name: 'urne étoilée' }
+        ],
+        puzzle: 'Dans un observatoire lunaire, trois contenants gardent le silence autour du prisme d’aurore. Une seule inscription est vraie sur le bon scénario. À toi de déduire où le prisme est caché.',
+        statements: [
+          { containerId: 'A', containerName: 'coffret de basalte', text: 'L’objet est dans l’urne étoilée' },
+          { containerId: 'B', containerName: 'écrin argenté', text: 'L’objet n’est pas dans l’écrin argenté' },
+          { containerId: 'C', containerName: 'urne étoilée', text: 'L’objet n’est pas dans l’urne étoilée' }
+        ],
+        choices: [
+          { id: 'A', containerName: 'coffret de basalte' },
+          { id: 'B', containerName: 'écrin argenté' },
+          { id: 'C', containerName: 'urne étoilée' }
+        ],
+        solution: 'B',
+        solutionContainerName: 'écrin argenté',
+        auditTrail: ['thème', 'objet recherché', 'coordonnée choisie', 'table validée', 'lecture des colonnes', 'correspondance', 'énigme', 'solution finale']
+      }
+    }, context)
   }
   if (kind === 'narratia_child_choices') {
     return {

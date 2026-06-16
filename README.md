@@ -123,3 +123,9 @@ Au lancement, l’app appelle l’IA et attend un JSON strictement exploitable c
 ```
 
 Pendant le jeu, une seule question s’affiche à la fois avec trois boutons de réponse. La bonne réponse n’est jamais exposée avant le choix de l’enfant; après réponse, l’interface verrouille la question, valorise la bonne réponse, invalide les autres, affiche un retour encourageant ou doux, puis permet de passer à la suite. La fin de partie affiche le score, le pourcentage de réussite et le détail par question, avec un bouton pour recommencer.
+
+## Règle Enigmia
+
+La règle **Enigmia** ajoute une app d’énigmes logiques au portail. Chaque manche interroge l’IA via `/api/ai` pour générer une énigme avec trois contenants thématiques, trois inscriptions converties depuis une table logique validée, et trois choix A/B/C affichés comme réponses.
+
+L’interface montre l’état de chargement, l’erreur de génération si l’appel échoue, puis verrouille la réponse choisie. Si le joueur trouve le bon contenant, un message de réussite apparaît; sinon l’app indique la bonne réponse. Dans les deux cas, le bouton **Énigme suivante** relance une génération IA pour créer un nouveau mystère.

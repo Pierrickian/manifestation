@@ -48,16 +48,40 @@ const FLOW_WORDS_BY_NEED = {
 }
 
 const AI_ENDPOINT = '/api/ai'
+const AI_REQUEST_TIMEOUT_MS = 20000
 
 async function requestAI(kind, context) {
-  const response = await fetch(AI_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ kind, context })
-  })
+  const controller = new AbortController()
+  const timeoutId = globalThis.setTimeout(() => controller.abort(), AI_REQUEST_TIMEOUT_MS)
+  let response
+
+  try {
+    response = await fetch(AI_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ kind, context }),
+      signal: controller.signal
+    })
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      const timeoutError = new Error('AI request timed out')
+      timeoutError.userMessage = 'L’IA a mis plus de 20 secondes à répondre. Relance dans quelques instants.'
+      timeoutError.debug = {
+        source: 'ai',
+        fallbackReason: 'client_timeout',
+        timeoutMs: AI_REQUEST_TIMEOUT_MS,
+        kind
+      }
+      throw timeoutError
+    }
+
+    throw error
+  } finally {
+    globalThis.clearTimeout(timeoutId)
+  }
 
   const responseText = await response.text()
 
@@ -381,6 +405,21 @@ export async function getMesQuestionsQuiz(context) {
 
   return {
     ...result,
+    source: result.source || result.debug?.source || 'ai'
+  }
+}
+
+
+export async function getEnigmiaRiddle(context = {}) {
+  const result = await requestAI('enigmia_riddle', context)
+
+  if (!result?.riddle?.solution || !Array.isArray(result.riddle?.choices)) {
+    throw createInvalidAiPayloadError('enigmia_riddle', result)
+  }
+
+  return {
+    ...result.riddle,
+    debug: result.debug,
     source: result.source || result.debug?.source || 'ai'
   }
 }
