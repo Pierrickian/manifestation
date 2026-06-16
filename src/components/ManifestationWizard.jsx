@@ -12,6 +12,7 @@ import { NarratiaApp } from '../features/narratia/NarratiaApp'
 import { MesQuestionsApp } from '../features/MesQuestionsApp'
 import { EnigmiaApp } from '../features/EnigmiaApp'
 import { CreateYourApp } from '../features/create-your-app/CreateYourApp'
+import { HtmlAppGenerator } from '../features/html-app-generator/HtmlAppGenerator'
 import { DEFAULT_RULE_ID, ENIGMIA_RULE_ID, FLOW_RULE_ID, MES_QUESTIONS_RULE_ID, NARRATIA_RULE_ID, RECONCILIATION_RULE_ID, getRules, hasRule, isGuidedJourneyRule } from '../core/engine/ruleRegistry'
 import { getInitialRuleIdFromUrl, readRuleUrlState, useRuleUrlSync } from '../hooks/useRuleUrlSync'
 
@@ -502,6 +503,12 @@ export function ManifestationWizard() {
     setPortalView('create-app')
   }
 
+  function openHtmlAppGenerator() {
+    resetJourney()
+    setHasConfiguredApp(false)
+    setPortalView('html-app-generator')
+  }
+
   const { selectRuleFromUi } = useRuleUrlSync({
     activeRuleId,
     onRuleChange: chooseRule,
@@ -934,8 +941,11 @@ export function ManifestationWizard() {
             activeRuleId={activeRuleId}
             onRuleChange={selectRuleFromUi}
             onCreateYourApp={openCreateYourApp}
+            onHtmlAppGenerator={openHtmlAppGenerator}
           />
         </>
+      ) : portalView === 'html-app-generator' ? (
+        <HtmlAppGenerator onClose={goHome} speechEnabled />
       ) : portalView === 'create-app' ? (
         <CreateYourApp
           config={CREATE_YOUR_APP_CONFIG}
@@ -1198,7 +1208,7 @@ function ReconciliationStep({
   )
 }
 
-function AppChooser({ rules, activeRuleId, onRuleChange, onCreateYourApp }) {
+function AppChooser({ rules, activeRuleId, onRuleChange, onCreateYourApp, onHtmlAppGenerator }) {
   return (
     <section className="app-chooser" aria-labelledby="app-chooser-title">
       <div className="app-chooser-header">
@@ -1218,6 +1228,14 @@ function AppChooser({ rules, activeRuleId, onRuleChange, onCreateYourApp }) {
             <small>{rule.description}</small>
           </button>
         ))}
+        <button
+          type="button"
+          className="rule-option create-app-option"
+          onClick={onHtmlAppGenerator}
+        >
+          <span>Html App Generator</span>
+          <small>Génère et exécute immédiatement une application HTML dans un viewer isolé.</small>
+        </button>
         <button
           type="button"
           className="rule-option create-app-option"

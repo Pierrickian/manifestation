@@ -21,6 +21,7 @@ const questionVariationRules = [
 ]
 
 export function buildPrompt(kind, context) {
+  if (kind === 'html_app') return buildHtmlAppPrompt(context)
   if (kind?.startsWith('narratia_')) return buildNarratiaPrompt(context)
   if (kind === 'mes_questions_quiz') return buildMesQuestionsPrompt(context)
   if (kind === 'enigmia_riddle') return buildEnigmiaPrompt(context)
@@ -364,6 +365,25 @@ Ne t’arrête jamais aux exemples fournis dans ce prompt : ils servent uniqueme
           }
         }
       })
+    }
+  ]
+}
+
+
+function buildHtmlAppPrompt(context = {}) {
+  return [
+    {
+      role: 'system',
+      content: [
+        'You generate complete standalone HTML applications.',
+        'Return HTML only: no Markdown, no explanations, no code fences.',
+        'The document must be self-contained and runnable offline with embedded CSS and JavaScript.',
+        'Do not use external dependencies or remote assets unless the user explicitly requested them.'
+      ].join('\n')
+    },
+    {
+      role: 'user',
+      content: String(context.prompt || '')
     }
   ]
 }
