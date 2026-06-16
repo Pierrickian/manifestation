@@ -35,6 +35,7 @@ export function EnigmiaApp({ onAiDebug }) {
   async function loadRiddle() {
     setStatus({ loading: true, error: '' })
     setSelectedAnswer(null)
+    setRiddle(null)
 
     try {
       const payload = await getEnigmiaRiddle()

@@ -5,9 +5,10 @@ import { generateLinks } from '../src/ai/generateLinks.js'
 import { generateQuestion } from '../src/ai/generateQuestion.js'
 
 const DEFAULT_OPENAI_MODEL = 'gpt-5.4-mini'
+const OPENAI_REQUEST_TIMEOUT_MS = 20000
 
 const client = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: OPENAI_REQUEST_TIMEOUT_MS })
   : null
 
 const responseFormats = {
@@ -223,8 +224,26 @@ const responseFormats = {
             properties: {
               theme: { type: 'string' },
               object: { type: 'string' },
-              coordinate: { type: 'object', additionalProperties: true },
-              table: { type: 'array', items: { type: 'array', items: { type: 'string' } } },
+              coordinate: {
+                type: 'object',
+                additionalProperties: false,
+                required: ['row', 'column'],
+                properties: {
+                  row: { type: 'string', enum: ['Objet=A', 'Objet=B', 'Objet=C'] },
+                  column: { type: 'string', enum: ['A', 'B', 'C'] }
+                }
+              },
+              table: {
+                type: 'array',
+                minItems: 3,
+                maxItems: 3,
+                items: {
+                  type: 'array',
+                  minItems: 3,
+                  maxItems: 3,
+                  items: { type: 'string', enum: ['V', 'F'] }
+                }
+              },
               columnReadings: { type: 'array', items: { type: 'object', additionalProperties: true } },
               containers: { type: 'array', minItems: 3, maxItems: 3, items: { type: 'object', additionalProperties: false, required: ['id', 'name'], properties: { id: { type: 'string' }, name: { type: 'string' } } } },
               puzzle: { type: 'string' },
@@ -469,17 +488,14 @@ function normalizeEnigmiaPayload(payload) {
   const table = Array.isArray(riddle.table)
     ? ENIGMIA_ROWS.map((_, rowIndex) => ENIGMIA_IDS.map((__, colIndex) => normalizeTruthCell(riddle.table?.[rowIndex]?.[colIndex])))
     : []
+  const safeTable = validateEnigmiaTable(table).isValid ? table : createEnigmiaTable()
 
-  if (!validateEnigmiaTable(table).isValid) {
-    return payload
-  }
-
-  const solutionIndex = table.findIndex((row) => row.filter((cell) => cell === 'V').length === 1)
+  const solutionIndex = safeTable.findIndex((row) => row.filter((cell) => cell === 'V').length === 1)
   const solution = ENIGMIA_IDS[solutionIndex]
-  const solutionRow = table[solutionIndex]
+  const solutionRow = safeTable[solutionIndex]
   const coordinateColumn = ENIGMIA_IDS[solutionRow.findIndex((cell) => cell === 'V')]
   const columnReadings = ENIGMIA_IDS.map((containerId, columnIndex) => {
-    const pattern = table.map((row) => row[columnIndex]).join('')
+    const pattern = safeTable.map((row) => row[columnIndex]).join('')
     const internalStatement = ENIGMIA_STATEMENTS_BY_PATTERN[pattern]
     const convertedStatement = convertEnigmiaStatement(internalStatement, namesById)
     return {
@@ -495,7 +511,7 @@ function normalizeEnigmiaPayload(payload) {
     riddle: {
       ...riddle,
       coordinate: { row: ENIGMIA_ROWS[solutionIndex], column: coordinateColumn },
-      table,
+      table: safeTable,
       columnReadings,
       containers,
       statements: columnReadings.map((reading) => ({
@@ -508,11 +524,37 @@ function normalizeEnigmiaPayload(payload) {
       solutionContainerName: namesById[solution],
       auditTrail: [
         ...(Array.isArray(riddle.auditTrail) ? riddle.auditTrail : []),
-        `Table validée côté API: lignes ${table.map((row) => row.filter((cell) => cell === 'V').length).join('/')}, total 5 V.`,
+        `Table validée côté API: lignes ${safeTable.map((row) => row.filter((cell) => cell === 'V').length).join('/')}, total 5 V.`,
         'Inscriptions reconstruites côté API à partir des colonnes validées.'
       ]
     }
   }
+}
+
+function createEnigmiaTable() {
+  const validTables = []
+
+  for (let solutionIndex = 0; solutionIndex < ENIGMIA_IDS.length; solutionIndex += 1) {
+    for (let coordinateColumnIndex = 0; coordinateColumnIndex < ENIGMIA_IDS.length; coordinateColumnIndex += 1) {
+      for (let firstFalseColumn = 0; firstFalseColumn < ENIGMIA_IDS.length; firstFalseColumn += 1) {
+        for (let secondFalseColumn = 0; secondFalseColumn < ENIGMIA_IDS.length; secondFalseColumn += 1) {
+          const falseColumns = [firstFalseColumn, secondFalseColumn]
+          const rows = ENIGMIA_IDS.map((_, rowIndex) => {
+            if (rowIndex === solutionIndex) {
+              return ENIGMIA_IDS.map((__, columnIndex) => columnIndex === coordinateColumnIndex ? 'V' : 'F')
+            }
+
+            const falseColumnIndex = falseColumns.shift()
+            return ENIGMIA_IDS.map((__, columnIndex) => columnIndex === falseColumnIndex ? 'F' : 'V')
+          })
+
+          if (validateEnigmiaTable(rows).isValid) validTables.push(rows)
+        }
+      }
+    }
+  }
+
+  return validTables[Math.floor(Math.random() * validTables.length)]
 }
 
 function convertEnigmiaStatement(statement, namesById) {
