@@ -39,5 +39,5 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: issueNumber,
-              body: `@codex implement this issue.\nRead replit.md first.\nUpdate release_notes.\nCreate a branch from latest main.\nOpen a PR against main.\nMention: Closes #${issueNumber}`
+              body: `@codex implement this issue.\nRead replit.md first.\nRespect the Manifestation architecture and mobile-first UX.\nCreate a branch from latest main.\nOpen a PR against main.\nMention: Closes #${issueNumber}`
             });
