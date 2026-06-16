@@ -384,3 +384,18 @@ export async function getMesQuestionsQuiz(context) {
     source: result.source || result.debug?.source || 'ai'
   }
 }
+
+
+export async function getEnigmiaRiddle(context = {}) {
+  const result = await requestAI('enigmia_riddle', context)
+
+  if (!result?.riddle?.solution || !Array.isArray(result.riddle?.choices)) {
+    throw createInvalidAiPayloadError('enigmia_riddle', result)
+  }
+
+  return {
+    ...result.riddle,
+    debug: result.debug,
+    source: result.source || result.debug?.source || 'ai'
+  }
+}

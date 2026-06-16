@@ -3,6 +3,7 @@ export const RECONCILIATION_RULE_ID = 'emotional-reconciliation'
 export const FLOW_RULE_ID = 'flow'
 export const NARRATIA_RULE_ID = 'narratia'
 export const MES_QUESTIONS_RULE_ID = 'mes-questions'
+export const ENIGMIA_RULE_ID = 'enigmia'
 
 export const ruleRegistry = {
   [DEFAULT_RULE_ID]: {
@@ -39,6 +40,13 @@ export const ruleRegistry = {
     description: 'Créer un quiz éducatif joyeux, adapté à l’âge et généré par IA.',
     family: 'mes-questions',
     isEnabled: () => true
+  },
+  [ENIGMIA_RULE_ID]: {
+    id: ENIGMIA_RULE_ID,
+    label: 'Enigmia',
+    description: 'Résoudre des énigmes logiques générées par IA avec trois contenants et une seule bonne réponse.',
+    family: 'enigmia',
+    isEnabled: () => true
   }
 }
 
@@ -47,7 +55,8 @@ export const defaultRuleSet = [
   RECONCILIATION_RULE_ID,
   FLOW_RULE_ID,
   NARRATIA_RULE_ID,
-  MES_QUESTIONS_RULE_ID
+  MES_QUESTIONS_RULE_ID,
+  ENIGMIA_RULE_ID
 ]
 
 export function getRule(ruleId) {

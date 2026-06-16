@@ -207,6 +207,38 @@ const responseFormats = {
       }
     }
   },
+  enigmia_riddle: {
+    type: 'json_schema',
+    json_schema: {
+      name: 'enigmia_riddle',
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['riddle'],
+        properties: {
+          riddle: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['theme', 'object', 'coordinate', 'table', 'columnReadings', 'containers', 'puzzle', 'statements', 'choices', 'solution', 'solutionContainerName', 'auditTrail'],
+            properties: {
+              theme: { type: 'string' },
+              object: { type: 'string' },
+              coordinate: { type: 'object', additionalProperties: true },
+              table: { type: 'array', items: { type: 'array', items: { type: 'string' } } },
+              columnReadings: { type: 'array', items: { type: 'object', additionalProperties: true } },
+              containers: { type: 'array', minItems: 3, maxItems: 3, items: { type: 'object', additionalProperties: false, required: ['id', 'name'], properties: { id: { type: 'string' }, name: { type: 'string' } } } },
+              puzzle: { type: 'string' },
+              statements: { type: 'array', minItems: 3, maxItems: 3, items: { type: 'object', additionalProperties: false, required: ['containerId', 'containerName', 'text'], properties: { containerId: { type: 'string' }, containerName: { type: 'string' }, text: { type: 'string' } } } },
+              choices: { type: 'array', minItems: 3, maxItems: 3, items: { type: 'object', additionalProperties: false, required: ['id', 'containerName'], properties: { id: { type: 'string' }, containerName: { type: 'string' } } } },
+              solution: { type: 'string', enum: ['A', 'B', 'C'] },
+              solutionContainerName: { type: 'string' },
+              auditTrail: { type: 'array', items: { type: 'string' } }
+            }
+          }
+        }
+      }
+    }
+  },
   mes_questions_quiz: {
     type: 'json_schema',
     json_schema: {
@@ -317,7 +349,8 @@ export default async function handler(request, response) {
       retryCount: error?.retryCount ?? 0
     }
 
-    if (kind === 'mes_questions_quiz') {
+
+  if (kind === 'mes_questions_quiz') {
       response.status(502).json({
         error: 'AI quiz generation failed',
         message: 'La génération IA du quiz a échoué. Relance la génération dans quelques instants.',
@@ -384,6 +417,7 @@ function validateAiPayload(kind, payload, context = {}) {
     flow: (value) => Array.isArray(value?.words),
     narratia_child_choices: (value) => Array.isArray(value?.childChoices) && value.childChoices.length >= 6,
     narratia_story_package: (value) => Boolean(value?.title && Array.isArray(value.milestones) && Array.isArray(value.segments) && Array.isArray(value.endings) && value.endings.length === 3),
+    enigmia_riddle: (value) => Boolean(value?.riddle?.theme && value.riddle.object && Array.isArray(value.riddle.statements) && value.riddle.statements.length === 3 && Array.isArray(value.riddle.choices) && value.riddle.choices.length === 3 && ['A', 'B', 'C'].includes(value.riddle.solution)),
     mes_questions_quiz: (value) => Array.isArray(value?.questions) && value.questions.length === Number(context?.questionCount || value.questions.length) && value.questions.every((question) => question?.id && question.subject && question.question && Array.isArray(question.answers) && question.answers.length === 3 && question.answers.some((answer) => answer.id === question.correctAnswerId))
   }
 
@@ -404,6 +438,7 @@ function getShapeInstruction(kind) {
   if (kind === 'links') return 'Format attendu: { "needLinks": array, "pathLinks": array }.'
   if (kind === 'settings') return 'Format attendu: { "slider": { "id": string, "label": string, "left": string, "right": string, "value": number } }.'
   if (kind === 'flow') return 'Format attendu: { "words": array, "conclusion": string }.'
+  if (kind === 'enigmia_riddle') return 'Format attendu: { \"riddle\": { \"theme\": string, \"object\": string, \"puzzle\": string, \"statements\": [{ \"containerId\": \"A\", \"containerName\": string, \"text\": string }], \"choices\": [{ \"id\": \"A\", \"containerName\": string }], \"solution\": \"A|B|C\" } }.'
   if (kind === 'narratia_child_choices') return 'Expected format: { "childChoices": [{ "id": string, "label": string, "category": string }] }.'
   if (kind === 'narratia_story_package') return 'Expected format: { "id": string, "title": string, "narrators": array, "milestones": array, "segments": array, "endings": array, "metadata": object }.'
   if (kind === 'mes_questions_quiz') return 'Format attendu: { "questions": [{ "id": string, "subject": string, "question": string, "answers": [{ "id": string, "text": string }], "correctAnswerId": string }] }.'
@@ -434,6 +469,40 @@ function getLocalResult(kind, context) {
         left: 'Retenir',
         right: 'Traverser',
         value: 50
+      }
+    }
+  }
+  if (kind === 'enigmia_riddle') {
+    return {
+      riddle: {
+        theme: 'observatoire lunaire',
+        object: 'le prisme d’aurore',
+        coordinate: { row: 'Objet=B', column: 'C' },
+        table: [['F', 'V', 'V'], ['F', 'F', 'V'], ['V', 'V', 'F']],
+        columnReadings: [
+          { containerId: 'A', pattern: 'FFV', internalStatement: 'L’objet est dans C', convertedStatement: 'L’objet est dans l’urne étoilée' },
+          { containerId: 'B', pattern: 'VFV', internalStatement: 'L’objet n’est pas dans B', convertedStatement: 'L’objet n’est pas dans l’écrin argenté' },
+          { containerId: 'C', pattern: 'VVF', internalStatement: 'L’objet n’est pas dans C', convertedStatement: 'L’objet n’est pas dans l’urne étoilée' }
+        ],
+        containers: [
+          { id: 'A', name: 'coffret de basalte' },
+          { id: 'B', name: 'écrin argenté' },
+          { id: 'C', name: 'urne étoilée' }
+        ],
+        puzzle: 'Dans un observatoire lunaire, trois contenants gardent le silence autour du prisme d’aurore. Une seule inscription est vraie sur le bon scénario. À toi de déduire où le prisme est caché.',
+        statements: [
+          { containerId: 'A', containerName: 'coffret de basalte', text: 'L’objet est dans l’urne étoilée' },
+          { containerId: 'B', containerName: 'écrin argenté', text: 'L’objet n’est pas dans l’écrin argenté' },
+          { containerId: 'C', containerName: 'urne étoilée', text: 'L’objet n’est pas dans l’urne étoilée' }
+        ],
+        choices: [
+          { id: 'A', containerName: 'coffret de basalte' },
+          { id: 'B', containerName: 'écrin argenté' },
+          { id: 'C', containerName: 'urne étoilée' }
+        ],
+        solution: 'B',
+        solutionContainerName: 'écrin argenté',
+        auditTrail: ['thème', 'objet recherché', 'coordonnée choisie', 'table validée', 'lecture des colonnes', 'correspondance', 'énigme', 'solution finale']
       }
     }
   }

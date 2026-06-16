@@ -23,6 +23,7 @@ const questionVariationRules = [
 export function buildPrompt(kind, context) {
   if (kind?.startsWith('narratia_')) return buildNarratiaPrompt(context)
   if (kind === 'mes_questions_quiz') return buildMesQuestionsPrompt(context)
+  if (kind === 'enigmia_riddle') return buildEnigmiaPrompt(context)
   const needsSummary = NEEDS.map((need) => {
     return `${need.name}: ${need.needs.join(', ')}`
   }).join('\n')
@@ -235,6 +236,64 @@ function buildMesQuestionsPrompt(context = {}) {
               correctAnswerId: 'b'
             }
           ]
+        }
+      })
+    }
+  ]
+}
+
+
+function buildEnigmiaPrompt(context = {}) {
+  const validatedPrompt = [
+    'Tu es un générateur d’énigmes logiques.',
+    'Crée une énigme avec 3 contenants.',
+    'Méthode obligatoire, dans cet ordre strict :',
+    'Choisis un thème, trois contenants adaptés et un objet à trouver.',
+    'Les lettres A, B, C servent uniquement à la construction logique interne.',
+    'Pour l’énigme affichée au joueur : attribue à chaque contenant un nom descriptif unique et thématique ; n’utilise pas les lettres A, B, C dans la narration ; les noms doivent être cohérents avec le thème choisi.',
+    'Choisis une coordonnée aléatoire (ligne, colonne). La ligne est la solution : Objet=A, Objet=B ou Objet=C. La colonne est le contenant dont l’inscription est la seule vraie sur cette ligne.',
+    'Construis uniquement une table 3×3 de V/F. Colonnes = inscriptions portées par les contenants A, B, C. Lignes = hypothèses : Objet=A, Objet=B, Objet=C.',
+    'Contraintes obligatoires : la ligne solution contient exactement 1 V ; ce V est dans la colonne choisie ; les deux autres lignes contiennent exactement 2 V ; total général = 5 V.',
+    'Vérifie la table. Pour chaque ligne, affiche le nombre de V. Vérifie que la ligne solution contient exactement 1 V, les deux autres exactement 2 V, et le total général exactement 5 V.',
+    'Déduis les inscriptions uniquement à partir des colonnes. Lis chaque colonne de haut en bas dans l’ordre Objet=A, Objet=B, Objet=C.',
+    'Correspondances obligatoires : VFF → « L’objet est dans A » ; FVF → « L’objet est dans B » ; FFV → « L’objet est dans C » ; FVV → « L’objet n’est pas dans A » ; VFV → « L’objet n’est pas dans B » ; VVF → « L’objet n’est pas dans C ».',
+    'Règles supplémentaires : ne jamais inventer une inscription ; ne jamais écrire une inscription avant d’avoir validé la table ; chaque inscription doit être exactement la traduction de sa colonne ; les trois colonnes doivent être différentes ; les trois inscriptions doivent donc être différentes ; si deux colonnes sont identiques, reconstruis la table avant de continuer ; ne jamais modifier une inscription pour des raisons de style ou de narration ; la logique de la table est prioritaire sur tout le reste.',
+    'Convertis ensuite les références A, B, C vers les noms descriptifs des contenants uniquement après la déduction logique des inscriptions.',
+    'Affiche le résultat dans cet ordre exact : thème ; objet recherché ; coordonnée choisie ; table validée ; lecture des colonnes ; correspondance entre A/B/C et les contenants descriptifs ; énigme avec les inscriptions converties ; solution finale avec le nom descriptif du contenant.',
+    'Ne révèle aucune étape intermédiaire autre que celles demandées. Invente librement de nouveaux thèmes, objets et contenants descriptifs tout en respectant strictement la méthode logique.'
+  ].join('\n')
+
+  return [
+    {
+      role: 'system',
+      content: [
+        validatedPrompt,
+        'Réponds uniquement en JSON valide, sans Markdown.',
+        'Le champ riddle.puzzle doit contenir seulement la narration jouable, sans dévoiler la table ni la solution.',
+        'Inclue aussi les champs de vérification demandés dans auditTrail pour conserver la méthode validée hors de la narration joueur.'
+      ].join('\n\n')
+    },
+    {
+      role: 'user',
+      content: JSON.stringify({
+        kind: 'enigmia_riddle',
+        task: 'Créer une nouvelle énigme Enigmia logique, originale et directement jouable.',
+        context,
+        expectedShape: {
+          riddle: {
+            theme: 'string',
+            object: 'string',
+            coordinate: { row: 'Objet=A|Objet=B|Objet=C', column: 'A|B|C' },
+            table: [['V ou F']],
+            columnReadings: [{ containerId: 'A', pattern: 'VFF', internalStatement: 'string', convertedStatement: 'string' }],
+            containers: [{ id: 'A', name: 'string' }, { id: 'B', name: 'string' }, { id: 'C', name: 'string' }],
+            puzzle: 'string',
+            statements: [{ containerId: 'A', containerName: 'string', text: 'string' }],
+            choices: [{ id: 'A', containerName: 'string' }, { id: 'B', containerName: 'string' }, { id: 'C', containerName: 'string' }],
+            solution: 'A|B|C',
+            solutionContainerName: 'string',
+            auditTrail: ['string']
+          }
         }
       })
     }
