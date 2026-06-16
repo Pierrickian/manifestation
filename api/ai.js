@@ -408,7 +408,7 @@ async function createValidatedAiResult(kind, context, model) {
     })
 
     const content = completion.choices[0]?.message?.content || '{}'
-    const payload = normalizeAiPayload(kind, JSON.parse(content))
+    const payload = normalizeAiPayload(kind, JSON.parse(content), context)
     const validationError = validateAiPayload(kind, payload, context)
 
     if (!validationError) {
@@ -450,9 +450,9 @@ function validateAiPayload(kind, payload, context = {}) {
   return error
 }
 
-function normalizeAiPayload(kind, payload) {
+function normalizeAiPayload(kind, payload, context = {}) {
   if (kind !== 'enigmia_riddle') return payload
-  return normalizeEnigmiaPayload(payload)
+  return normalizeEnigmiaPayload(payload, context)
 }
 
 const ENIGMIA_IDS = ['A', 'B', 'C']
@@ -473,7 +473,7 @@ function normalizeTruthCell(cell) {
   return normalized === 'V' || normalized === 'TRUE' || normalized === 'VRAI' ? 'V' : 'F'
 }
 
-function normalizeEnigmiaPayload(payload) {
+function normalizeEnigmiaPayload(payload, context = {}) {
   const riddle = payload?.riddle
   if (!riddle) return payload
 
@@ -488,9 +488,12 @@ function normalizeEnigmiaPayload(payload) {
   const table = Array.isArray(riddle.table)
     ? ENIGMIA_ROWS.map((_, rowIndex) => ENIGMIA_IDS.map((__, colIndex) => normalizeTruthCell(riddle.table?.[rowIndex]?.[colIndex])))
     : []
-  const safeTable = validateEnigmiaTable(table).isValid ? table : createEnigmiaTable()
+  const previousSolution = getPreviousEnigmiaSolution(context)
+  const safeTable = validateEnigmiaTable(table).isValid && getEnigmiaSolution(table) !== previousSolution
+    ? table
+    : createEnigmiaTable(previousSolution)
 
-  const solutionIndex = safeTable.findIndex((row) => row.filter((cell) => cell === 'V').length === 1)
+  const solutionIndex = getEnigmiaSolutionIndex(safeTable)
   const solution = ENIGMIA_IDS[solutionIndex]
   const solutionRow = safeTable[solutionIndex]
   const coordinateColumn = ENIGMIA_IDS[solutionRow.findIndex((cell) => cell === 'V')]
@@ -531,7 +534,22 @@ function normalizeEnigmiaPayload(payload) {
   }
 }
 
-function createEnigmiaTable() {
+function getPreviousEnigmiaSolution(context = {}) {
+  const previousRiddles = Array.isArray(context.previousRiddles) ? context.previousRiddles : []
+  const lastSolution = previousRiddles.at(-1)?.solution
+  return ENIGMIA_IDS.includes(lastSolution) ? lastSolution : null
+}
+
+function getEnigmiaSolutionIndex(table) {
+  return table.findIndex((row) => row.filter((cell) => cell === 'V').length === 1)
+}
+
+function getEnigmiaSolution(table) {
+  const solutionIndex = getEnigmiaSolutionIndex(table)
+  return ENIGMIA_IDS[solutionIndex] || null
+}
+
+function createEnigmiaTable(excludedSolution = null) {
   const validTables = []
 
   for (let solutionIndex = 0; solutionIndex < ENIGMIA_IDS.length; solutionIndex += 1) {
@@ -548,13 +566,18 @@ function createEnigmiaTable() {
             return ENIGMIA_IDS.map((__, columnIndex) => columnIndex === falseColumnIndex ? 'F' : 'V')
           })
 
-          if (validateEnigmiaTable(rows).isValid) validTables.push(rows)
+          if (validateEnigmiaTable(rows).isValid && getEnigmiaSolution(rows) !== excludedSolution) validTables.push(rows)
         }
       }
     }
   }
 
-  return validTables[Math.floor(Math.random() * validTables.length)]
+  const pool = validTables.length ? validTables : [createFallbackEnigmiaTable()]
+  return pool[Math.floor(Math.random() * pool.length)]
+}
+
+function createFallbackEnigmiaTable() {
+  return [['F', 'V', 'V'], ['F', 'F', 'V'], ['V', 'V', 'F']]
 }
 
 function convertEnigmiaStatement(statement, namesById) {
@@ -632,12 +655,12 @@ function getLocalResult(kind, context) {
     }
   }
   if (kind === 'enigmia_riddle') {
-    return {
+    return normalizeEnigmiaPayload({
       riddle: {
         theme: 'observatoire lunaire',
         object: 'le prisme d’aurore',
         coordinate: { row: 'Objet=B', column: 'C' },
-        table: [['F', 'V', 'V'], ['F', 'F', 'V'], ['V', 'V', 'F']],
+        table: createEnigmiaTable(getPreviousEnigmiaSolution(context)),
         columnReadings: [
           { containerId: 'A', pattern: 'FFV', internalStatement: 'L’objet est dans C', convertedStatement: 'L’objet est dans l’urne étoilée' },
           { containerId: 'B', pattern: 'VFV', internalStatement: 'L’objet n’est pas dans B', convertedStatement: 'L’objet n’est pas dans l’écrin argenté' },
@@ -663,7 +686,7 @@ function getLocalResult(kind, context) {
         solutionContainerName: 'écrin argenté',
         auditTrail: ['thème', 'objet recherché', 'coordonnée choisie', 'table validée', 'lecture des colonnes', 'correspondance', 'énigme', 'solution finale']
       }
-    }
+    }, context)
   }
   if (kind === 'narratia_child_choices') {
     return {

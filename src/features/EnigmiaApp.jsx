@@ -29,6 +29,7 @@ function normalizeRiddle(payload) {
 
 export function EnigmiaApp({ onAiDebug }) {
   const [riddle, setRiddle] = useState(null)
+  const [riddleHistory, setRiddleHistory] = useState([])
   const [selectedAnswer, setSelectedAnswer] = useState(null)
   const [status, setStatus] = useState({ loading: true, error: '' })
 
@@ -38,13 +39,25 @@ export function EnigmiaApp({ onAiDebug }) {
     setRiddle(null)
 
     try {
-      const payload = await getEnigmiaRiddle()
+      const payload = await getEnigmiaRiddle({
+        previousRiddles: riddleHistory.slice(-3)
+      })
       onAiDebug?.({
         ...(payload.debug || {}),
         source: payload.source || payload.debug?.source || 'ai',
         kind: 'enigmia_riddle'
       })
-      setRiddle(normalizeRiddle(payload))
+      const nextRiddle = normalizeRiddle(payload)
+      setRiddle(nextRiddle)
+      setRiddleHistory((current) => [
+        ...current.slice(-2),
+        {
+          object: nextRiddle.object,
+          containers: nextRiddle.containers.map((container) => container.name),
+          solution: nextRiddle.solution,
+          solutionContainerName: nextRiddle.solutionContainerName
+        }
+      ])
       setStatus({ loading: false, error: '' })
     } catch (error) {
       onAiDebug?.({

@@ -244,6 +244,15 @@ function buildMesQuestionsPrompt(context = {}) {
 
 
 function buildEnigmiaPrompt(context = {}) {
+  const lastRiddle = Array.isArray(context.previousRiddles) ? context.previousRiddles.at(-1) : null
+  const antiRepetitionRules = lastRiddle
+    ? [
+        `Historique de la dernière énigme: objet="${lastRiddle.object}", contenants="${(lastRiddle.containers || []).join(', ')}", réponse gagnante="${lastRiddle.solution}".`,
+        'À partir de cette deuxième énigme consécutive, ne répète pas le nom de l’objet précédent.',
+        'Ne répète aucun nom de contenant précédent.',
+        `Ne répète pas la même réponse gagnante: la dernière réponse gagnante était ${lastRiddle.solution}.`
+      ]
+    : []
   const validatedPrompt = `Tu es un générateur d’énigmes logiques.
 Crée une énigme avec 3 contenants.
 Méthode obligatoire, dans cet ordre strict :
@@ -326,6 +335,7 @@ Ne t’arrête jamais aux exemples fournis dans ce prompt : ils servent uniqueme
       role: 'system',
       content: [
         validatedPrompt,
+        ...antiRepetitionRules,
         'Réponds uniquement en JSON valide, sans Markdown.',
         'Le champ riddle.puzzle doit contenir seulement la narration jouable, sans dévoiler la table ni la solution.',
         'Inclue aussi les champs de vérification demandés dans auditTrail pour conserver la méthode validée hors de la narration joueur.'
