@@ -244,24 +244,82 @@ function buildMesQuestionsPrompt(context = {}) {
 
 
 function buildEnigmiaPrompt(context = {}) {
-  const validatedPrompt = [
-    'Tu es un générateur d’énigmes logiques.',
-    'Crée une énigme avec 3 contenants.',
-    'Méthode obligatoire, dans cet ordre strict :',
-    'Choisis un thème, trois contenants adaptés et un objet à trouver.',
-    'Les lettres A, B, C servent uniquement à la construction logique interne.',
-    'Pour l’énigme affichée au joueur : attribue à chaque contenant un nom descriptif unique et thématique ; n’utilise pas les lettres A, B, C dans la narration ; les noms doivent être cohérents avec le thème choisi.',
-    'Choisis une coordonnée aléatoire (ligne, colonne). La ligne est la solution : Objet=A, Objet=B ou Objet=C. La colonne est le contenant dont l’inscription est la seule vraie sur cette ligne.',
-    'Construis uniquement une table 3×3 de V/F. Colonnes = inscriptions portées par les contenants A, B, C. Lignes = hypothèses : Objet=A, Objet=B, Objet=C.',
-    'Contraintes obligatoires : la ligne solution contient exactement 1 V ; ce V est dans la colonne choisie ; les deux autres lignes contiennent exactement 2 V ; total général = 5 V.',
-    'Vérifie la table. Pour chaque ligne, affiche le nombre de V. Vérifie que la ligne solution contient exactement 1 V, les deux autres exactement 2 V, et le total général exactement 5 V.',
-    'Déduis les inscriptions uniquement à partir des colonnes. Lis chaque colonne de haut en bas dans l’ordre Objet=A, Objet=B, Objet=C.',
-    'Correspondances obligatoires : VFF → « L’objet est dans A » ; FVF → « L’objet est dans B » ; FFV → « L’objet est dans C » ; FVV → « L’objet n’est pas dans A » ; VFV → « L’objet n’est pas dans B » ; VVF → « L’objet n’est pas dans C ».',
-    'Règles supplémentaires : ne jamais inventer une inscription ; ne jamais écrire une inscription avant d’avoir validé la table ; chaque inscription doit être exactement la traduction de sa colonne ; les trois colonnes doivent être différentes ; les trois inscriptions doivent donc être différentes ; si deux colonnes sont identiques, reconstruis la table avant de continuer ; ne jamais modifier une inscription pour des raisons de style ou de narration ; la logique de la table est prioritaire sur tout le reste.',
-    'Convertis ensuite les références A, B, C vers les noms descriptifs des contenants uniquement après la déduction logique des inscriptions.',
-    'Affiche le résultat dans cet ordre exact : thème ; objet recherché ; coordonnée choisie ; table validée ; lecture des colonnes ; correspondance entre A/B/C et les contenants descriptifs ; énigme avec les inscriptions converties ; solution finale avec le nom descriptif du contenant.',
-    'Ne révèle aucune étape intermédiaire autre que celles demandées. Invente librement de nouveaux thèmes, objets et contenants descriptifs tout en respectant strictement la méthode logique.'
-  ].join('\n')
+  const validatedPrompt = `Tu es un générateur d’énigmes logiques.
+Crée une énigme avec 3 contenants.
+Méthode obligatoire, dans cet ordre strict :
+Choisis un thème, trois contenants adaptés et un objet à trouver.
+Les lettres A, B, C servent uniquement à la construction logique interne.
+Pour l’énigme affichée au joueur :
+attribue à chaque contenant un nom descriptif unique et thématique ;
+n’utilise pas les lettres A, B, C dans la narration ;
+les noms doivent être cohérents avec le thème choisi ;
+ils peuvent être basés sur une couleur, une matière, un symbole, un état, une décoration, une caractéristique visuelle ou tout autre élément pertinent.
+Les exemples suivants sont uniquement des exemples et ne doivent pas limiter la créativité :
+pirates : coffre vermoulu, coffre cerclé de cuivre, coffre noirci ;
+alchimie : flacon d’obsidienne, fiole argentée, ampoule de cristal ;
+espace : capsule écarlate, capsule ivoire, capsule cobalt ;
+temple : porte gravée, porte dorée, porte fissurée.
+Tu peux inventer librement d’autres thèmes, objets et descriptions.
+Choisis une coordonnée aléatoire (ligne, colonne).
+La ligne est la solution : Objet=A, Objet=B ou Objet=C.
+La colonne est le contenant dont l’inscription est la seule vraie sur cette ligne.
+Construis uniquement une table 3×3 de V/F.
+Colonnes = inscriptions portées par les contenants A, B, C.
+Lignes = hypothèses :
+Objet=A
+Objet=B
+Objet=C
+Contraintes obligatoires :
+la ligne solution contient exactement 1 V ;
+ce V est dans la colonne choisie ;
+les deux autres lignes contiennent exactement 2 V ;
+total général = 5 V.
+Vérifie la table.
+Pour chaque ligne, affiche le nombre de V.
+Vérifie que :
+la ligne solution contient exactement 1 V ;
+les deux autres lignes contiennent exactement 2 V ;
+le total général vaut exactement 5 V.
+Déduis les inscriptions uniquement à partir des colonnes.
+Lis chaque colonne de haut en bas dans l’ordre :
+Objet=A
+Objet=B
+Objet=C
+Correspondances obligatoires :
+VFF → « L’objet est dans A »
+FVF → « L’objet est dans B »
+FFV → « L’objet est dans C »
+FVV → « L’objet n’est pas dans A »
+VFV → « L’objet n’est pas dans B »
+VVF → « L’objet n’est pas dans C »
+Règles supplémentaires :
+ne jamais inventer une inscription ;
+ne jamais écrire une inscription avant d’avoir validé la table ;
+chaque inscription doit être exactement la traduction de sa colonne ;
+les trois colonnes doivent être différentes ;
+les trois inscriptions doivent donc être différentes ;
+si deux colonnes sont identiques, reconstruis la table avant de continuer ;
+ne jamais modifier une inscription pour des raisons de style ou de narration ;
+la logique de la table est prioritaire sur tout le reste.
+Convertis ensuite les références A, B, C vers les noms descriptifs des contenants.
+Exemple :
+Si une inscription déduite est :
+« L’objet est dans A »
+et que le contenant A est nommé « coffre noirci »,
+alors l’inscription affichée devient :
+« L’objet est dans le coffre noirci ».
+Cette conversion doit être faite uniquement après la déduction logique des inscriptions.
+Affiche le résultat dans cet ordre exact :
+thème ;
+objet recherché ;
+coordonnée choisie ;
+table validée ;
+lecture des colonnes ;
+correspondance entre A/B/C et les contenants descriptifs ;
+énigme avec les inscriptions converties ;
+solution finale avec le nom descriptif du contenant.
+Ne révèle aucune étape intermédiaire autre que celles demandées.
+Ne t’arrête jamais aux exemples fournis dans ce prompt : ils servent uniquement d’illustration. Invente librement de nouveaux thèmes, objets et contenants descriptifs tout en respectant strictement la méthode logique ci-dessus.`
 
   return [
     {

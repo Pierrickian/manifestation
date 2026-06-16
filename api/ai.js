@@ -389,7 +389,7 @@ async function createValidatedAiResult(kind, context, model) {
     })
 
     const content = completion.choices[0]?.message?.content || '{}'
-    const payload = JSON.parse(content)
+    const payload = normalizeAiPayload(kind, JSON.parse(content))
     const validationError = validateAiPayload(kind, payload, context)
 
     if (!validationError) {
@@ -417,7 +417,7 @@ function validateAiPayload(kind, payload, context = {}) {
     flow: (value) => Array.isArray(value?.words),
     narratia_child_choices: (value) => Array.isArray(value?.childChoices) && value.childChoices.length >= 6,
     narratia_story_package: (value) => Boolean(value?.title && Array.isArray(value.milestones) && Array.isArray(value.segments) && Array.isArray(value.endings) && value.endings.length === 3),
-    enigmia_riddle: (value) => Boolean(value?.riddle?.theme && value.riddle.object && Array.isArray(value.riddle.statements) && value.riddle.statements.length === 3 && Array.isArray(value.riddle.choices) && value.riddle.choices.length === 3 && ['A', 'B', 'C'].includes(value.riddle.solution)),
+    enigmia_riddle: (value) => validateEnigmiaRiddle(value?.riddle).isValid,
     mes_questions_quiz: (value) => Array.isArray(value?.questions) && value.questions.length === Number(context?.questionCount || value.questions.length) && value.questions.every((question) => question?.id && question.subject && question.question && Array.isArray(question.answers) && question.answers.length === 3 && question.answers.some((answer) => answer.id === question.correctAnswerId))
   }
 
@@ -429,6 +429,123 @@ function validateAiPayload(kind, payload, context = {}) {
   error.code = 'invalid_ai_payload'
   error.payloadKeys = Object.keys(payload || {})
   return error
+}
+
+function normalizeAiPayload(kind, payload) {
+  if (kind !== 'enigmia_riddle') return payload
+  return normalizeEnigmiaPayload(payload)
+}
+
+const ENIGMIA_IDS = ['A', 'B', 'C']
+const ENIGMIA_ROWS = ['Objet=A', 'Objet=B', 'Objet=C']
+const ENIGMIA_STATEMENTS_BY_PATTERN = {
+  VFF: 'L’objet est dans A',
+  FVF: 'L’objet est dans B',
+  FFV: 'L’objet est dans C',
+  FVV: 'L’objet n’est pas dans A',
+  VFV: 'L’objet n’est pas dans B',
+  VVF: 'L’objet n’est pas dans C'
+}
+
+function normalizeTruthCell(cell) {
+  if (cell === true) return 'V'
+  if (cell === false) return 'F'
+  const normalized = String(cell || '').trim().toUpperCase()
+  return normalized === 'V' || normalized === 'TRUE' || normalized === 'VRAI' ? 'V' : 'F'
+}
+
+function normalizeEnigmiaPayload(payload) {
+  const riddle = payload?.riddle
+  if (!riddle) return payload
+
+  const containers = ENIGMIA_IDS.map((id, index) => {
+    const container = riddle.containers?.find((item) => item?.id === id) || riddle.containers?.[index] || {}
+    return {
+      id,
+      name: container.name || `contenant ${id}`
+    }
+  })
+  const namesById = Object.fromEntries(containers.map((container) => [container.id, container.name]))
+  const table = Array.isArray(riddle.table)
+    ? ENIGMIA_ROWS.map((_, rowIndex) => ENIGMIA_IDS.map((__, colIndex) => normalizeTruthCell(riddle.table?.[rowIndex]?.[colIndex])))
+    : []
+
+  if (!validateEnigmiaTable(table).isValid) {
+    return payload
+  }
+
+  const solutionIndex = table.findIndex((row) => row.filter((cell) => cell === 'V').length === 1)
+  const solution = ENIGMIA_IDS[solutionIndex]
+  const solutionRow = table[solutionIndex]
+  const coordinateColumn = ENIGMIA_IDS[solutionRow.findIndex((cell) => cell === 'V')]
+  const columnReadings = ENIGMIA_IDS.map((containerId, columnIndex) => {
+    const pattern = table.map((row) => row[columnIndex]).join('')
+    const internalStatement = ENIGMIA_STATEMENTS_BY_PATTERN[pattern]
+    const convertedStatement = convertEnigmiaStatement(internalStatement, namesById)
+    return {
+      containerId,
+      pattern,
+      internalStatement,
+      convertedStatement
+    }
+  })
+
+  return {
+    ...payload,
+    riddle: {
+      ...riddle,
+      coordinate: { row: ENIGMIA_ROWS[solutionIndex], column: coordinateColumn },
+      table,
+      columnReadings,
+      containers,
+      statements: columnReadings.map((reading) => ({
+        containerId: reading.containerId,
+        containerName: namesById[reading.containerId],
+        text: reading.convertedStatement
+      })),
+      choices: ENIGMIA_IDS.map((id) => ({ id, containerName: namesById[id] })),
+      solution,
+      solutionContainerName: namesById[solution],
+      auditTrail: [
+        ...(Array.isArray(riddle.auditTrail) ? riddle.auditTrail : []),
+        `Table validée côté API: lignes ${table.map((row) => row.filter((cell) => cell === 'V').length).join('/')}, total 5 V.`,
+        'Inscriptions reconstruites côté API à partir des colonnes validées.'
+      ]
+    }
+  }
+}
+
+function convertEnigmiaStatement(statement, namesById) {
+  return ENIGMIA_IDS.reduce((text, id) => {
+    return text.replace(new RegExp(`\\b${id}\\b`, 'g'), `le ${namesById[id]}`)
+  }, statement)
+}
+
+function validateEnigmiaTable(table) {
+  if (!Array.isArray(table) || table.length !== 3 || table.some((row) => !Array.isArray(row) || row.length !== 3)) {
+    return { isValid: false, reason: 'invalid_table_shape' }
+  }
+
+  const rowCounts = table.map((row) => row.filter((cell) => cell === 'V').length)
+  const solutionRows = rowCounts.filter((count) => count === 1).length
+  const otherRows = rowCounts.filter((count) => count === 2).length
+  const total = rowCounts.reduce((sum, count) => sum + count, 0)
+  const patterns = ENIGMIA_IDS.map((_, columnIndex) => table.map((row) => row[columnIndex]).join(''))
+  const knownPatterns = patterns.every((pattern) => Boolean(ENIGMIA_STATEMENTS_BY_PATTERN[pattern]))
+  const uniquePatterns = new Set(patterns).size === 3
+
+  return {
+    isValid: solutionRows === 1 && otherRows === 2 && total === 5 && knownPatterns && uniquePatterns,
+    reason: 'invalid_truth_constraints'
+  }
+}
+
+function validateEnigmiaRiddle(riddle) {
+  if (!riddle?.theme || !riddle.object || !Array.isArray(riddle.statements) || riddle.statements.length !== 3 || !Array.isArray(riddle.choices) || riddle.choices.length !== 3 || !ENIGMIA_IDS.includes(riddle.solution)) {
+    return { isValid: false, reason: 'invalid_riddle_shape' }
+  }
+
+  return validateEnigmiaTable(riddle.table)
 }
 
 function getShapeInstruction(kind) {
