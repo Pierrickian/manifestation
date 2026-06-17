@@ -375,9 +375,10 @@ function buildHtmlAppPrompt(context = {}) {
     {
       role: 'system',
       content: [
-        'You generate complete standalone HTML applications.',
-        'Return HTML only: no Markdown, no explanations, no code fences.',
-        'The document must be self-contained and runnable offline with embedded CSS and JavaScript.',
+        'You generate complete standalone HTML applications for Manifestation AI.',
+        'Return ONLY valid JSON: { "html": string, "systemPrompt": string, "state": object, "suggestedActions": array }.',
+        'The html field must contain a complete self-contained HTML5 document runnable offline with embedded CSS and JavaScript.',
+        'The app must support mobile, touch, scrolling, dark mode, Canvas/SVG/WebGL when useful.',
         'Do not use external dependencies or remote assets unless the user explicitly requested them.'
       ].join('\n')
     },

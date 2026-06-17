@@ -1,21 +1,23 @@
 import { useMemo, useRef, useState } from 'react'
 import { requestAiCompletion } from '../aiProvider'
-import { buildAiPrompt } from '../promptBuilder'
+import { buildAiPrompt, normalizeStructuredAiResponse } from '../promptBuilder'
+import { createProject, evolveProject, storeProject } from '../projectModel'
 
 const REQUEST_TIMEOUT_MS = 60000
 
 const PATIENCE_IDEAS = [
   'Idée : demande une mini app pour apprendre, jouer ou visualiser une notion.',
   'Astuce : tu peux préciser une ambiance, un public ou un format mobile.',
-  'Exemple : html quiz éducatif avec score et animations douces.',
-  'Exemple : html tableau de bord personnel simple et tactile.'
+  'Exemple : quiz éducatif avec score et animations douces.',
+  'Exemple : tableau de bord personnel simple et tactile.'
 ]
 
-export function useAiApplicationController({ rendererType, designSystem, speechEnabled = false, aiProvider = requestAiCompletion, onDebug } = {}) {
+export function useAiApplicationController({ mode = 'create', designSystem, speechEnabled = false, aiProvider = requestAiCompletion, onDebug } = {}) {
   const [input, setInput] = useState('')
   const [status, setStatus] = useState('idle')
   const [message, setMessage] = useState('Décris ce que tu veux créer.')
   const [result, setResult] = useState(null)
+  const [project, setProject] = useState(null)
   const [error, setError] = useState(null)
   const [ideaIndex, setIdeaIndex] = useState(0)
   const abortRef = useRef(null)
@@ -43,7 +45,7 @@ export function useAiApplicationController({ rendererType, designSystem, speechE
     setResult(null)
     setIdeaIndex(0)
     setMessage(progressText)
-    onDebug?.({ status: 'loading', rendererType, speechEnabled, timeoutMs: REQUEST_TIMEOUT_MS, startedAt: new Date().toISOString() })
+    onDebug?.({ status: 'loading', rendererType: 'html', mode, speechEnabled, timeoutMs: REQUEST_TIMEOUT_MS, startedAt: new Date().toISOString() })
     timeoutRef.current = window.setTimeout(() => {
       controller.abort()
     }, REQUEST_TIMEOUT_MS)
@@ -53,30 +55,35 @@ export function useAiApplicationController({ rendererType, designSystem, speechE
     }, 9000)
 
     try {
-      const request = buildAiPrompt({ input: trimmed, rendererType, designSystem })
+      const request = buildAiPrompt({ input: trimmed, mode, designSystem, project })
       onDebug?.({ status: 'request_ready', kind: request.kind, rendererType: request.metadata.rendererType, designSystem: request.metadata.designSystem?.themeName })
       const payload = await aiProvider({ ...request, signal: controller.signal })
-      setResult(payload)
+      const structured = normalizeStructuredAiResponse(payload)
+      const nextProject = storeProject(project ? evolveProject(project, trimmed, structured) : createProject({ mode, request: trimmed, response: structured, designSystem }))
+      setProject(nextProject)
+      setResult(structured)
+      setInput('')
       setStatus('success')
-      setMessage('C’est prêt.')
+      setMessage(project ? 'Le projet a évolué.' : 'Le projet est prêt.')
       onDebug?.({
         ...(payload.debug || {}),
         status: 'success',
         source: payload.source || payload.debug?.source || 'unknown',
-        rendererType,
-        hasHtml: Boolean(payload.html),
-        htmlLength: payload.html?.length || 0
+        rendererType: 'html',
+        mode,
+        hasHtml: Boolean(structured.html),
+        htmlLength: structured.html?.length || 0
       })
     } catch (submitError) {
       if (submitError?.name === 'AbortError') {
         setStatus('idle')
         setMessage('Génération annulée.')
-        onDebug?.({ status: 'aborted', rendererType, timeoutMs: REQUEST_TIMEOUT_MS, timestamp: new Date().toISOString() })
+        onDebug?.({ status: 'aborted', rendererType: 'html', timeoutMs: REQUEST_TIMEOUT_MS, timestamp: new Date().toISOString() })
       } else {
         setStatus('error')
         setError(submitError instanceof Error ? submitError.message : 'Impossible de générer la réponse pour le moment.')
         setMessage('La génération a échoué.')
-        onDebug?.({ status: 'error', rendererType, errorMessage: submitError?.message || 'unknown', timestamp: new Date().toISOString() })
+        onDebug?.({ status: 'error', rendererType: 'html', errorMessage: submitError?.message || 'unknown', timestamp: new Date().toISOString() })
       }
     } finally {
       window.clearInterval(interval)
@@ -88,5 +95,5 @@ export function useAiApplicationController({ rendererType, designSystem, speechE
 
   function cancel() { abortRef.current?.abort() }
 
-  return { input, setInput, status, message, error, result, submit, cancel, appendTranscript, speechEnabled, progressText }
+  return { input, setInput, status, message, error, result, project, submit, cancel, appendTranscript, speechEnabled, progressText }
 }

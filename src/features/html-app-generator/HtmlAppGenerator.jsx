@@ -7,20 +7,28 @@ import { HtmlViewer } from '../../platform/ai/renderers/HtmlViewer'
 
 export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
   const [isViewingHtml, setIsViewingHtml] = useState(false)
-  const controller = useAiApplicationController({ rendererType: 'html', designSystem: MANIFESTATION_DESIGN_SYSTEM, speechEnabled, onDebug })
-  const html = controller.result?.html || controller.result?.text || ''
+  const [mode, setMode] = useState('create')
+  const controller = useAiApplicationController({ mode, designSystem: MANIFESTATION_DESIGN_SYSTEM, speechEnabled, onDebug })
+  const project = controller.project
+  const html = project?.currentApplication || ''
+  const latestSuggestions = project?.aiSuggestionsHistory?.at(-1)?.suggestions || []
 
   if (html && isViewingHtml) {
-    return <HtmlViewer html={html} onBack={() => setIsViewingHtml(false)} />
+    return <HtmlViewer html={html} title={project?.creationRequest || 'Application créée'} onBack={() => setIsViewingHtml(false)} />
   }
 
   return (
-    <section className="create-app-panel html-generator-panel" aria-labelledby="iaview-title">
+    <section className="create-app-panel html-generator-panel" aria-labelledby="project-creator-title">
       <div className="create-app-aurora" aria-hidden="true" />
       <div className="create-app-header">
-        <p className="eyebrow">IAview</p>
-        <h2 id="iaview-title">Crée une page vivante</h2>
-        <p>Décris ce que tu veux obtenir. Tu peux parler au micro, relire, corriger, puis lancer la création.</p>
+        <p className="eyebrow">Manifestation AI</p>
+        <h2 id="project-creator-title">Décris ce que tu veux.</h2>
+        <p>Parle ou écris ton idée. La plateforme crée un projet automatiquement, puis le fait évoluer avec tes demandes.</p>
+      </div>
+
+      <div className="mode-selector" aria-label="Mode de création">
+        <button type="button" className={mode === 'create' ? 'active' : ''} onClick={() => setMode('create')}>Create</button>
+        <button type="button" className={mode === 'co-create' ? 'active' : ''} onClick={() => setMode('co-create')}>Co-Create</button>
       </div>
 
       <AiInputComposer
@@ -31,16 +39,22 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
         disabled={controller.status === 'loading'}
         speechEnabled={speechEnabled}
         statusMessage={(message) => onDebug?.({ status: 'speech', message, timestamp: new Date().toISOString() })}
-        placeholder="html visualisation fibonacci"
+        placeholder={project ? 'Ex: ajoute un minimap, change les couleurs, simplifie l’interface…' : 'Ex: un jeu de mémoire doux avec progression et sons…'}
       />
 
       {controller.status === 'loading' ? <AiLoadingState text={controller.progressText} onCancel={controller.cancel} /> : null}
       {controller.error ? <div className="create-app-status error" role="alert"><strong>Oups</strong><span>{controller.error}</span></div> : null}
       {html ? (
         <div className="iaview-ready-card">
-          <strong>Ta page est prête.</strong>
-          <span>Ouvre-la en plein écran, puis reviens ici avec le bouton de retour.</span>
-          <button type="button" className="primary-action" onClick={() => setIsViewingHtml(true)}>Ouvrir la page</button>
+          <strong>{project.creationRequest}</strong>
+          <span>Projet enregistré automatiquement. Demande une évolution ou ouvre l’application.</span>
+          <button type="button" className="primary-action" onClick={() => setIsViewingHtml(true)}>Ouvrir l’application</button>
+        </div>
+      ) : null}
+      {mode === 'co-create' && latestSuggestions.length ? (
+        <div className="ai-suggestions-card">
+          <strong>Suggestions du partenaire créatif</strong>
+          <div>{latestSuggestions.map((suggestion, index) => <button type="button" key={`${suggestion}-${index}`} onClick={() => controller.setInput(String(suggestion))}>{suggestion}</button>)}</div>
         </div>
       ) : null}
 
