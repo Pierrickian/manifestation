@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MANIFESTATION_DESIGN_SYSTEM } from '../../platform/ai/designSystem'
 import { useAiApplicationController } from '../../platform/ai/hooks/useAiApplicationController'
 import { AiInputComposer } from '../../platform/ai/components/AiInputComposer'
@@ -12,7 +12,42 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
   const [lastExport, setLastExport] = useState(null)
   const importInputRef = useRef(null)
   const [mode, setMode] = useState('create')
-  const controller = useAiApplicationController({ mode, designSystem: MANIFESTATION_DESIGN_SYSTEM, speechEnabled, onDebug })
+  const [aiActivity, setAiActivity] = useState({ active: false, log: [] })
+
+  function recordAiActivity(event = {}) {
+    onDebug?.(event)
+    const status = event.status || 'info'
+    const isRequest = status === 'ai_request' || status === 'request'
+    const isResponse = status === 'ai_response' || status === 'response' || status === 'success' || status === 'error' || status === 'aborted'
+    const title = event.shortTitle || event.title || event.kind || event.message || (isRequest ? 'Requête IA' : 'Réponse IA')
+
+    if (!isRequest && !isResponse) return
+
+    setAiActivity((current) => ({
+      active: isRequest ? true : isResponse ? false : current.active,
+      log: [
+        {
+          id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          type: isRequest ? 'request' : status === 'error' ? 'error' : 'response',
+          title,
+          timestamp: event.timestamp || event.startedAt || new Date().toISOString()
+        },
+        ...current.log
+      ].slice(0, 18)
+    }))
+  }
+
+  useEffect(() => {
+    function handleGeneratedHtmlMessage(event) {
+      if (event.data?.source !== 'creatia-generated-html' || event.data?.type !== 'ai-activity') return
+      recordAiActivity(event.data)
+    }
+
+    window.addEventListener('message', handleGeneratedHtmlMessage)
+    return () => window.removeEventListener('message', handleGeneratedHtmlMessage)
+  }, [])
+
+  const controller = useAiApplicationController({ mode, designSystem: MANIFESTATION_DESIGN_SYSTEM, speechEnabled, onDebug: recordAiActivity })
   const project = controller.project
   const html = project?.currentApplication || ''
   const latestSuggestions = project?.aiSuggestionsHistory?.at(-1)?.suggestions || []
@@ -20,6 +55,20 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
   const continuationPlan = mode === 'co-create' ? project?.continuationPlan : null
   const [showHealthcheckDetails, setShowHealthcheckDetails] = useState(false)
   const isBusy = controller.status === 'loading' || controller.status === 'repairing'
+  const hasUnsavedAiApp = Boolean(project?.currentApplication || controller.input.trim() || isBusy)
+
+  useEffect(() => {
+    if (!hasUnsavedAiApp) return undefined
+
+    function confirmBeforeLeaving(event) {
+      event.preventDefault()
+      event.returnValue = 'Êtes-vous sûr de vouloir quitter ? Votre app Creatia en cours pourrait être perdue.'
+      return event.returnValue
+    }
+
+    window.addEventListener('beforeunload', confirmBeforeLeaving)
+    return () => window.removeEventListener('beforeunload', confirmBeforeLeaving)
+  }, [hasUnsavedAiApp])
 
   function rememberExport(exportData, kind) {
     setLastExport({ ...exportData, kind })
@@ -87,7 +136,7 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
   }
 
   if (html && isViewingHtml) {
-    return <HtmlViewer html={html} title={project?.creationRequest || 'Application créée'} onBack={() => setIsViewingHtml(false)} />
+    return <HtmlViewer html={html} title={project?.creationRequest || 'Application créée'} onBack={() => setIsViewingHtml(false)} aiOverlay={<CreatiaAiOverlay activity={aiActivity} />} />
   }
 
   return (
@@ -99,6 +148,8 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
         <p>Parle ou écris ton idée. La plateforme crée un projet automatiquement, puis le fait évoluer avec tes demandes.</p>
       </div>
 
+      <CreatiaAiOverlay activity={aiActivity} />
+
       <div className="mode-selector" aria-label="Mode de création">
         <button type="button" className={mode === 'create' ? 'active' : ''} onClick={() => setMode('create')}>Create</button>
         <button type="button" className={mode === 'co-create' ? 'active' : ''} onClick={() => setMode('co-create')}>Co-Create</button>
@@ -109,6 +160,21 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
         <span>I Have Time</span>
         <small>Autorise Planner, validations plus profondes, boucles de réparation et revues qualité quand l’IA le juge utile.</small>
       </label>
+
+      <details className="project-menu ai-journal-menu">
+        <summary>Journal IA</summary>
+        {aiActivity.log.length ? (
+          <ol>
+            {aiActivity.log.map((entry) => (
+              <li key={entry.id} className={entry.type}>
+                <span>{entry.type === 'request' ? '↗' : entry.type === 'error' ? '!' : '↙'}</span>
+                <strong>{entry.title}</strong>
+                <time dateTime={entry.timestamp}>{new Date(entry.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</time>
+              </li>
+            ))}
+          </ol>
+        ) : <small>Aucun appel IA Creatia pour le moment.</small>}
+      </details>
 
       <details className="project-menu" open={Boolean(project)}>
         <summary>Exporter</summary>
@@ -217,5 +283,14 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
 
       <button type="button" className="ghost-action" onClick={onClose}>Retour</button>
     </section>
+  )
+}
+
+function CreatiaAiOverlay({ activity }) {
+  return (
+    <div className={`creatia-ai-overlay${activity.active ? ' is-active' : ''}`} role="status" aria-live="polite" aria-label={activity.active ? 'IA Creatia consultée' : 'IA Creatia en attente'}>
+      <span className="creatia-ai-spinner" aria-hidden="true" />
+      <span>{activity.active ? 'IA…' : 'IA prête'}</span>
+    </div>
   )
 }

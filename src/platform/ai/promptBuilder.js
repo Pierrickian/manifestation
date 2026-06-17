@@ -11,6 +11,8 @@ const STRUCTURED_APP_INSTRUCTIONS = [
   'Avoid external libraries whenever possible.',
   'A downloaded HTML file should continue to work offline after export.',
   'Support mobile devices, touch events, scrolling, dark mode, Canvas/SVG/WebGL when useful, and offline execution.',
+  'Every generated screen or panel that contains informational text, instructions, logs, descriptions, story content, results, settings, or help must be vertically scrollable on mobile, even when the first version appears short.',
+  'Use safe scroll containers such as main, section, .screen, .panel, or .content with overflow-y: auto and -webkit-overflow-scrolling: touch; avoid locking text-heavy interfaces behind fixed 100vh layouts without scroll.',
   'systemPrompt is a hidden evolution prompt that explains how to continue evolving this specific project.',
   'state stores persistent application state and decisions that future evolutions must preserve.',
   'capabilities must declare expected runtime capabilities, for example { "webgl": true, "audio": false, "simulation": true }.',
