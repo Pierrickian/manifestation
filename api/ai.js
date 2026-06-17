@@ -5,7 +5,8 @@ import { generateLinks } from '../src/ai/generateLinks.js'
 import { generateQuestion } from '../src/ai/generateQuestion.js'
 
 const DEFAULT_OPENAI_MODEL = 'gpt-5.4-mini'
-const OPENAI_REQUEST_TIMEOUT_MS = 20000
+const OPENAI_REQUEST_TIMEOUT_MS = 60000
+const LOCAL_FALLBACK_DELAY_MS = 30000
 
 const client = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: OPENAI_REQUEST_TIMEOUT_MS })
@@ -305,6 +306,7 @@ const responseFormats = {
 
 
 function getResponseFormat(kind, context) {
+  if (kind === 'html_app') return undefined
   if (kind !== 'mes_questions_quiz') return responseFormats[kind] || responseFormats.question
 
   const exactQuestionCount = Math.max(1, Math.min(10, Number(context?.questionCount || 5)))
@@ -340,10 +342,16 @@ export default async function handler(request, response) {
     response.status(200).json(withDebug(getLocalResult(kind, context), {
       source: 'local',
       fallbackReason: 'missing_openai_api_key',
-      hasOpenAIKey: false
+      hasOpenAIKey: false,
+      kind,
+      timeoutMs: OPENAI_REQUEST_TIMEOUT_MS,
+      fallbackAfterMs: LOCAL_FALLBACK_DELAY_MS,
+      timestamp: new Date().toISOString()
     }))
     return
   }
+
+  const requestStartedAt = Date.now()
 
   try {
     const model = process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL
@@ -354,7 +362,11 @@ export default async function handler(request, response) {
       hasOpenAIKey: true,
       model,
       finishReason: result.finishReason,
-      retryCount: result.retryCount
+      retryCount: result.retryCount,
+      kind,
+      timeoutMs: OPENAI_REQUEST_TIMEOUT_MS,
+      fallbackAfterMs: LOCAL_FALLBACK_DELAY_MS,
+      timestamp: new Date().toISOString()
     }))
   } catch (error) {
     const debug = {
@@ -365,7 +377,11 @@ export default async function handler(request, response) {
       errorName: error?.name || 'Error',
       errorMessage: error?.message || 'Unknown OpenAI error',
       invalidPayloadKeys: error?.payloadKeys?.join(', ') || 'none',
-      retryCount: error?.retryCount ?? 0
+      retryCount: error?.retryCount ?? 0,
+      kind,
+      timeoutMs: OPENAI_REQUEST_TIMEOUT_MS,
+      fallbackAfterMs: LOCAL_FALLBACK_DELAY_MS,
+      timestamp: new Date().toISOString()
     }
 
 
@@ -378,24 +394,33 @@ export default async function handler(request, response) {
       return
     }
 
-    response.status(200).json(withDebug(getLocalResult(kind, context), debug))
+    const elapsedMs = Date.now() - requestStartedAt
+    if (elapsedMs < LOCAL_FALLBACK_DELAY_MS) {
+      await wait(LOCAL_FALLBACK_DELAY_MS - elapsedMs)
+    }
+    response.status(200).json(withDebug(getLocalResult(kind, context), {
+      ...debug,
+      elapsedMs: Date.now() - requestStartedAt
+    }))
   }
 }
 
 async function createValidatedAiResult(kind, context, model) {
-  const attempts = [buildPrompt(kind, context), buildPrompt(kind, context)]
-  attempts[1] = [
-    ...attempts[1],
-    {
-      role: 'user',
-      content: [
-        'La reponse precedente etait invalide ou ressemblait a un schema JSON.',
-        getShapeInstruction(kind),
-        'Ne renvoie jamais les champs type, properties, schema ou json_schema comme objet principal.',
-        'Renvoie uniquement les donnees finales utilisables par le wizard.'
-      ].join(' ')
-    }
-  ]
+  const attempts = kind === 'html_app' ? [buildPrompt(kind, context)] : [buildPrompt(kind, context), buildPrompt(kind, context)]
+  if (kind !== 'html_app') {
+    attempts[1] = [
+      ...attempts[1],
+      {
+        role: 'user',
+        content: [
+          'La reponse precedente etait invalide ou ressemblait a un schema JSON.',
+          getShapeInstruction(kind),
+          'Ne renvoie jamais les champs type, properties, schema ou json_schema comme objet principal.',
+          'Renvoie uniquement les donnees finales utilisables par le wizard.'
+        ].join(' ')
+      }
+    ]
+  }
 
   let lastError = null
 
@@ -403,12 +428,12 @@ async function createValidatedAiResult(kind, context, model) {
     const completion = await client.chat.completions.create({
       model,
       messages,
-      response_format: getResponseFormat(kind, context),
+      ...(getResponseFormat(kind, context) ? { response_format: getResponseFormat(kind, context) } : {}),
       temperature: 0.75
     })
 
     const content = completion.choices[0]?.message?.content || '{}'
-    const payload = normalizeAiPayload(kind, JSON.parse(content), context)
+    const payload = kind === 'html_app' ? { html: sanitizeHtmlOnly(content) } : normalizeAiPayload(kind, JSON.parse(content), context)
     const validationError = validateAiPayload(kind, payload, context)
 
     if (!validationError) {
@@ -437,6 +462,7 @@ function validateAiPayload(kind, payload, context = {}) {
     narratia_child_choices: (value) => Array.isArray(value?.childChoices) && value.childChoices.length >= 6,
     narratia_story_package: (value) => Boolean(value?.title && Array.isArray(value.milestones) && Array.isArray(value.segments) && Array.isArray(value.endings) && value.endings.length === 3),
     enigmia_riddle: (value) => validateEnigmiaRiddle(value?.riddle).isValid,
+    html_app: (value) => typeof value?.html === 'string' && /^\s*(<!doctype html|<html)/i.test(value.html),
     mes_questions_quiz: (value) => Array.isArray(value?.questions) && value.questions.length === Number(context?.questionCount || value.questions.length) && value.questions.every((question) => question?.id && question.subject && question.question && Array.isArray(question.answers) && question.answers.length === 3 && question.answers.some((answer) => answer.id === question.correctAnswerId))
   }
 
@@ -623,11 +649,13 @@ function getShapeInstruction(kind) {
   if (kind === 'enigmia_riddle') return 'Format attendu: { \"riddle\": { \"theme\": string, \"object\": string, \"puzzle\": string, \"statements\": [{ \"containerId\": \"A\", \"containerName\": string, \"text\": string }], \"choices\": [{ \"id\": \"A\", \"containerName\": string }], \"solution\": \"A|B|C\" } }.'
   if (kind === 'narratia_child_choices') return 'Expected format: { "childChoices": [{ "id": string, "label": string, "category": string }] }.'
   if (kind === 'narratia_story_package') return 'Expected format: { "id": string, "title": string, "narrators": array, "milestones": array, "segments": array, "endings": array, "metadata": object }.'
+  if (kind === 'html_app') return 'Format attendu: document HTML5 complet uniquement.'
   if (kind === 'mes_questions_quiz') return 'Format attendu: { "questions": [{ "id": string, "subject": string, "question": string, "answers": [{ "id": string, "text": string }], "correctAnswerId": string }] }.'
   return 'Format attendu: un objet JSON de donnees finales, pas un schema.'
 }
 
 function getLocalResult(kind, context) {
+  if (kind === 'html_app') return { html: createFallbackHtmlApp(context) }
   if (kind === 'answer') {
     return {
       answer: context?.answer || {
@@ -786,6 +814,23 @@ function getLocalResult(kind, context) {
     }
   }
   return generateQuestion(context)
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function sanitizeHtmlOnly(content = '') {
+  return String(content)
+    .replace(/^```(?:html)?\s*/i, '')
+    .replace(/```$/i, '')
+    .trim()
+}
+
+function createFallbackHtmlApp(context = {}) {
+  const prompt = String(context?.prompt || 'html application')
+  const title = prompt.split('User request:').pop()?.trim() || 'Application Manifestation'
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title.replace(/[<>]/g, '')}</title><style>:root{color-scheme:dark;--primary:#6A5AE0;--secondary:#A78BFA;--bg:#121212;--surface:#1E1E1E;--text:#fff}*{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:Inter,system-ui,sans-serif;background:radial-gradient(circle at top,var(--primary),transparent 34%),var(--bg);color:var(--text);display:grid;place-items:center;padding:24px}.app{width:min(720px,100%);background:color-mix(in srgb,var(--surface),transparent 5%);border:1px solid rgba(255,255,255,.14);border-radius:24px;padding:24px;box-shadow:0 24px 80px rgba(0,0,0,.35)}button{border:0;border-radius:16px;padding:14px 18px;background:linear-gradient(135deg,var(--primary),var(--secondary));color:white;font-weight:800;touch-action:manipulation}.orb{width:140px;aspect-ratio:1;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--secondary));margin:auto;animation:pulse 2s ease-in-out infinite alternate}@keyframes pulse{to{transform:scale(1.08);filter:brightness(1.2)}}@media (max-width:560px){.app{padding:18px;border-radius:18px}}</style></head><body><main class="app"><div class="orb"></div><h1>${title.replace(/[<>]/g, '')}</h1><p>Fallback offline généré par la plateforme IA Manifestation. Configure OPENAI_API_KEY pour obtenir une application complète.</p><button onclick="document.querySelector('.orb').style.animationDuration=Math.random()*1.5+.5+'s'">Animer</button></main></body></html>`
 }
 
 function withDebug(result, debug) {

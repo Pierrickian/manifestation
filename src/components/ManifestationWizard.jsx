@@ -12,6 +12,7 @@ import { NarratiaApp } from '../features/narratia/NarratiaApp'
 import { MesQuestionsApp } from '../features/MesQuestionsApp'
 import { EnigmiaApp } from '../features/EnigmiaApp'
 import { CreateYourApp } from '../features/create-your-app/CreateYourApp'
+import { HtmlAppGenerator } from '../features/html-app-generator/HtmlAppGenerator'
 import { DEFAULT_RULE_ID, ENIGMIA_RULE_ID, FLOW_RULE_ID, MES_QUESTIONS_RULE_ID, NARRATIA_RULE_ID, RECONCILIATION_RULE_ID, getRules, hasRule, isGuidedJourneyRule } from '../core/engine/ruleRegistry'
 import { getInitialRuleIdFromUrl, readRuleUrlState, useRuleUrlSync } from '../hooks/useRuleUrlSync'
 
@@ -356,6 +357,7 @@ export function ManifestationWizard() {
   const [flowBatch, setFlowBatch] = useState(0)
   const [mesQuestionsDebug, setMesQuestionsDebug] = useState(null)
   const [enigmiaDebug, setEnigmiaDebug] = useState(null)
+  const [htmlGeneratorDebug, setHtmlGeneratorDebug] = useState(null)
   const [hasConfiguredApp, setHasConfiguredApp] = useState(false)
   const [showAiDebug, setShowAiDebug] = useState(false)
   const [portalView, setPortalView] = useState(readInitialPortalView)
@@ -500,6 +502,13 @@ export function ManifestationWizard() {
     resetJourney()
     setHasConfiguredApp(false)
     setPortalView('create-app')
+  }
+
+  function openHtmlAppGenerator() {
+    resetJourney()
+    setHasConfiguredApp(false)
+    setHtmlGeneratorDebug(null)
+    setPortalView('html-app-generator')
   }
 
   const { selectRuleFromUi } = useRuleUrlSync({
@@ -934,7 +943,13 @@ export function ManifestationWizard() {
             activeRuleId={activeRuleId}
             onRuleChange={selectRuleFromUi}
             onCreateYourApp={openCreateYourApp}
+            onHtmlAppGenerator={openHtmlAppGenerator}
           />
+        </>
+      ) : portalView === 'html-app-generator' ? (
+        <>
+          <HtmlAppGenerator onClose={goHome} onDebug={setHtmlGeneratorDebug} speechEnabled />
+          {showAiDebug ? <AiDebugFooter debugRows={getDebugRows(null, htmlGeneratorDebug)} /> : null}
         </>
       ) : portalView === 'create-app' ? (
         <CreateYourApp
@@ -1198,7 +1213,7 @@ function ReconciliationStep({
   )
 }
 
-function AppChooser({ rules, activeRuleId, onRuleChange, onCreateYourApp }) {
+function AppChooser({ rules, activeRuleId, onRuleChange, onCreateYourApp, onHtmlAppGenerator }) {
   return (
     <section className="app-chooser" aria-labelledby="app-chooser-title">
       <div className="app-chooser-header">
@@ -1218,6 +1233,14 @@ function AppChooser({ rules, activeRuleId, onRuleChange, onCreateYourApp }) {
             <small>{rule.description}</small>
           </button>
         ))}
+        <button
+          type="button"
+          className="rule-option create-app-option"
+          onClick={onHtmlAppGenerator}
+        >
+          <span>IAview</span>
+          <small>Crée une page interactive depuis une idée écrite ou dictée.</small>
+        </button>
         <button
           type="button"
           className="rule-option create-app-option"

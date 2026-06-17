@@ -48,7 +48,7 @@ const FLOW_WORDS_BY_NEED = {
 }
 
 const AI_ENDPOINT = '/api/ai'
-const AI_REQUEST_TIMEOUT_MS = 20000
+const AI_REQUEST_TIMEOUT_MS = 60000
 
 async function requestAI(kind, context) {
   const controller = new AbortController()
@@ -68,7 +68,7 @@ async function requestAI(kind, context) {
   } catch (error) {
     if (error?.name === 'AbortError') {
       const timeoutError = new Error('AI request timed out')
-      timeoutError.userMessage = 'L’IA a mis plus de 20 secondes à répondre. Relance dans quelques instants.'
+      timeoutError.userMessage = 'L’IA a mis plus de 60 secondes à répondre. Relance dans quelques instants.'
       timeoutError.debug = {
         source: 'ai',
         fallbackReason: 'client_timeout',
