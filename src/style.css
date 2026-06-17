@@ -2395,3 +2395,12 @@ p {
   color: rgba(255, 255, 255, 0.72);
   line-height: 1.45;
 }
+
+.human-model-refresh-warning {
+  border-color: rgba(251, 191, 36, 0.42);
+  background: rgba(251, 191, 36, 0.12);
+}
+
+.human-model-refresh-warning .primary-action {
+  margin-top: 0.85rem;
+}

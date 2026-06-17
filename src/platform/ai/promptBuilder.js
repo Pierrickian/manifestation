@@ -28,9 +28,9 @@ const STRUCTURED_APP_INSTRUCTIONS = [
 ]
 
 export function normalizeStructuredAiResponse(payload = {}) {
-  if (payload.html) {
+  if (Object.prototype.hasOwnProperty.call(payload, 'html') || payload.humanModel || payload.analysis || payload.decisions || payload.generatedChanges) {
     return {
-      html: payload.html,
+      html: payload.html || '',
       humanModel: payload.humanModel && typeof payload.humanModel === 'object' ? payload.humanModel : {},
       files: payload.files && typeof payload.files === 'object' ? payload.files : {},
       analysis: payload.analysis || '',
@@ -130,5 +130,27 @@ export function buildRepairPrompt({ originalRequest, failedResponse, healthcheck
     kind: 'html_app_repair',
     prompt: [STRUCTURED_APP_INSTRUCTIONS.join('\n'), JSON.stringify(repairPayload, null, 2)].join('\n\n'),
     metadata: { rendererType: 'html', mode, designSystem, strategyId: 'recovery', capabilities, attempt, maxAttempts }
+  }
+}
+
+export function buildHumanModelRefreshPrompt({ project, designSystem = MANIFESTATION_DESIGN_SYSTEM }) {
+  const payload = {
+    task: 'refresh_human_model_from_current_html',
+    instruction: [
+      'Analyze the current standalone HTML application and rebuild only the human/design representation.',
+      'Do not replace, rewrite, repair, merge, or regenerate the HTML application.',
+      'Return the required JSON shape, but set html to an empty string and files to an empty object.',
+      'Regenerate humanModel, analysis, decisions, and generatedChanges so future evolutions understand the imported application.'
+    ].join(' '),
+    currentHtml: project?.currentApplication || '',
+    previousHumanModel: project?.humanModel || {},
+    previousEvolutionHistory: project?.evolutionHistory?.slice(-8) || [],
+    designSystem
+  }
+
+  return {
+    kind: 'human_model_refresh',
+    prompt: [STRUCTURED_APP_INSTRUCTIONS.join('\n'), JSON.stringify(payload, null, 2)].join('\n\n'),
+    metadata: { rendererType: 'html', projectId: project?.id || null, refreshOnly: true, designSystem }
   }
 }

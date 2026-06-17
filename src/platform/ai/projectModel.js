@@ -77,6 +77,28 @@ export function evolveProject(project, request, response) {
   }
 }
 
+
+export function refreshProjectHumanModel(project, response) {
+  const now = new Date().toISOString()
+  const entry = createEvolutionEntry({
+    at: now,
+    request: 'Rebuild Human Model',
+    response
+  })
+
+  return {
+    ...project,
+    humanModel: normalizeHumanModel(response.humanModel || response.human || response.state?.humanModel),
+    applicationState: response.state || project.applicationState || {},
+    evolutionHistory: [...(project.evolutionHistory || []), entry],
+    metadata: {
+      ...(project.metadata || {}),
+      updatedAt: now,
+      requiresHumanModelRefresh: false
+    }
+  }
+}
+
 export function readStoredProjects() {
   try { return JSON.parse(localStorage.getItem(PROJECTS_STORAGE_KEY) || '[]') } catch { return [] }
 }

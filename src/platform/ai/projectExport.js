@@ -109,9 +109,29 @@ export function importHtmlIntoProject(project, importedHtml) {
         }
       }
     ],
+    evolutionHistory: [
+      ...(project.evolutionHistory || []),
+      {
+        at: now,
+        userRequest: 'HTML imported',
+        analysis: 'External HTML replaced the active application.',
+        decisions: [
+          'Current application replaced',
+          'Human model may no longer match'
+        ],
+        generatedChanges: [
+          'currentApplication updated'
+        ]
+      }
+    ],
     metadata: {
       ...(project.metadata || {}),
-      updatedAt: now
+      updatedAt: now,
+      lastExternalImport: {
+        at: now,
+        source: 'html'
+      },
+      requiresHumanModelRefresh: true
     }
   })
 }

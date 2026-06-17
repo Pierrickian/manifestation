@@ -55,7 +55,7 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
   const preloadQueue = mode === 'co-create' ? project?.preloadQueue || [] : []
   const continuationPlan = mode === 'co-create' ? project?.continuationPlan : null
   const [showHealthcheckDetails, setShowHealthcheckDetails] = useState(false)
-  const isBusy = controller.status === 'loading' || controller.status === 'repairing'
+  const isBusy = controller.status === 'loading' || controller.status === 'repairing' || controller.status === 'refreshingHumanModel'
   const hasUnsavedAiApp = Boolean(project?.currentApplication || controller.input.trim() || isBusy)
 
   useEffect(() => {
@@ -257,7 +257,16 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
         placeholder={project ? 'Ex: ajoute un minimap, change les couleurs, simplifie l’interface…' : 'Ex: un jeu de mémoire doux avec progression et sons…'}
       />
 
-      {isBusy ? <AiLoadingState text={controller.status === 'repairing' ? 'Réparation automatique…' : controller.progressText} onCancel={controller.cancel} /> : null}
+      {isBusy ? <AiLoadingState text={controller.status === 'repairing' ? 'Réparation automatique…' : controller.status === 'refreshingHumanModel' ? 'Reconstruction du modèle humain…' : controller.progressText} onCancel={controller.cancel} /> : null}
+
+      {project?.metadata?.requiresHumanModelRefresh ? (
+        <div className="create-app-status warning human-model-refresh-warning" role="alert">
+          <strong>Modèle humain à vérifier</strong>
+          <span>An external HTML file replaced the application. The human model may no longer match the current application. Ask the AI to analyze the current application and rebuild its human model.</span>
+          <button type="button" className="primary-action" onClick={controller.rebuildHumanModel} disabled={isBusy}>Rebuild Human Model</button>
+        </div>
+      ) : null}
+
       {controller.error ? <div className="create-app-status error" role="alert"><strong>Oups</strong><span>{controller.error}</span></div> : null}
       {controller.repairError ? <div className="create-app-status error" role="alert"><strong>Réparation</strong><span>{controller.repairError}</span></div> : null}
       {html ? (
