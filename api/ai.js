@@ -5,7 +5,8 @@ import { generateLinks } from '../src/ai/generateLinks.js'
 import { generateQuestion } from '../src/ai/generateQuestion.js'
 
 const DEFAULT_OPENAI_MODEL = 'gpt-5.4-mini'
-const OPENAI_REQUEST_TIMEOUT_MS = 20000
+const OPENAI_REQUEST_TIMEOUT_MS = 60000
+const LOCAL_FALLBACK_DELAY_MS = 30000
 
 const client = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: OPENAI_REQUEST_TIMEOUT_MS })
@@ -341,10 +342,16 @@ export default async function handler(request, response) {
     response.status(200).json(withDebug(getLocalResult(kind, context), {
       source: 'local',
       fallbackReason: 'missing_openai_api_key',
-      hasOpenAIKey: false
+      hasOpenAIKey: false,
+      kind,
+      timeoutMs: OPENAI_REQUEST_TIMEOUT_MS,
+      fallbackAfterMs: LOCAL_FALLBACK_DELAY_MS,
+      timestamp: new Date().toISOString()
     }))
     return
   }
+
+  const requestStartedAt = Date.now()
 
   try {
     const model = process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL
@@ -355,7 +362,11 @@ export default async function handler(request, response) {
       hasOpenAIKey: true,
       model,
       finishReason: result.finishReason,
-      retryCount: result.retryCount
+      retryCount: result.retryCount,
+      kind,
+      timeoutMs: OPENAI_REQUEST_TIMEOUT_MS,
+      fallbackAfterMs: LOCAL_FALLBACK_DELAY_MS,
+      timestamp: new Date().toISOString()
     }))
   } catch (error) {
     const debug = {
@@ -366,7 +377,11 @@ export default async function handler(request, response) {
       errorName: error?.name || 'Error',
       errorMessage: error?.message || 'Unknown OpenAI error',
       invalidPayloadKeys: error?.payloadKeys?.join(', ') || 'none',
-      retryCount: error?.retryCount ?? 0
+      retryCount: error?.retryCount ?? 0,
+      kind,
+      timeoutMs: OPENAI_REQUEST_TIMEOUT_MS,
+      fallbackAfterMs: LOCAL_FALLBACK_DELAY_MS,
+      timestamp: new Date().toISOString()
     }
 
 
@@ -379,7 +394,14 @@ export default async function handler(request, response) {
       return
     }
 
-    response.status(200).json(withDebug(getLocalResult(kind, context), debug))
+    const elapsedMs = Date.now() - requestStartedAt
+    if (elapsedMs < LOCAL_FALLBACK_DELAY_MS) {
+      await wait(LOCAL_FALLBACK_DELAY_MS - elapsedMs)
+    }
+    response.status(200).json(withDebug(getLocalResult(kind, context), {
+      ...debug,
+      elapsedMs: Date.now() - requestStartedAt
+    }))
   }
 }
 
@@ -792,6 +814,10 @@ function getLocalResult(kind, context) {
     }
   }
   return generateQuestion(context)
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 function sanitizeHtmlOnly(content = '') {

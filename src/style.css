@@ -1964,3 +1964,57 @@ p {
     min-height: 68vh;
   }
 }
+
+.iaview-ready-card {
+  align-items: flex-start;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(167, 139, 250, 0.28);
+  border-radius: 20px;
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.html-viewer.is-fullscreen {
+  background: #05050a;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100dvh;
+  left: 0;
+  min-height: 100dvh;
+  overflow: hidden;
+  position: fixed;
+  resize: none;
+  top: 0;
+  width: 100vw;
+  z-index: 100;
+}
+
+.html-viewer-toolbar {
+  align-items: center;
+  backdrop-filter: blur(18px);
+  background: rgba(10, 10, 16, 0.78);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  min-height: env(safe-area-inset-top, 0);
+  padding: max(10px, env(safe-area-inset-top)) 12px 10px;
+}
+
+.html-viewer-back {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 800;
+  min-height: 44px;
+  padding: 10px 14px;
+}
+
+.html-viewer.is-fullscreen iframe {
+  height: 100%;
+  min-height: 0;
+}

@@ -357,6 +357,7 @@ export function ManifestationWizard() {
   const [flowBatch, setFlowBatch] = useState(0)
   const [mesQuestionsDebug, setMesQuestionsDebug] = useState(null)
   const [enigmiaDebug, setEnigmiaDebug] = useState(null)
+  const [htmlGeneratorDebug, setHtmlGeneratorDebug] = useState(null)
   const [hasConfiguredApp, setHasConfiguredApp] = useState(false)
   const [showAiDebug, setShowAiDebug] = useState(false)
   const [portalView, setPortalView] = useState(readInitialPortalView)
@@ -506,6 +507,7 @@ export function ManifestationWizard() {
   function openHtmlAppGenerator() {
     resetJourney()
     setHasConfiguredApp(false)
+    setHtmlGeneratorDebug(null)
     setPortalView('html-app-generator')
   }
 
@@ -945,7 +947,10 @@ export function ManifestationWizard() {
           />
         </>
       ) : portalView === 'html-app-generator' ? (
-        <HtmlAppGenerator onClose={goHome} speechEnabled />
+        <>
+          <HtmlAppGenerator onClose={goHome} onDebug={setHtmlGeneratorDebug} speechEnabled />
+          {showAiDebug ? <AiDebugFooter debugRows={getDebugRows(null, htmlGeneratorDebug)} /> : null}
+        </>
       ) : portalView === 'create-app' ? (
         <CreateYourApp
           config={CREATE_YOUR_APP_CONFIG}
@@ -1233,8 +1238,8 @@ function AppChooser({ rules, activeRuleId, onRuleChange, onCreateYourApp, onHtml
           className="rule-option create-app-option"
           onClick={onHtmlAppGenerator}
         >
-          <span>Html App Generator</span>
-          <small>Génère et exécute immédiatement une application HTML dans un viewer isolé.</small>
+          <span>IAview</span>
+          <small>Crée une page interactive depuis une idée écrite ou dictée.</small>
         </button>
         <button
           type="button"

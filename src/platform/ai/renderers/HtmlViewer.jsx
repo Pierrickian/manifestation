@@ -1,6 +1,9 @@
-export function HtmlViewer({ html, title = 'Application HTML générée' }) {
+export function HtmlViewer({ html, title = 'Page créée', onBack }) {
   return (
-    <section className="html-viewer" aria-label={title}>
+    <section className="html-viewer is-fullscreen" aria-label={title}>
+      <div className="html-viewer-toolbar">
+        <button type="button" className="html-viewer-back" onClick={onBack}>← Retour à IAview</button>
+      </div>
       <iframe
         title={title}
         sandbox="allow-scripts allow-forms allow-pointer-lock allow-popups allow-modals"
