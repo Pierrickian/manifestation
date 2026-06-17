@@ -2262,3 +2262,100 @@ p {
   font-size: 0.76rem;
   line-height: 1.25;
 }
+
+.creatia-ai-overlay {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  z-index: 80;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 250, 244, 0.24);
+  border-radius: 999px;
+  background: rgba(18, 12, 36, 0.38);
+  color: rgba(255, 250, 244, 0.72);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.54;
+  pointer-events: none;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(12px);
+  transition: opacity 180ms ease, transform 180ms ease, background 180ms ease;
+}
+
+.creatia-ai-overlay.is-active {
+  opacity: 0.86;
+  transform: scale(1.03);
+  background: rgba(54, 35, 92, 0.58);
+}
+
+.creatia-ai-spinner {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 3px solid rgba(255, 250, 244, 0.2);
+  border-top-color: rgba(255, 242, 173, 0.96);
+  animation: creatia-ai-spin 850ms linear infinite;
+}
+
+.creatia-ai-overlay:not(.is-active) .creatia-ai-spinner {
+  animation-play-state: paused;
+  opacity: 0.62;
+}
+
+@keyframes creatia-ai-spin {
+  to { transform: rotate(360deg); }
+}
+
+.ai-journal-menu ol {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ai-journal-menu li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 250, 244, 0.76);
+}
+
+.ai-journal-menu li.request span {
+  color: #fff2ad;
+}
+
+.ai-journal-menu li.response span {
+  color: #9df0cb;
+}
+
+.ai-journal-menu li.error span {
+  color: #ff9aa7;
+}
+
+.ai-journal-menu strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-journal-menu time {
+  color: rgba(255, 250, 244, 0.52);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.html-viewer .creatia-ai-overlay {
+  z-index: 120;
+  top: max(58px, calc(env(safe-area-inset-top) + 58px));
+}

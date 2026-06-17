@@ -80,8 +80,10 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
         attempt,
         maxAttempts
       })
-      onDebug?.({ status: 'repair_ready', reason, attempt, maxAttempts, kind: repairRequest.kind, healthcheck: verification, timestamp: new Date().toISOString() })
+      onDebug?.({ status: 'repair_ready', reason, attempt, maxAttempts, kind: repairRequest.kind, shortTitle: `Réparation IA ${attempt}/${maxAttempts}`, healthcheck: verification, timestamp: new Date().toISOString() })
+      onDebug?.({ status: 'ai_request', kind: repairRequest.kind, shortTitle: `Réparation IA ${attempt}/${maxAttempts}`, timestamp: new Date().toISOString() })
       const repairedPayload = await aiProvider({ ...repairRequest, signal: controller.signal })
+      onDebug?.({ status: 'ai_response', kind: repairRequest.kind, shortTitle: `Réponse réparation ${attempt}/${maxAttempts}`, timestamp: new Date().toISOString() })
       finalStructured = normalizeForProject(repairedPayload, detectedCapabilities, mode)
       verification = runGeneratedAppHealthcheck(finalStructured, { ...selectedStrategy, id: 'recovery' })
       attempts = attempt
@@ -122,8 +124,11 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
 
     try {
       const request = buildAiPrompt({ input: trimmed, mode, designSystem, project, capabilities: detectedCapabilities, strategy: selectedStrategy, hasTime })
-      onDebug?.({ status: 'request_ready', kind: request.kind, rendererType: request.metadata.rendererType, designSystem: request.metadata.designSystem?.themeName })
+      const requestShortTitle = project ? 'Évolution du projet' : 'Création du projet'
+      onDebug?.({ status: 'request_ready', kind: request.kind, shortTitle: requestShortTitle, rendererType: request.metadata.rendererType, designSystem: request.metadata.designSystem?.themeName, timestamp: new Date().toISOString() })
+      onDebug?.({ status: 'ai_request', kind: request.kind, shortTitle: requestShortTitle, timestamp: new Date().toISOString() })
       const payload = await aiProvider({ ...request, signal: controller.signal })
+      onDebug?.({ status: 'ai_response', kind: request.kind, shortTitle: project ? 'Projet évolué' : 'Projet généré', timestamp: new Date().toISOString() })
       const structured = normalizeForProject(payload, detectedCapabilities, mode)
       const initialHealthcheck = runGeneratedAppHealthcheck(structured, selectedStrategy)
       const repairResult = await runRepairLoop({
