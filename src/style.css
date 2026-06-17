@@ -2075,3 +2075,62 @@ p {
   text-align: left;
   padding: 10px 12px;
 }
+
+.ai-time-option,
+.ai-pipeline-card,
+.ai-verification-card {
+  position: relative;
+  z-index: 1;
+  border: 1px solid rgba(255, 250, 244, 0.13);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 250, 244, 0.76);
+  padding: 13px 14px;
+}
+
+.ai-time-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 10px;
+  align-items: center;
+}
+
+.ai-time-option input {
+  accent-color: #fff2ad;
+  height: 18px;
+  width: 18px;
+}
+
+.ai-time-option span,
+.ai-pipeline-card strong,
+.ai-verification-card strong {
+  color: #fffaf4;
+  font-weight: 900;
+}
+
+.ai-time-option small {
+  grid-column: 2;
+}
+
+.ai-time-option small,
+.ai-pipeline-card small,
+.ai-verification-card span {
+  color: rgba(255, 250, 244, 0.6);
+  line-height: 1.35;
+}
+
+.ai-pipeline-card,
+.ai-verification-card {
+  display: grid;
+  gap: 6px;
+}
+
+.ai-verification-card.verified {
+  border-color: rgba(120, 255, 186, 0.36);
+  background: rgba(120, 255, 186, 0.1);
+}
+
+.ai-verification-card.generated {
+  border-color: rgba(255, 242, 173, 0.28);
+  background: rgba(255, 242, 173, 0.08);
+}

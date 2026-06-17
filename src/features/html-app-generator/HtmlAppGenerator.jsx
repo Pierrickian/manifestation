@@ -12,6 +12,8 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
   const project = controller.project
   const html = project?.currentApplication || ''
   const latestSuggestions = project?.aiSuggestionsHistory?.at(-1)?.suggestions || []
+  const preloadQueue = mode === 'co-create' ? project?.preloadQueue || [] : []
+  const continuationPlan = mode === 'co-create' ? project?.continuationPlan : null
 
   if (html && isViewingHtml) {
     return <HtmlViewer html={html} title={project?.creationRequest || 'Application créée'} onBack={() => setIsViewingHtml(false)} />
@@ -31,6 +33,20 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
         <button type="button" className={mode === 'co-create' ? 'active' : ''} onClick={() => setMode('co-create')}>Co-Create</button>
       </div>
 
+      <label className="ai-time-option">
+        <input type="checkbox" checked={controller.hasTime} onChange={(event) => controller.setHasTime(event.target.checked)} disabled={controller.status === 'loading'} />
+        <span>I Have Time</span>
+        <small>Autorise Planner, validations plus profondes, boucles de réparation et revues qualité quand l’IA le juge utile.</small>
+      </label>
+
+      {controller.pipeline ? (
+        <div className="ai-pipeline-card">
+          <strong>{controller.pipeline.strategy.label}</strong>
+          <span>{controller.pipeline.strategy.description}</span>
+          <small>Capacités détectées : {Object.entries(controller.pipeline.capabilities).filter(([, enabled]) => enabled).map(([key]) => key).join(', ') || 'standard'}</small>
+        </div>
+      ) : null}
+
       <AiInputComposer
         value={controller.input}
         onChange={controller.setInput}
@@ -47,14 +63,33 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
       {html ? (
         <div className="iaview-ready-card">
           <strong>{project.creationRequest}</strong>
-          <span>Projet enregistré automatiquement. Demande une évolution ou ouvre l’application.</span>
+          <span>Projet enregistré automatiquement. {controller.healthcheck?.label || 'Application Generated'}. Demande une évolution ou ouvre l’application.</span>
           <button type="button" className="primary-action" onClick={() => setIsViewingHtml(true)}>Ouvrir l’application</button>
         </div>
       ) : null}
+      {controller.healthcheck ? (
+        <div className={`ai-verification-card ${controller.healthcheck.status}`}>
+          <strong>{controller.healthcheck.label}</strong>
+          <span>Healthcheck {controller.healthcheck.depth} · {controller.healthcheck.checks.filter((check) => check.ok).length}/{controller.healthcheck.checks.length} contrôles OK</span>
+        </div>
+      ) : null}
+
       {mode === 'co-create' && latestSuggestions.length ? (
         <div className="ai-suggestions-card">
           <strong>Suggestions du partenaire créatif</strong>
           <div>{latestSuggestions.map((suggestion, index) => <button type="button" key={`${suggestion}-${index}`} onClick={() => controller.setInput(String(suggestion))}>{suggestion}</button>)}</div>
+        </div>
+      ) : null}
+      {mode === 'co-create' && continuationPlan ? (
+        <div className="ai-suggestions-card">
+          <strong>Plan de continuation</strong>
+          <span>{continuationPlan.summary || continuationPlan.nextContact || 'L’IA propose une suite de collaboration.'}</span>
+        </div>
+      ) : null}
+      {mode === 'co-create' && preloadQueue.length ? (
+        <div className="ai-suggestions-card">
+          <strong>Preload proposé</strong>
+          <div>{preloadQueue.map((item, index) => <button type="button" key={`${item.task || 'preload'}-${index}`} onClick={() => controller.setInput(String(item.task || item.reason || 'Préparer le contenu suivant'))}>{item.priority || 'Soon'} · {item.task || item.reason}</button>)}</div>
         </div>
       ) : null}
 
