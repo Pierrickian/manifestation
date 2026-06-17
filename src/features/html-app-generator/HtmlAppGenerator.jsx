@@ -1,12 +1,16 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { MANIFESTATION_DESIGN_SYSTEM } from '../../platform/ai/designSystem'
 import { useAiApplicationController } from '../../platform/ai/hooks/useAiApplicationController'
 import { AiInputComposer } from '../../platform/ai/components/AiInputComposer'
 import { AiLoadingState } from '../../platform/ai/components/AiLoadingState'
 import { HtmlViewer } from '../../platform/ai/renderers/HtmlViewer'
+import { buildHtmlExport, buildProjectExport, exportHtmlProject, exportProjectJson, normalizeImportedProject, shareExport } from '../../platform/ai/projectExport'
 
 export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
   const [isViewingHtml, setIsViewingHtml] = useState(false)
+  const [exportStatus, setExportStatus] = useState(null)
+  const [lastExport, setLastExport] = useState(null)
+  const importInputRef = useRef(null)
   const [mode, setMode] = useState('create')
   const controller = useAiApplicationController({ mode, designSystem: MANIFESTATION_DESIGN_SYSTEM, speechEnabled, onDebug })
   const project = controller.project
@@ -16,6 +20,71 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
   const continuationPlan = mode === 'co-create' ? project?.continuationPlan : null
   const [showHealthcheckDetails, setShowHealthcheckDetails] = useState(false)
   const isBusy = controller.status === 'loading' || controller.status === 'repairing'
+
+  function rememberExport(exportData, kind) {
+    setLastExport({ ...exportData, kind })
+    setExportStatus(kind === 'html' ? 'HTML exporté dans les téléchargements.' : 'Projet exporté dans les téléchargements.')
+  }
+
+  function handleExportHtml() {
+    if (!project?.currentApplication) return
+    rememberExport(exportHtmlProject(project), 'html')
+  }
+
+  function handleExportProject() {
+    if (!project) return
+    rememberExport(exportProjectJson(project), 'project')
+  }
+
+  async function shareGeneratedExport(exportData, kind) {
+    try {
+      const shared = await shareExport({
+        blob: exportData.blob,
+        filename: exportData.filename,
+        title: kind === 'html' ? 'Application HTML Creatia' : 'Projet Creatia',
+        text: kind === 'html' ? 'Application HTML autonome exportée depuis Creatia.' : 'Projet Creatia exporté depuis Evolutia.'
+      })
+      setLastExport({ ...exportData, kind })
+      setExportStatus(shared ? 'Partage ouvert.' : 'Partage indisponible sur ce navigateur. Tu peux télécharger le fichier puis le partager depuis ton appareil.')
+    } catch (error) {
+      setExportStatus(error?.name === 'AbortError' ? 'Partage annulé.' : 'Partage indisponible. Tu peux télécharger le fichier puis le partager depuis ton appareil.')
+    }
+  }
+
+  async function handleShareHtml() {
+    if (!project?.currentApplication) return
+    await shareGeneratedExport(buildHtmlExport(project), 'html')
+  }
+
+  async function handleShareProject() {
+    if (!project) return
+    await shareGeneratedExport(buildProjectExport(project), 'project')
+  }
+
+  async function handleShareLastExport() {
+    if (!lastExport) return
+    await shareGeneratedExport(lastExport, lastExport.kind)
+  }
+
+  async function handleImportProject(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!file.name.endsWith('.manifestation.json')) {
+      setExportStatus('Choisis un fichier .manifestation.json exporté depuis Creatia.')
+      return
+    }
+
+    try {
+      const payload = JSON.parse(await file.text())
+      const importedProject = normalizeImportedProject(payload)
+      controller.importProject(importedProject)
+      setMode(importedProject.mode || 'create')
+      setExportStatus('Projet importé sans perte. Tu peux continuer la création.')
+    } catch (error) {
+      setExportStatus(error instanceof Error ? error.message : 'Import impossible pour ce fichier.')
+    }
+  }
 
   if (html && isViewingHtml) {
     return <HtmlViewer html={html} title={project?.creationRequest || 'Application créée'} onBack={() => setIsViewingHtml(false)} />
@@ -40,6 +109,37 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
         <span>I Have Time</span>
         <small>Autorise Planner, validations plus profondes, boucles de réparation et revues qualité quand l’IA le juge utile.</small>
       </label>
+
+      <details className="project-menu" open={Boolean(project)}>
+        <summary>Exporter</summary>
+        <div className="project-menu-actions">
+          <button type="button" className="ghost-action project-export-action" onClick={handleExportHtml} disabled={!project?.currentApplication}>
+            <span>Page web (.html)</span>
+            <small>Jouer ou partager.</small>
+          </button>
+          <button type="button" className="ghost-action project-export-action project-share-action" onClick={handleShareHtml} disabled={!project?.currentApplication}>
+            <span>Partager la page</span>
+            <small>Même si elle est déjà téléchargée.</small>
+          </button>
+          <button type="button" className="ghost-action project-export-action" onClick={handleExportProject} disabled={!project}>
+            <span>Projet</span>
+            <small>Continuer à créer plus tard. À réimporter ici.</small>
+          </button>
+          <button type="button" className="ghost-action project-export-action project-share-action" onClick={handleShareProject} disabled={!project}>
+            <span>Partager le projet</span>
+            <small>Même s’il est déjà téléchargé.</small>
+          </button>
+          <button type="button" className="ghost-action project-export-action" onClick={() => importInputRef.current?.click()} disabled={isBusy}>
+            <span>Importer</span>
+            <small>Restaurer un projet exporté.</small>
+          </button>
+          {lastExport?.url ? <a className="ghost-action export-link" href={lastExport.url} target="_blank" rel="noreferrer">Ouvrir</a> : null}
+          {lastExport ? <button type="button" className="ghost-action" onClick={handleShareLastExport}>Partager</button> : null}
+        </div>
+        <input ref={importInputRef} className="visually-hidden" type="file" accept=".manifestation.json,application/json" onChange={handleImportProject} />
+        <small>L’export Projet sert à reprendre la création après Import. Export APK non implémenté.</small>
+        {exportStatus ? <span className="project-export-status" role="status">{exportStatus}</span> : null}
+      </details>
 
       {controller.pipeline ? (
         <div className="ai-pipeline-card">

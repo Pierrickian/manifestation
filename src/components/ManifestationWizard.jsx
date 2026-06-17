@@ -929,7 +929,7 @@ export function ManifestationWizard() {
       {portalView === 'home' ? (
         <>
           <section className="wizard-hero">
-            <h1>Creatia</h1>
+            <h1>Evolutia</h1>
           </section>
 
           <AppChooser

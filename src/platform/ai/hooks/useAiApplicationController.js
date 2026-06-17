@@ -236,7 +236,27 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
     }
   }
 
+  function importProject(nextProject) {
+    setProject(nextProject)
+    const latestResponse = nextProject?.generationHistory?.at(-1)?.response || null
+    setResult(latestResponse || (nextProject?.currentApplication ? {
+      html: nextProject.currentApplication,
+      systemPrompt: nextProject.systemPrompt,
+      state: nextProject.applicationState,
+      suggestedActions: nextProject.aiSuggestionsHistory?.at(-1)?.suggestions || [],
+      continuationPlan: nextProject.continuationPlan,
+      preload: nextProject.preloadQueue || [],
+      capabilities: nextProject.capabilities || {}
+    } : null))
+    setInput('')
+    setStatus('success')
+    setError(null)
+    setRepairError(null)
+    setHealthcheck(null)
+    setMessage('Projet importé. Tu peux continuer Create ou Co-Create immédiatement.')
+  }
+
   function cancel() { abortRef.current?.abort() }
 
-  return { input, setInput, status, message, error, repairError, result, project, submit, submitPartnerSuggestion, retry, repair, cancel, appendTranscript, speechEnabled, progressText, hasTime, setHasTime, pipeline, healthcheck }
+  return { input, setInput, status, message, error, repairError, result, project, submit, submitPartnerSuggestion, retry, repair, importProject, cancel, appendTranscript, speechEnabled, progressText, hasTime, setHasTime, pipeline, healthcheck }
 }

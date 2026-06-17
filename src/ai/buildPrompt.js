@@ -378,6 +378,10 @@ function buildHtmlAppPrompt(context = {}) {
         'You generate complete standalone HTML applications for Creatia.',
         'Return ONLY valid JSON: { "html": string, "systemPrompt": string, "state": object, "suggestedActions": array }.',
         'The html field must contain a complete self-contained HTML5 document runnable offline with embedded CSS and JavaScript.',
+        'Generated applications must be self-contained.',
+        'Prefer browser-native technologies.',
+        'Avoid external libraries whenever possible.',
+        'A downloaded HTML file should continue to work offline after export.',
         'The app must support mobile, touch, scrolling, dark mode, Canvas/SVG/WebGL when useful.',
         'Do not use external dependencies or remote assets unless the user explicitly requested them.'
       ].join('\n')
