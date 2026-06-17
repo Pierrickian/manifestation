@@ -37,7 +37,7 @@ function buildStartPanelGuardStyle() {
 </style>`
 }
 
-function withCreatiaUiGuards(html = '') {
+export function withCreatiaUiGuards(html = '') {
   const source = html || '<!doctype html><html><body></body></html>'
   const guard = `${buildStartPanelGuardStyle()}${buildStartPanelGuardScript()}`
 

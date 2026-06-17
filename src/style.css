@@ -2186,3 +2186,55 @@ p {
     grid-template-columns: 1fr;
   }
 }
+
+.project-menu {
+  border: 1px solid rgba(255, 250, 244, 0.14);
+  border-radius: 18px;
+  padding: 13px;
+  background: rgba(255, 250, 244, 0.06);
+}
+
+.project-menu > summary {
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.project-menu-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.project-menu .export-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.project-menu > small,
+.project-export-status {
+  display: block;
+  margin-top: 10px;
+  color: rgba(255, 250, 244, 0.68);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.project-export-status {
+  color: #fff2ad;
+  font-weight: 800;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
