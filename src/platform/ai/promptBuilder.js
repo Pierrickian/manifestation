@@ -19,7 +19,7 @@ const STRUCTURED_APP_INSTRUCTIONS = [
   'Use safe scroll containers such as main, section, .screen, .panel, or .content with overflow-y: auto and -webkit-overflow-scrolling: touch; avoid locking text-heavy interfaces behind fixed 100vh layouts without scroll.',
   'systemPrompt is a hidden evolution prompt that explains how to continue evolving this specific project.',
   'state stores persistent application state and decisions that future evolutions must preserve.',
-  'files stores the technical level: { "index.html": string, "styles.css": string, "app.js": string }. If the runnable app is self-contained, repeat the standalone document in files["index.html"] and keep extracted CSS/JS strings optional.',
+  'currentApplication/html is the single authoritative active HTML source. files stores optional supporting technical artifacts only, for example { "styles.css": string, "app.js": string }; do not duplicate the complete HTML document in files["index.html"].',
   'capabilities must declare expected runtime capabilities, for example { "webgl": true, "audio": false, "simulation": true }.',
   'suggestedActions contains concise creative next steps only when collaboration mode is enabled; otherwise return an empty array.',
   'continuationPlan and preload are exclusive to co-create mode. In create mode return null and an empty array.',

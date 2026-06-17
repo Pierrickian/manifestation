@@ -244,7 +244,7 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
   function importProject(nextProject) {
     setProject(nextProject)
     const latestResponse = nextProject?.generationHistory?.at(-1)?.response || null
-    setResult(latestResponse || (nextProject?.currentApplication ? {
+    const fallbackResponse = nextProject?.currentApplication ? {
       html: nextProject.currentApplication,
       systemPrompt: nextProject.systemPrompt,
       state: nextProject.applicationState,
@@ -252,7 +252,8 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
       continuationPlan: nextProject.continuationPlan,
       preload: nextProject.preloadQueue || [],
       capabilities: nextProject.capabilities || {}
-    } : null))
+    } : null
+    setResult(latestResponse?.html ? latestResponse : fallbackResponse)
     setInput('')
     setStatus('success')
     setError(null)

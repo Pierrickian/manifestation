@@ -11,11 +11,11 @@ function normalizeHumanModel(value = {}) {
   }
 }
 
-function normalizeTechnicalModel(response = {}, fallbackHtml = '') {
+export function normalizeTechnicalModel(response = {}) {
   const files = response.files && typeof response.files === 'object' ? response.files : {}
   return {
+    htmlSource: 'currentApplication',
     files: {
-      'index.html': files['index.html'] || response.html || fallbackHtml || '',
       'styles.css': files['styles.css'] || '',
       'app.js': files['app.js'] || ''
     }
@@ -42,7 +42,7 @@ export function createProject({ mode, request, response, designSystem }) {
     creationRequest: request,
     humanModel,
     technicalModel,
-    currentApplication: response.html || technicalModel.files['index.html'] || '',
+    currentApplication: response.html || '',
     systemPrompt: response.systemPrompt || '',
     applicationState: response.state || {},
     generationHistory: [{ at: now, request, response }],
@@ -61,7 +61,7 @@ export function evolveProject(project, request, response) {
   return {
     ...project,
     humanModel: normalizeHumanModel(response.humanModel || response.human || project.humanModel || response.state?.humanModel),
-    technicalModel: normalizeTechnicalModel(response, currentHtml),
+    technicalModel: normalizeTechnicalModel(response),
     currentApplication: currentHtml,
     systemPrompt: response.systemPrompt || project.systemPrompt,
     applicationState: response.state || project.applicationState || {},

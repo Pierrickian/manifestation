@@ -1,4 +1,4 @@
-import { storeProject } from './projectModel'
+import { normalizeTechnicalModel, storeProject } from './projectModel'
 import { withCreatiaUiGuards } from './renderers/HtmlViewer'
 
 const PROJECT_EXPORT_VERSION = 1
@@ -45,18 +45,20 @@ export function buildProjectExport(project) {
     rootApp: 'Evolutia',
     version: PROJECT_EXPORT_VERSION,
     exportedAt: now,
+    id: project?.id || '',
+    mode: project?.mode || 'create',
+    metadata: project?.metadata || {},
     request: project?.creationRequest || '',
     systemPrompt: project?.systemPrompt || latestResponse.systemPrompt || '',
     state: project?.applicationState || latestResponse.state || {},
     humanModel: project?.humanModel || latestResponse.humanModel || {},
-    technicalModel: project?.technicalModel || { files: latestResponse.files || { 'index.html': project?.currentApplication || latestResponse.html || '', 'styles.css': '', 'app.js': '' } },
+    technicalModel: normalizeTechnicalModel(project?.technicalModel || latestResponse),
     evolutionHistory: project?.evolutionHistory || [],
     history: project?.generationHistory || [],
     currentApplication: project?.currentApplication || latestResponse.html || '',
     aiSuggestions: project?.aiSuggestionsHistory || [],
     continuationPlan: project?.continuationPlan || latestResponse.continuationPlan || null,
-    preloadMetadata: project?.preloadQueue || latestResponse.preload || [],
-    project
+    preloadMetadata: project?.preloadQueue || latestResponse.preload || []
   }
   const json = JSON.stringify(payload, null, 2)
   const filename = `${safeSlug(project?.creationRequest || project?.id || 'creatia-project')}.manifestation.json`
@@ -127,7 +129,7 @@ export function normalizeImportedProject(payload) {
     systemPrompt: payload?.systemPrompt ?? sourceProject?.systemPrompt ?? latestResponse.systemPrompt ?? '',
     applicationState: payload?.state ?? sourceProject?.applicationState ?? latestResponse.state ?? {},
     humanModel: payload?.humanModel ?? sourceProject?.humanModel ?? latestResponse.humanModel ?? {},
-    technicalModel: payload?.technicalModel ?? sourceProject?.technicalModel ?? { files: latestResponse.files || { 'index.html': payload?.currentApplication ?? sourceProject?.currentApplication ?? latestResponse.html ?? '', 'styles.css': '', 'app.js': '' } },
+    technicalModel: normalizeTechnicalModel(payload?.technicalModel ?? sourceProject?.technicalModel ?? latestResponse),
     evolutionHistory: Array.isArray(payload?.evolutionHistory) ? payload.evolutionHistory : sourceProject?.evolutionHistory || [],
     generationHistory: history,
     aiSuggestionsHistory: Array.isArray(payload?.aiSuggestions) ? payload.aiSuggestions : sourceProject?.aiSuggestionsHistory || [],
