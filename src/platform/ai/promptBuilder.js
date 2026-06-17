@@ -12,6 +12,7 @@ const STRUCTURED_APP_INSTRUCTIONS = [
   'capabilities must declare expected runtime capabilities, for example { "webgl": true, "audio": false, "simulation": true }.',
   'suggestedActions contains concise creative next steps only when collaboration mode is enabled; otherwise return an empty array.',
   'continuationPlan and preload are exclusive to co-create mode. In create mode return null and an empty array.',
+  'If the app has an intro or description panel with a Play, Start, Jouer, Lancer, or Commencer button, make that panel interactive and hide/remove it as soon as the user starts so the actual game or app receives focus.',
   'Do not use external dependencies or remote assets unless the user explicitly requests them.'
 ]
 

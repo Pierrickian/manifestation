@@ -99,7 +99,7 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
       {mode === 'co-create' && latestSuggestions.length ? (
         <div className="ai-suggestions-card">
           <strong>Suggestions du partenaire créatif</strong>
-          <div>{latestSuggestions.map((suggestion, index) => <button type="button" key={`${suggestion}-${index}`} onClick={() => controller.setInput(String(suggestion))}>{suggestion}</button>)}</div>
+          <div>{latestSuggestions.map((suggestion, index) => <button type="button" key={`${suggestion}-${index}`} onClick={() => controller.submitPartnerSuggestion(suggestion)} disabled={isBusy}>{suggestion}</button>)}</div>
         </div>
       ) : null}
       {mode === 'co-create' && continuationPlan ? (
@@ -111,7 +111,7 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
       {mode === 'co-create' && preloadQueue.length ? (
         <div className="ai-suggestions-card">
           <strong>Preload proposé</strong>
-          <div>{preloadQueue.map((item, index) => <button type="button" key={`${item.task || 'preload'}-${index}`} onClick={() => controller.setInput(String(item.task || item.reason || 'Préparer le contenu suivant'))}>{item.priority || 'Soon'} · {item.task || item.reason}</button>)}</div>
+          <div>{preloadQueue.map((item, index) => <button type="button" key={`${item.task || 'preload'}-${index}`} onClick={() => controller.submitPartnerSuggestion(item.task || item.reason || 'Préparer le contenu suivant')} disabled={isBusy}>{item.priority || 'Soon'} · {item.task || item.reason}</button>)}</div>
         </div>
       ) : null}
 

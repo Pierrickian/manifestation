@@ -179,6 +179,18 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
     await submitWithText(input)
   }
 
+
+  async function submitPartnerSuggestion(suggestion) {
+    const suggestionText = typeof suggestion === 'string' ? suggestion : JSON.stringify(suggestion)
+    const wrappedPrompt = [
+      'Traite cette suggestion du partenaire créatif comme une évolution à appliquer au projet Creatia actuel.',
+      'Préserve ce qui fonctionne déjà, respecte le mode Co-Create, puis retourne une application complète mise à jour.',
+      `Suggestion: ${suggestionText}`
+    ].join('\n')
+    setInput(wrappedPrompt)
+    await submitWithText(wrappedPrompt)
+  }
+
   async function retry() {
     const originalRequest = project?.creationRequest || input
     await submitWithText(originalRequest)
@@ -226,5 +238,5 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
 
   function cancel() { abortRef.current?.abort() }
 
-  return { input, setInput, status, message, error, repairError, result, project, submit, retry, repair, cancel, appendTranscript, speechEnabled, progressText, hasTime, setHasTime, pipeline, healthcheck }
+  return { input, setInput, status, message, error, repairError, result, project, submit, submitPartnerSuggestion, retry, repair, cancel, appendTranscript, speechEnabled, progressText, hasTime, setHasTime, pipeline, healthcheck }
 }
