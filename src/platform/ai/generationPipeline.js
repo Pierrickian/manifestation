@@ -71,6 +71,21 @@ export function buildCapabilityContract(capabilities = {}) {
   }
 }
 
+function hasInformationalText(html = '') {
+  const text = String(html)
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&[a-z0-9#]+;/gi, ' ')
+    .trim()
+
+  return text.split(/\s+/).filter(Boolean).length >= 30
+}
+
+function hasScrollableTextSurface(html = '') {
+  return /overflow-y\s*:\s*(auto|scroll)|overflow\s*:\s*(auto|scroll)|-webkit-overflow-scrolling\s*:\s*touch|scrollable|data-scrollable/i.test(String(html))
+}
+
 export function runGeneratedAppHealthcheck(response = {}, strategy = {}) {
   const html = String(response.html || '')
   const capabilities = buildCapabilityContract(response.capabilities || {})
@@ -85,6 +100,18 @@ export function runGeneratedAppHealthcheck(response = {}, strategy = {}) {
     repairConfidence: 'medium',
     repairable: true
   }))
+
+  if (hasInformationalText(html)) {
+    checks.push(createCheck({
+      id: 'text_screens_scrollable',
+      ok: hasScrollableTextSurface(html),
+      message: 'Scrollable text surfaces detected.',
+      expected: 'Every information-rich screen or panel has a vertical scroll container for mobile.',
+      actual: 'Text content was detected without an explicit scrollable container.',
+      repairConfidence: 'high',
+      repairable: true
+    }))
+  }
 
   if (capabilities.webgl) {
     checks.push(createCheck({ id: 'canvas_exists', ok: /<canvas[\s>]/i.test(html), message: 'WebGL canvas declared.', expected: 'A visible canvas element for WebGL rendering.', actual: 'No canvas element was detected.', repairConfidence: 'high', repairable: true }))
