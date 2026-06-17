@@ -10,6 +10,24 @@ const SMART_COMPLEXITY_TERMS = [
   'complexe', 'avancé', 'avance', 'multi-système', 'multijoueur', 'jeu', 'physique'
 ]
 
+const CONFIDENCE_SCORE = { low: 1, medium: 2, high: 3 }
+const AUTO_REPAIR_CONFIDENCES = new Set(['high', 'medium'])
+
+function createCheck({ id, ok, message, expected, actual, repairConfidence = 'low', repairable = false }) {
+  return { id, ok, message, expected, actual: ok ? 'Detected.' : actual, repairConfidence, repairable }
+}
+
+function getRepairConfidence(failedChecks) {
+  if (!failedChecks.length) return 'none'
+  return failedChecks.reduce((current, check) => (
+    CONFIDENCE_SCORE[check.repairConfidence] < CONFIDENCE_SCORE[current] ? check.repairConfidence : current
+  ), 'high')
+}
+
+export function isAutoRepairableHealthcheck(healthcheck = {}) {
+  return AUTO_REPAIR_CONFIDENCES.has(healthcheck.repairConfidence) && Boolean(healthcheck.failedChecks?.some((check) => check.repairable))
+}
+
 export function detectCapabilities(input = '') {
   const normalized = String(input).toLowerCase()
   return CAPABILITY_RULES.reduce((capabilities, rule) => ({
@@ -58,37 +76,50 @@ export function runGeneratedAppHealthcheck(response = {}, strategy = {}) {
   const capabilities = buildCapabilityContract(response.capabilities || {})
   const checks = []
 
-  if (!html.trim()) checks.push({ id: 'html-present', ok: false, message: 'Aucun document HTML généré.' })
-  else checks.push({ id: 'html-present', ok: true, message: 'Application Generated.' })
+  checks.push(createCheck({
+    id: 'html-present',
+    ok: Boolean(html.trim()),
+    message: html.trim() ? 'Application Generated.' : 'Aucun document HTML généré.',
+    expected: 'A complete standalone HTML5 document.',
+    actual: 'The generated application is empty.',
+    repairConfidence: 'medium',
+    repairable: true
+  }))
 
   if (capabilities.webgl) {
-    checks.push({ id: 'webgl-canvas', ok: /<canvas[\s>]/i.test(html), message: 'WebGL canvas declared.' })
-    checks.push({ id: 'webgl-renderer', ok: /webgl|experimental-webgl|getContext\(['"]webgl/i.test(html), message: 'Renderer initialization detected.' })
-    checks.push({ id: 'webgl-camera-scene', ok: /camera|scene|perspective|viewport/i.test(html), message: 'Scene/camera hints detected.' })
+    checks.push(createCheck({ id: 'canvas_exists', ok: /<canvas[\s>]/i.test(html), message: 'WebGL canvas declared.', expected: 'A visible canvas element for WebGL rendering.', actual: 'No canvas element was detected.', repairConfidence: 'high', repairable: true }))
+    checks.push(createCheck({ id: 'renderer_initialized', ok: /webgl|experimental-webgl|getContext\(['"]webgl/i.test(html), message: 'Renderer initialization detected.', expected: 'A WebGL renderer/context initialization.', actual: 'No WebGL context initialization was detected.', repairConfidence: 'high', repairable: true }))
+    checks.push(createCheck({ id: 'scene_visible', ok: /camera|scene|perspective|viewport/i.test(html), message: 'Scene/camera hints detected.', expected: 'A valid camera/scene setup with visible rendered objects.', actual: 'No scene, camera, perspective, or viewport setup was detected.', repairConfidence: 'high', repairable: true }))
   }
 
   if (capabilities.audio) {
-    checks.push({ id: 'audio-context', ok: /AudioContext|webkitAudioContext/i.test(html), message: 'Audio context initialization detected.' })
+    checks.push(createCheck({ id: 'audio_context_initialized', ok: /AudioContext|webkitAudioContext/i.test(html), message: 'Audio context initialization detected.', expected: 'An initialized browser audio context.', actual: 'No AudioContext initialization was detected.', repairConfidence: 'medium', repairable: true }))
   }
 
   if (capabilities.simulation) {
-    checks.push({ id: 'simulation-loop', ok: /requestAnimationFrame|setInterval/i.test(html), message: 'Simulation loop detected.' })
+    checks.push(createCheck({ id: 'simulation_loop_running', ok: /requestAnimationFrame|setInterval/i.test(html), message: 'Simulation loop detected.', expected: 'A simulation loop driven by requestAnimationFrame or a timer.', actual: 'No animation or simulation loop was detected.', repairConfidence: 'high', repairable: true }))
   }
 
   if (capabilities.map) {
-    checks.push({ id: 'map-surface', ok: /map|gps|geolocation|navigator\.geolocation|svg/i.test(html), message: 'Map/navigation surface detected.' })
+    checks.push(createCheck({ id: 'map_surface_exists', ok: /map|gps|geolocation|navigator\.geolocation|svg/i.test(html), message: 'Map/navigation surface detected.', expected: 'A map, navigation, GPS, geolocation, SVG, or equivalent surface.', actual: 'No map/navigation surface was detected.', repairConfidence: 'medium', repairable: true }))
   }
 
   if (capabilities.speech) {
-    checks.push({ id: 'speech-api', ok: /SpeechRecognition|webkitSpeechRecognition|speechSynthesis/i.test(html), message: 'Speech API detected.' })
+    checks.push(createCheck({ id: 'speech_api_initialized', ok: /SpeechRecognition|webkitSpeechRecognition|speechSynthesis/i.test(html), message: 'Speech API detected.', expected: 'Speech recognition or synthesis API initialization.', actual: 'No browser speech API usage was detected.', repairConfidence: 'medium', repairable: true }))
   }
 
   const failedChecks = checks.filter((check) => !check.ok)
+  const repairConfidence = getRepairConfidence(failedChecks)
   return {
     status: failedChecks.length ? 'generated' : 'verified',
     label: failedChecks.length ? 'Application Generated' : 'Application Verified',
     strategyId: strategy.id || 'fast',
     depth: strategy.healthcheckDepth || 'light',
-    checks
+    repairConfidence,
+    isRepairable: AUTO_REPAIR_CONFIDENCES.has(repairConfidence) && failedChecks.some((check) => check.repairable),
+    passedCount: checks.length - failedChecks.length,
+    failedCount: failedChecks.length,
+    checks,
+    failedChecks
   }
 }

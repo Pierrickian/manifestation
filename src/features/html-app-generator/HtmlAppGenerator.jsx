@@ -14,6 +14,8 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
   const latestSuggestions = project?.aiSuggestionsHistory?.at(-1)?.suggestions || []
   const preloadQueue = mode === 'co-create' ? project?.preloadQueue || [] : []
   const continuationPlan = mode === 'co-create' ? project?.continuationPlan : null
+  const [showHealthcheckDetails, setShowHealthcheckDetails] = useState(false)
+  const isBusy = controller.status === 'loading' || controller.status === 'repairing'
 
   if (html && isViewingHtml) {
     return <HtmlViewer html={html} title={project?.creationRequest || 'Application créée'} onBack={() => setIsViewingHtml(false)} />
@@ -34,7 +36,7 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
       </div>
 
       <label className="ai-time-option">
-        <input type="checkbox" checked={controller.hasTime} onChange={(event) => controller.setHasTime(event.target.checked)} disabled={controller.status === 'loading'} />
+        <input type="checkbox" checked={controller.hasTime} onChange={(event) => controller.setHasTime(event.target.checked)} disabled={isBusy} />
         <span>I Have Time</span>
         <small>Autorise Planner, validations plus profondes, boucles de réparation et revues qualité quand l’IA le juge utile.</small>
       </label>
@@ -52,14 +54,15 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
         onChange={controller.setInput}
         onSubmit={controller.submit}
         onTranscript={controller.appendTranscript}
-        disabled={controller.status === 'loading'}
+        disabled={isBusy}
         speechEnabled={speechEnabled}
         statusMessage={(message) => onDebug?.({ status: 'speech', message, timestamp: new Date().toISOString() })}
         placeholder={project ? 'Ex: ajoute un minimap, change les couleurs, simplifie l’interface…' : 'Ex: un jeu de mémoire doux avec progression et sons…'}
       />
 
-      {controller.status === 'loading' ? <AiLoadingState text={controller.progressText} onCancel={controller.cancel} /> : null}
+      {isBusy ? <AiLoadingState text={controller.status === 'repairing' ? 'Réparation automatique…' : controller.progressText} onCancel={controller.cancel} /> : null}
       {controller.error ? <div className="create-app-status error" role="alert"><strong>Oups</strong><span>{controller.error}</span></div> : null}
+      {controller.repairError ? <div className="create-app-status error" role="alert"><strong>Réparation</strong><span>{controller.repairError}</span></div> : null}
       {html ? (
         <div className="iaview-ready-card">
           <strong>{project.creationRequest}</strong>
@@ -70,7 +73,26 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
       {controller.healthcheck ? (
         <div className={`ai-verification-card ${controller.healthcheck.status}`}>
           <strong>{controller.healthcheck.label}</strong>
-          <span>Healthcheck {controller.healthcheck.depth} · {controller.healthcheck.checks.filter((check) => check.ok).length}/{controller.healthcheck.checks.length} contrôles OK</span>
+          <span>Healthcheck: {controller.healthcheck.passedCount ?? controller.healthcheck.checks.filter((check) => check.ok).length}/{controller.healthcheck.checks.length} passed</span>
+          <small>Repair confidence: {controller.healthcheck.repairConfidence || 'none'}{controller.healthcheck.repairAttempts ? ` · ${controller.healthcheck.repairAttempts} repair attempt(s)` : ''}</small>
+          <div className="ai-repair-actions">
+            <button type="button" className="ghost-action" onClick={() => setShowHealthcheckDetails((visible) => !visible)}>
+              {showHealthcheckDetails ? 'Hide Details' : 'View Details'}
+            </button>
+            <button type="button" className="ghost-action" onClick={controller.retry} disabled={isBusy}>Retry</button>
+            <button type="button" className="primary-action" onClick={controller.repair} disabled={isBusy || controller.healthcheck.status === 'verified' || !controller.healthcheck.isRepairable}>Repair</button>
+          </div>
+          {showHealthcheckDetails ? (
+            <ul className="ai-healthcheck-details">
+              {controller.healthcheck.checks.map((check) => (
+                <li key={check.id} className={check.ok ? 'passed' : 'failed'}>
+                  <strong>{check.ok ? '✓' : '×'} {check.id}</strong>
+                  <span>{check.message}</span>
+                  {!check.ok ? <small>Expected: {check.expected} · Actual: {check.actual}</small> : null}
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       ) : null}
 

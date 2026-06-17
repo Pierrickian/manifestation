@@ -2134,3 +2134,55 @@ p {
   border-color: rgba(255, 242, 173, 0.28);
   background: rgba(255, 242, 173, 0.08);
 }
+
+.ai-repair-actions {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 8px;
+}
+
+.ai-repair-actions .ghost-action,
+.ai-repair-actions .primary-action {
+  margin-top: 0;
+  min-height: 42px;
+}
+
+.ai-healthcheck-details {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.ai-healthcheck-details li {
+  border: 1px solid rgba(255, 250, 244, 0.12);
+  border-radius: 14px;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+}
+
+.ai-healthcheck-details li.passed {
+  border-color: rgba(120, 255, 186, 0.28);
+}
+
+.ai-healthcheck-details li.failed {
+  border-color: rgba(255, 122, 122, 0.34);
+}
+
+.ai-healthcheck-details strong {
+  color: #fffaf4;
+}
+
+.ai-healthcheck-details small {
+  color: rgba(255, 250, 244, 0.62);
+  line-height: 1.35;
+}
+
+@media (max-width: 560px) {
+  .ai-repair-actions {
+    grid-template-columns: 1fr;
+  }
+}

@@ -73,22 +73,42 @@ export function buildAiPrompt({ input, mode = 'create', designSystem = MANIFESTA
   }
 }
 
-export function buildRepairPrompt({ originalRequest, failedResponse, healthcheck, mode = 'create', designSystem = MANIFESTATION_DESIGN_SYSTEM, capabilities = {}, strategy = {} }) {
+export function buildRepairPrompt({ originalRequest, failedResponse, healthcheck, mode = 'create', designSystem = MANIFESTATION_DESIGN_SYSTEM, capabilities = {}, strategy = {}, attempt = 1, maxAttempts = 1 }) {
+  const failedChecks = healthcheck?.failedChecks || healthcheck?.checks?.filter((check) => !check.ok) || []
   const repairPayload = {
     task: 'repair_project',
     mode,
     userRequest: originalRequest.trim(),
-    failedHealthcheck: healthcheck,
-    detectedCapabilities: capabilities,
-    generationStrategy: { id: 'recovery', baseStrategyId: strategy?.id || 'fast' },
     previousHtml: failedResponse?.html || '',
+    detectedCapabilities: capabilities,
+    generationStrategy: { id: 'recovery', baseStrategyId: strategy?.id || 'fast', attempt, maxAttempts },
+    healthcheckReport: {
+      status: healthcheck?.status || 'generated',
+      passedCount: healthcheck?.passedCount ?? 0,
+      failedCount: healthcheck?.failedCount ?? failedChecks.length,
+      repairConfidence: healthcheck?.repairConfidence || 'low',
+      isRepairable: Boolean(healthcheck?.isRepairable)
+    },
+    failedChecks: failedChecks.map((check) => ({
+      id: check.id,
+      message: check.message,
+      expected: check.expected,
+      actual: check.actual,
+      repairConfidence: check.repairConfidence
+    })),
+    failureReasons: failedChecks.map((check) => `${check.id}: expected ${check.expected}; actual ${check.actual}`),
     designSystem,
-    instruction: 'Repair only the failed capability checks. Return the same JSON shape with corrected standalone HTML.'
+    instruction: [
+      'The following application failed validation.',
+      'Repair the failed checks while preserving the intended functionality and visual style.',
+      'Do not merely repeat the original request; use the previousHtml and healthcheckReport as debugging context.',
+      'Return a corrected standalone HTML application using the required JSON shape.'
+    ].join(' ')
   }
 
   return {
     kind: 'html_app_repair',
     prompt: [STRUCTURED_APP_INSTRUCTIONS.join('\n'), JSON.stringify(repairPayload, null, 2)].join('\n\n'),
-    metadata: { rendererType: 'html', mode, designSystem, strategyId: 'recovery', capabilities }
+    metadata: { rendererType: 'html', mode, designSystem, strategyId: 'recovery', capabilities, attempt, maxAttempts }
   }
 }
