@@ -433,7 +433,7 @@ async function createValidatedAiResult(kind, context, model) {
     })
 
     const content = completion.choices[0]?.message?.content || '{}'
-    const payload = kind === 'html_app' ? { html: sanitizeHtmlOnly(content) } : normalizeAiPayload(kind, JSON.parse(content), context)
+    const payload = kind === 'html_app' ? normalizeHtmlAppPayload(content) : normalizeAiPayload(kind, JSON.parse(content), context)
     const validationError = validateAiPayload(kind, payload, context)
 
     if (!validationError) {
@@ -462,7 +462,7 @@ function validateAiPayload(kind, payload, context = {}) {
     narratia_child_choices: (value) => Array.isArray(value?.childChoices) && value.childChoices.length >= 6,
     narratia_story_package: (value) => Boolean(value?.title && Array.isArray(value.milestones) && Array.isArray(value.segments) && Array.isArray(value.endings) && value.endings.length === 3),
     enigmia_riddle: (value) => validateEnigmiaRiddle(value?.riddle).isValid,
-    html_app: (value) => typeof value?.html === 'string' && /^\s*(<!doctype html|<html)/i.test(value.html),
+    html_app: (value) => typeof value?.html === 'string' && /^\s*(<!doctype html|<html)/i.test(value.html) && typeof value?.systemPrompt === 'string' && value?.state && Array.isArray(value?.suggestedActions),
     mes_questions_quiz: (value) => Array.isArray(value?.questions) && value.questions.length === Number(context?.questionCount || value.questions.length) && value.questions.every((question) => question?.id && question.subject && question.question && Array.isArray(question.answers) && question.answers.length === 3 && question.answers.some((answer) => answer.id === question.correctAnswerId))
   }
 
@@ -655,7 +655,7 @@ function getShapeInstruction(kind) {
 }
 
 function getLocalResult(kind, context) {
-  if (kind === 'html_app') return { html: createFallbackHtmlApp(context) }
+  if (kind === 'html_app') return createFallbackHtmlAppPayload(context)
   if (kind === 'answer') {
     return {
       answer: context?.answer || {
@@ -825,6 +825,34 @@ function sanitizeHtmlOnly(content = '') {
     .replace(/^```(?:html)?\s*/i, '')
     .replace(/```$/i, '')
     .trim()
+}
+
+function createFallbackHtmlAppPayload(context = {}) {
+  return {
+    html: createFallbackHtmlApp(context),
+    systemPrompt: 'Evolve this Manifestation project by preserving its intent, state, visual identity, and existing interactions while applying the user request.',
+    state: {},
+    suggestedActions: shouldSuggestActions(context) ? ['Ajouter une progression', 'Améliorer l’onboarding', 'Ajouter des effets sonores'] : []
+  }
+}
+
+function shouldSuggestActions(context = {}) {
+  const prompt = String(context?.prompt || '')
+  return prompt.includes('\"mode\": \"co-create\"') || prompt.includes('co-create')
+}
+
+function normalizeHtmlAppPayload(content) {
+  try {
+    const parsed = JSON.parse(content)
+    return {
+      html: sanitizeHtmlOnly(parsed.html || ''),
+      systemPrompt: String(parsed.systemPrompt || ''),
+      state: parsed.state && typeof parsed.state === 'object' ? parsed.state : {},
+      suggestedActions: Array.isArray(parsed.suggestedActions) ? parsed.suggestedActions : []
+    }
+  } catch {
+    return { html: sanitizeHtmlOnly(content), systemPrompt: '', state: {}, suggestedActions: [] }
+  }
 }
 
 function createFallbackHtmlApp(context = {}) {

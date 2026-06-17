@@ -1,47 +1,61 @@
 import { MANIFESTATION_DESIGN_SYSTEM } from './designSystem'
 
-export const HTML_KEYWORD = 'html'
-
-const HTML_GENERATION_INSTRUCTIONS = [
-  'Return ONLY a complete standalone HTML document.',
-  'Requirements: valid HTML5, embedded CSS, embedded JavaScript, responsive layout, mobile-first design, touch friendly, dark mode compatible, self-contained, runnable offline, no markdown, no explanations, no code fences, no external dependencies unless explicitly requested, production-quality UI, clean modern design.',
-  'Preferred technologies: HTML5, CSS3, JavaScript, Canvas 2D when appropriate, SVG when appropriate, WebGL when appropriate.',
-  'Avoid unnecessary libraries, framework lock-in, CDN dependencies, remote assets.',
-  'The response must contain HTML only.'
+const STRUCTURED_APP_INSTRUCTIONS = [
+  'You are the hidden application architect for Manifestation AI.',
+  'The user never needs to know about HTML, persistence, rendering, or implementation details.',
+  'Return ONLY valid JSON, without Markdown or code fences.',
+  'Required shape: { "html": string, "systemPrompt": string, "state": object, "suggestedActions": array }.',
+  'html must be a complete standalone executable HTML5 document with embedded CSS and JavaScript.',
+  'Support mobile devices, touch events, scrolling, dark mode, Canvas/SVG/WebGL when useful, and offline execution.',
+  'systemPrompt is a hidden evolution prompt that explains how to continue evolving this specific project.',
+  'state stores persistent application state and decisions that future evolutions must preserve.',
+  'suggestedActions contains concise creative next steps only when collaboration mode is enabled; otherwise return an empty array.',
+  'Do not use external dependencies or remote assets unless the user explicitly requests them.'
 ]
 
-export function isHtmlGenerationRequest(input = '') {
-  return input.trim().toLowerCase().startsWith(`${HTML_KEYWORD} `) || input.trim().toLowerCase() === HTML_KEYWORD
-}
-
-export function stripHtmlKeyword(input = '') {
-  const trimmed = input.trim()
-  return isHtmlGenerationRequest(trimmed) ? trimmed.replace(/^html\b/i, '').trim() : trimmed
-}
-
-export function buildHtmlApplicationPrompt(input, designSystem = MANIFESTATION_DESIGN_SYSTEM) {
-  return [
-    HTML_GENERATION_INSTRUCTIONS.join('\n'),
-    '',
-    'Manifestation Design System to inject visually into the generated application:',
-    JSON.stringify(designSystem, null, 2),
-    '',
-    `User request: ${stripHtmlKeyword(input)}`
-  ].join('\n')
-}
-
-export function buildAiPrompt({ input, rendererType, designSystem = MANIFESTATION_DESIGN_SYSTEM, systemInstructions = '' }) {
-  if (rendererType === 'html' || isHtmlGenerationRequest(input)) {
+export function normalizeStructuredAiResponse(payload = {}) {
+  if (payload.html) {
     return {
-      kind: 'html_app',
-      prompt: buildHtmlApplicationPrompt(input, designSystem),
-      metadata: { rendererType: 'html', designSystem }
+      html: payload.html,
+      systemPrompt: payload.systemPrompt || '',
+      state: payload.state && typeof payload.state === 'object' ? payload.state : {},
+      suggestedActions: Array.isArray(payload.suggestedActions) ? payload.suggestedActions : []
     }
   }
 
+  const text = payload.text || ''
+  try {
+    const parsed = JSON.parse(text)
+    return normalizeStructuredAiResponse(parsed)
+  } catch {
+    return { html: text, systemPrompt: '', state: {}, suggestedActions: [] }
+  }
+}
+
+export function buildAiPrompt({ input, mode = 'create', designSystem = MANIFESTATION_DESIGN_SYSTEM, project = null }) {
+  const isCoCreate = mode === 'co-create'
+  const task = project ? 'evolve_project' : 'create_project'
+  const userPayload = {
+    task,
+    mode,
+    collaboration: isCoCreate ? 'AI suggestions enabled; proactively propose next steps.' : 'AI suggestions disabled by default; suggestedActions must be empty unless explicitly requested.',
+    userRequest: input.trim(),
+    currentProject: project ? {
+      creationRequest: project.creationRequest,
+      currentApplication: project.currentApplication,
+      systemPrompt: project.systemPrompt,
+      applicationState: project.applicationState,
+      generationHistory: project.generationHistory?.slice(-5) || [],
+      metadata: project.metadata
+    } : null,
+    architecture: 'User Input → Prompt Builder → AI Provider → Structured Response → Renderer → Project Update',
+    renderer: 'html',
+    designSystem
+  }
+
   return {
-    kind: rendererType || 'text',
-    prompt: [systemInstructions, input.trim()].filter(Boolean).join('\n\n'),
-    metadata: { rendererType: rendererType || 'text', designSystem }
+    kind: 'html_app',
+    prompt: [STRUCTURED_APP_INSTRUCTIONS.join('\n'), JSON.stringify(userPayload, null, 2)].join('\n\n'),
+    metadata: { rendererType: 'html', mode, designSystem, projectId: project?.id || null }
   }
 }

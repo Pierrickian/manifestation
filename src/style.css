@@ -2018,3 +2018,60 @@ p {
   height: 100%;
   min-height: 0;
 }
+
+.mode-selector {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid rgba(255, 250, 244, 0.12);
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.mode-selector button {
+  min-height: 48px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: rgba(255, 250, 244, 0.74);
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.mode-selector button.active {
+  background: linear-gradient(135deg, rgba(106, 90, 224, 0.95), rgba(167, 139, 250, 0.82));
+  color: #fff;
+  box-shadow: 0 12px 30px rgba(106, 90, 224, 0.28);
+}
+
+.ai-suggestions-card {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(255, 242, 173, 0.22);
+  border-radius: 20px;
+  background: rgba(255, 242, 173, 0.08);
+}
+
+.ai-suggestions-card > div {
+  display: grid;
+  gap: 8px;
+}
+
+.ai-suggestions-card button {
+  min-height: 44px;
+  border: 1px solid rgba(255, 250, 244, 0.14);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fffaf4;
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+  padding: 10px 12px;
+}

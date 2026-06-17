@@ -935,7 +935,7 @@ export function ManifestationWizard() {
       {portalView === 'home' ? (
         <>
           <section className="wizard-hero">
-            <h1>Portail de Création</h1>
+            <h1>Manifestation AI</h1>
           </section>
 
           <AppChooser
@@ -1238,16 +1238,16 @@ function AppChooser({ rules, activeRuleId, onRuleChange, onCreateYourApp, onHtml
           className="rule-option create-app-option"
           onClick={onHtmlAppGenerator}
         >
-          <span>IAview</span>
-          <small>Crée une page interactive depuis une idée écrite ou dictée.</small>
+          <span>Create / Co-Create</span>
+          <small>Décris une application, puis fais-la évoluer naturellement avec l’IA.</small>
         </button>
         <button
           type="button"
           className="rule-option create-app-option"
           onClick={onCreateYourApp}
         >
-          <span>Crée ton App</span>
-          <small>Propose une nouvelle app et prépare sa demande d’intégration au portail.</small>
+          <span>Demande produit</span>
+          <small>Prépare une demande d’intégration au portail existant.</small>
         </button>
       </div>
     </section>
