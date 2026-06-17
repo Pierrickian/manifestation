@@ -55,6 +55,20 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
   const continuationPlan = mode === 'co-create' ? project?.continuationPlan : null
   const [showHealthcheckDetails, setShowHealthcheckDetails] = useState(false)
   const isBusy = controller.status === 'loading' || controller.status === 'repairing'
+  const hasUnsavedAiApp = Boolean(project?.currentApplication || controller.input.trim() || isBusy)
+
+  useEffect(() => {
+    if (!hasUnsavedAiApp) return undefined
+
+    function confirmBeforeLeaving(event) {
+      event.preventDefault()
+      event.returnValue = 'Êtes-vous sûr de vouloir quitter ? Votre app Creatia en cours pourrait être perdue.'
+      return event.returnValue
+    }
+
+    window.addEventListener('beforeunload', confirmBeforeLeaving)
+    return () => window.removeEventListener('beforeunload', confirmBeforeLeaving)
+  }, [hasUnsavedAiApp])
 
   function rememberExport(exportData, kind) {
     setLastExport({ ...exportData, kind })

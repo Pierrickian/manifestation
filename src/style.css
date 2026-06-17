@@ -2359,3 +2359,8 @@ p {
   z-index: 120;
   top: max(58px, calc(env(safe-area-inset-top) + 58px));
 }
+
+.html-viewer,
+.html-viewer iframe {
+  overscroll-behavior: contain;
+}

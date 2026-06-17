@@ -31,6 +31,7 @@ function buildStartPanelGuardScript() {
 function buildStartPanelGuardStyle() {
   return `
 <style data-creatia-ui-guard="start-panel">
+  html, body { overscroll-behavior-y: contain; }
   .creatia-start-panel-active { pointer-events: auto; }
   .creatia-start-panel-active button, .creatia-start-panel-active [role="button"], .creatia-start-panel-active a { pointer-events: auto; }
   .creatia-start-panel-hidden { opacity: 0 !important; pointer-events: none !important; transform: translateY(-10px) scale(0.98); transition: opacity 220ms ease, transform 220ms ease; }
