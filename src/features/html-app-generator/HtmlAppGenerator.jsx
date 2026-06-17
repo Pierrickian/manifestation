@@ -236,6 +236,36 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
           <button type="button" className="primary-action" onClick={() => setIsViewingHtml(true)}>Ouvrir l’application</button>
         </div>
       ) : null}
+
+      {project?.humanModel ? (
+        <details className="project-menu">
+          <summary>Niveau humain</summary>
+          <dl className="human-model-list">
+            <div><dt>Objectif</dt><dd>{project.humanModel.purpose || 'À préciser'}</dd></div>
+            <div><dt>Audience</dt><dd>{project.humanModel.audience || 'À préciser'}</dd></div>
+            <div><dt>Ton</dt><dd>{project.humanModel.tone || 'À préciser'}</dd></div>
+            <div><dt>Émotion</dt><dd>{project.humanModel.emotion || 'À préciser'}</dd></div>
+            <div><dt>Parcours</dt><dd>{project.humanModel.journey || 'À préciser'}</dd></div>
+          </dl>
+        </details>
+      ) : null}
+
+      {project?.evolutionHistory?.length ? (
+        <details className="project-menu">
+          <summary>Historique d’évolution</summary>
+          <ol className="evolution-history-list">
+            {project.evolutionHistory.slice(-3).reverse().map((entry, index) => (
+              <li key={`${entry.at || 'evolution'}-${index}`}>
+                <strong>{entry.userRequest}</strong>
+                {entry.analysis ? <span>{entry.analysis}</span> : null}
+                {entry.decisions?.length ? <small>Décisions : {entry.decisions.join(' · ')}</small> : null}
+                {entry.generatedChanges?.length ? <small>Changements : {entry.generatedChanges.join(' · ')}</small> : null}
+              </li>
+            ))}
+          </ol>
+        </details>
+      ) : null}
+
       {controller.healthcheck ? (
         <div className={`ai-verification-card ${controller.healthcheck.status}`}>
           <strong>{controller.healthcheck.label}</strong>

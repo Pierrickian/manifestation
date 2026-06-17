@@ -2364,3 +2364,34 @@ p {
 .html-viewer iframe {
   overscroll-behavior: contain;
 }
+
+.human-model-list,
+.evolution-history-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+}
+
+.human-model-list div,
+.evolution-history-list li {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.85rem;
+}
+
+.human-model-list dt,
+.evolution-history-list strong {
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 700;
+}
+
+.human-model-list dd,
+.evolution-history-list span,
+.evolution-history-list small {
+  display: block;
+  margin: 0.25rem 0 0;
+  color: rgba(255, 255, 255, 0.72);
+  line-height: 1.45;
+}
