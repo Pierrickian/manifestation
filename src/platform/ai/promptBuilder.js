@@ -1,10 +1,14 @@
 import { MANIFESTATION_DESIGN_SYSTEM } from './designSystem'
 
 const STRUCTURED_APP_INSTRUCTIONS = [
-  'You are the hidden application architect for Creatia.',
-  'The user never needs to know about HTML, persistence, rendering, or implementation details.',
+  'You are the hidden application architect for Creatia / Evolutia. The goal is not to generate HTML; the goal is to translate natural-language intentions into design decisions, then render the technical consequence.',
+  'The user never needs to know about HTML, CSS, JavaScript, React, components, frameworks, databases, APIs, persistence, rendering, or implementation details.',
   'Return ONLY valid JSON, without Markdown or code fences.',
-  'Required shape: { "html": string, "systemPrompt": string, "state": object, "suggestedActions": array, "capabilities": object, "continuationPlan": object|null, "preload": array }.',
+  'Required shape: { "humanModel": object, "analysis": string, "decisions": array, "generatedChanges": array, "html": string, "files": object, "systemPrompt": string, "state": object, "suggestedActions": array, "capabilities": object, "continuationPlan": object|null, "preload": array }.',
+  'humanModel must describe the human level: { "purpose": string, "audience": string, "tone": string, "emotion": string, "journey": string, "sections": array }.',
+  'analysis must explain the design reasoning before implementation: goal, audience, desired emotion, UX journey, readability, information density, interactions, and business constraints when relevant.',
+  'decisions must list the design decisions derived from the user intention before code generation.',
+  'generatedChanges must list the concrete technical consequences of those decisions.',
   'html must be a complete standalone executable HTML5 document with embedded CSS and JavaScript.',
   'Generated applications must be self-contained.',
   'Prefer browser-native technologies.',
@@ -15,6 +19,7 @@ const STRUCTURED_APP_INSTRUCTIONS = [
   'Use safe scroll containers such as main, section, .screen, .panel, or .content with overflow-y: auto and -webkit-overflow-scrolling: touch; avoid locking text-heavy interfaces behind fixed 100vh layouts without scroll.',
   'systemPrompt is a hidden evolution prompt that explains how to continue evolving this specific project.',
   'state stores persistent application state and decisions that future evolutions must preserve.',
+  'currentApplication/html is the single authoritative active HTML source. files stores optional supporting technical artifacts only, for example { "styles.css": string, "app.js": string }; do not duplicate the complete HTML document in files["index.html"].',
   'capabilities must declare expected runtime capabilities, for example { "webgl": true, "audio": false, "simulation": true }.',
   'suggestedActions contains concise creative next steps only when collaboration mode is enabled; otherwise return an empty array.',
   'continuationPlan and preload are exclusive to co-create mode. In create mode return null and an empty array.',
@@ -23,9 +28,14 @@ const STRUCTURED_APP_INSTRUCTIONS = [
 ]
 
 export function normalizeStructuredAiResponse(payload = {}) {
-  if (payload.html) {
+  if (Object.prototype.hasOwnProperty.call(payload, 'html') || payload.humanModel || payload.analysis || payload.decisions || payload.generatedChanges) {
     return {
-      html: payload.html,
+      html: payload.html || '',
+      humanModel: payload.humanModel && typeof payload.humanModel === 'object' ? payload.humanModel : {},
+      files: payload.files && typeof payload.files === 'object' ? payload.files : {},
+      analysis: payload.analysis || '',
+      decisions: Array.isArray(payload.decisions) ? payload.decisions : [],
+      generatedChanges: Array.isArray(payload.generatedChanges) ? payload.generatedChanges : [],
       systemPrompt: payload.systemPrompt || '',
       state: payload.state && typeof payload.state === 'object' ? payload.state : {},
       suggestedActions: Array.isArray(payload.suggestedActions) ? payload.suggestedActions : [],
@@ -40,7 +50,7 @@ export function normalizeStructuredAiResponse(payload = {}) {
     const parsed = JSON.parse(text)
     return normalizeStructuredAiResponse(parsed)
   } catch {
-    return { html: text, systemPrompt: '', state: {}, suggestedActions: [], capabilities: {}, continuationPlan: null, preload: [] }
+    return { html: text, humanModel: {}, files: {}, analysis: '', decisions: [], generatedChanges: [], systemPrompt: '', state: {}, suggestedActions: [], capabilities: {}, continuationPlan: null, preload: [] }
   }
 }
 
@@ -57,6 +67,9 @@ export function buildAiPrompt({ input, mode = 'create', designSystem = MANIFESTA
       currentApplication: project.currentApplication,
       systemPrompt: project.systemPrompt,
       applicationState: project.applicationState,
+      humanModel: project.humanModel,
+      technicalModel: project.technicalModel,
+      evolutionHistory: project.evolutionHistory?.slice(-8) || [],
       generationHistory: project.generationHistory?.slice(-5) || [],
       metadata: project.metadata
     } : null,
@@ -64,7 +77,7 @@ export function buildAiPrompt({ input, mode = 'create', designSystem = MANIFESTA
     generationStrategy: {
       id: strategy?.id || 'fast',
       plannerAllowed: Boolean(strategy?.usesPlanner),
-      instruction: strategy?.usesPlanner ? 'Use a concise planner internally before building; do not expose planning text outside JSON fields.' : 'Do not use a separate planning step; build directly from detected capabilities.',
+      instruction: strategy?.usesPlanner ? 'Reason first at the human/design level, then build. Expose the concise reasoning only through analysis, decisions and generatedChanges.' : 'Even on the fast path, interpret the user intention at the human/design level before building; expose it through analysis, decisions and generatedChanges.',
       healthcheckDepth: strategy?.healthcheckDepth || 'light',
       hasTimeAuthorized: Boolean(hasTime)
     },
@@ -117,5 +130,27 @@ export function buildRepairPrompt({ originalRequest, failedResponse, healthcheck
     kind: 'html_app_repair',
     prompt: [STRUCTURED_APP_INSTRUCTIONS.join('\n'), JSON.stringify(repairPayload, null, 2)].join('\n\n'),
     metadata: { rendererType: 'html', mode, designSystem, strategyId: 'recovery', capabilities, attempt, maxAttempts }
+  }
+}
+
+export function buildHumanModelRefreshPrompt({ project, designSystem = MANIFESTATION_DESIGN_SYSTEM }) {
+  const payload = {
+    task: 'refresh_human_model_from_current_html',
+    instruction: [
+      'Analyze the current standalone HTML application and rebuild only the human/design representation.',
+      'Do not replace, rewrite, repair, merge, or regenerate the HTML application.',
+      'Return the required JSON shape, but set html to an empty string and files to an empty object.',
+      'Regenerate humanModel, analysis, decisions, and generatedChanges so future evolutions understand the imported application.'
+    ].join(' '),
+    currentHtml: project?.currentApplication || '',
+    previousHumanModel: project?.humanModel || {},
+    previousEvolutionHistory: project?.evolutionHistory?.slice(-8) || [],
+    designSystem
+  }
+
+  return {
+    kind: 'human_model_refresh',
+    prompt: [STRUCTURED_APP_INSTRUCTIONS.join('\n'), JSON.stringify(payload, null, 2)].join('\n\n'),
+    metadata: { rendererType: 'html', projectId: project?.id || null, refreshOnly: true, designSystem }
   }
 }

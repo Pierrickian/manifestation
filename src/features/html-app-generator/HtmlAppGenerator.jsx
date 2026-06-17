@@ -4,13 +4,14 @@ import { useAiApplicationController } from '../../platform/ai/hooks/useAiApplica
 import { AiInputComposer } from '../../platform/ai/components/AiInputComposer'
 import { AiLoadingState } from '../../platform/ai/components/AiLoadingState'
 import { HtmlViewer } from '../../platform/ai/renderers/HtmlViewer'
-import { buildHtmlExport, buildProjectExport, exportHtmlProject, exportProjectJson, normalizeImportedProject, shareExport } from '../../platform/ai/projectExport'
+import { buildHtmlExport, buildProjectExport, exportHtmlProject, exportProjectJson, importHtmlIntoProject, normalizeImportedProject, shareExport } from '../../platform/ai/projectExport'
 
 export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
   const [isViewingHtml, setIsViewingHtml] = useState(false)
   const [exportStatus, setExportStatus] = useState(null)
   const [lastExport, setLastExport] = useState(null)
   const importInputRef = useRef(null)
+  const htmlImportInputRef = useRef(null)
   const [mode, setMode] = useState('create')
   const [aiActivity, setAiActivity] = useState({ active: false, log: [] })
 
@@ -54,7 +55,7 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
   const preloadQueue = mode === 'co-create' ? project?.preloadQueue || [] : []
   const continuationPlan = mode === 'co-create' ? project?.continuationPlan : null
   const [showHealthcheckDetails, setShowHealthcheckDetails] = useState(false)
-  const isBusy = controller.status === 'loading' || controller.status === 'repairing'
+  const isBusy = controller.status === 'loading' || controller.status === 'repairing' || controller.status === 'refreshingHumanModel'
   const hasUnsavedAiApp = Boolean(project?.currentApplication || controller.input.trim() || isBusy)
 
   useEffect(() => {
@@ -113,6 +114,31 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
   async function handleShareLastExport() {
     if (!lastExport) return
     await shareGeneratedExport(lastExport, lastExport.kind)
+  }
+
+
+  async function handleImportHtml(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!project) {
+      setExportStatus('Importe ou crée d’abord un projet Creatia avant de remplacer son HTML.')
+      return
+    }
+    if (!file.name.endsWith('.html') && file.type !== 'text/html') {
+      setExportStatus('Choisis un fichier .html exporté puis modifié.')
+      return
+    }
+
+    try {
+      const importedHtml = await file.text()
+      const updatedProject = importHtmlIntoProject(project, importedHtml)
+      controller.importProject(updatedProject)
+      setMode(updatedProject.mode || 'create')
+      setExportStatus('HTML importé. Il remplace maintenant l’application du projet.')
+    } catch (error) {
+      setExportStatus(error instanceof Error ? error.message : 'Import HTML impossible pour ce fichier.')
+    }
   }
 
   async function handleImportProject(event) {
@@ -199,10 +225,15 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
             <span>Importer</span>
             <small>Restaurer un projet exporté.</small>
           </button>
+          <button type="button" className="ghost-action project-export-action" onClick={() => htmlImportInputRef.current?.click()} disabled={isBusy || !project}>
+            <span>Import HTML</span>
+            <small>Remplacer l’application par un .html modifié.</small>
+          </button>
           {lastExport?.url ? <a className="ghost-action export-link" href={lastExport.url} target="_blank" rel="noreferrer">Ouvrir</a> : null}
           {lastExport ? <button type="button" className="ghost-action" onClick={handleShareLastExport}>Partager</button> : null}
         </div>
         <input ref={importInputRef} className="visually-hidden" type="file" accept=".manifestation.json,application/json" onChange={handleImportProject} />
+        <input ref={htmlImportInputRef} className="visually-hidden" type="file" accept=".html,text/html" onChange={handleImportHtml} />
         <small>L’export Projet sert à reprendre la création après Import. Export APK non implémenté.</small>
         {exportStatus ? <span className="project-export-status" role="status">{exportStatus}</span> : null}
       </details>
@@ -226,7 +257,16 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
         placeholder={project ? 'Ex: ajoute un minimap, change les couleurs, simplifie l’interface…' : 'Ex: un jeu de mémoire doux avec progression et sons…'}
       />
 
-      {isBusy ? <AiLoadingState text={controller.status === 'repairing' ? 'Réparation automatique…' : controller.progressText} onCancel={controller.cancel} /> : null}
+      {isBusy ? <AiLoadingState text={controller.status === 'repairing' ? 'Réparation automatique…' : controller.status === 'refreshingHumanModel' ? 'Reconstruction du modèle humain…' : controller.progressText} onCancel={controller.cancel} /> : null}
+
+      {project?.metadata?.requiresHumanModelRefresh ? (
+        <div className="create-app-status warning human-model-refresh-warning" role="alert">
+          <strong>Modèle humain à vérifier</strong>
+          <span>An external HTML file replaced the application. The human model may no longer match the current application. Ask the AI to analyze the current application and rebuild its human model.</span>
+          <button type="button" className="primary-action" onClick={controller.rebuildHumanModel} disabled={isBusy}>Rebuild Human Model</button>
+        </div>
+      ) : null}
+
       {controller.error ? <div className="create-app-status error" role="alert"><strong>Oups</strong><span>{controller.error}</span></div> : null}
       {controller.repairError ? <div className="create-app-status error" role="alert"><strong>Réparation</strong><span>{controller.repairError}</span></div> : null}
       {html ? (
@@ -236,6 +276,36 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
           <button type="button" className="primary-action" onClick={() => setIsViewingHtml(true)}>Ouvrir l’application</button>
         </div>
       ) : null}
+
+      {project?.humanModel ? (
+        <details className="project-menu">
+          <summary>Niveau humain</summary>
+          <dl className="human-model-list">
+            <div><dt>Objectif</dt><dd>{project.humanModel.purpose || 'À préciser'}</dd></div>
+            <div><dt>Audience</dt><dd>{project.humanModel.audience || 'À préciser'}</dd></div>
+            <div><dt>Ton</dt><dd>{project.humanModel.tone || 'À préciser'}</dd></div>
+            <div><dt>Émotion</dt><dd>{project.humanModel.emotion || 'À préciser'}</dd></div>
+            <div><dt>Parcours</dt><dd>{project.humanModel.journey || 'À préciser'}</dd></div>
+          </dl>
+        </details>
+      ) : null}
+
+      {project?.evolutionHistory?.length ? (
+        <details className="project-menu">
+          <summary>Historique d’évolution</summary>
+          <ol className="evolution-history-list">
+            {project.evolutionHistory.slice(-3).reverse().map((entry, index) => (
+              <li key={`${entry.at || 'evolution'}-${index}`}>
+                <strong>{entry.userRequest}</strong>
+                {entry.analysis ? <span>{entry.analysis}</span> : null}
+                {entry.decisions?.length ? <small>Décisions : {entry.decisions.join(' · ')}</small> : null}
+                {entry.generatedChanges?.length ? <small>Changements : {entry.generatedChanges.join(' · ')}</small> : null}
+              </li>
+            ))}
+          </ol>
+        </details>
+      ) : null}
+
       {controller.healthcheck ? (
         <div className={`ai-verification-card ${controller.healthcheck.status}`}>
           <strong>{controller.healthcheck.label}</strong>

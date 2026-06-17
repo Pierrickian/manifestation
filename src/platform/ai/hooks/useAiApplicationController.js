@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { requestAiCompletion } from '../aiProvider'
-import { buildAiPrompt, buildRepairPrompt, normalizeStructuredAiResponse } from '../promptBuilder'
-import { createProject, evolveProject, storeProject } from '../projectModel'
+import { buildAiPrompt, buildHumanModelRefreshPrompt, buildRepairPrompt, normalizeStructuredAiResponse } from '../promptBuilder'
+import { createProject, evolveProject, refreshProjectHumanModel, storeProject } from '../projectModel'
 import { detectCapabilities, isAutoRepairableHealthcheck, runGeneratedAppHealthcheck, selectGenerationStrategy } from '../generationPipeline'
 
 const REQUEST_TIMEOUT_MS = 60000
@@ -241,10 +241,49 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
     }
   }
 
+
+  async function rebuildHumanModel() {
+    if (!project?.currentApplication) return
+
+    const controller = new AbortController()
+    abortRef.current = controller
+    setStatus('refreshingHumanModel')
+    setError(null)
+    setRepairError(null)
+    setMessage('Analyse du modèle humain…')
+
+    try {
+      const request = buildHumanModelRefreshPrompt({ project, designSystem })
+      onDebug?.({ status: 'request_ready', kind: request.kind, shortTitle: 'Rebuild Human Model', rendererType: request.metadata.rendererType, timestamp: new Date().toISOString() })
+      onDebug?.({ status: 'ai_request', kind: request.kind, shortTitle: 'Rebuild Human Model', timestamp: new Date().toISOString() })
+      const payload = await aiProvider({ ...request, signal: controller.signal })
+      onDebug?.({ status: 'ai_response', kind: request.kind, shortTitle: 'Human Model Rebuilt', timestamp: new Date().toISOString() })
+      const structured = normalizeForProject(payload, project.capabilities || {}, mode)
+      const nextProject = storeProject(refreshProjectHumanModel(project, structured))
+      setProject(nextProject)
+      setResult((current) => current || (nextProject.currentApplication ? { html: nextProject.currentApplication } : null))
+      setStatus('success')
+      setMessage('Le modèle humain a été reconstruit.')
+    } catch (refreshError) {
+      if (refreshError?.name === 'AbortError') {
+        setStatus('idle')
+        setMessage('Analyse annulée.')
+        onDebug?.({ status: 'aborted', kind: 'human_model_refresh', timestamp: new Date().toISOString() })
+      } else {
+        setStatus('error')
+        setError(refreshError instanceof Error ? refreshError.message : 'Impossible de reconstruire le modèle humain pour le moment.')
+        setMessage('La reconstruction a échoué.')
+        onDebug?.({ status: 'error', kind: 'human_model_refresh', errorMessage: refreshError?.message || 'unknown', timestamp: new Date().toISOString() })
+      }
+    } finally {
+      abortRef.current = null
+    }
+  }
+
   function importProject(nextProject) {
     setProject(nextProject)
     const latestResponse = nextProject?.generationHistory?.at(-1)?.response || null
-    setResult(latestResponse || (nextProject?.currentApplication ? {
+    const fallbackResponse = nextProject?.currentApplication ? {
       html: nextProject.currentApplication,
       systemPrompt: nextProject.systemPrompt,
       state: nextProject.applicationState,
@@ -252,7 +291,8 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
       continuationPlan: nextProject.continuationPlan,
       preload: nextProject.preloadQueue || [],
       capabilities: nextProject.capabilities || {}
-    } : null))
+    } : null
+    setResult(latestResponse?.html ? latestResponse : fallbackResponse)
     setInput('')
     setStatus('success')
     setError(null)
@@ -263,5 +303,5 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
 
   function cancel() { abortRef.current?.abort() }
 
-  return { input, setInput, status, message, error, repairError, result, project, submit, submitPartnerSuggestion, retry, repair, importProject, cancel, appendTranscript, speechEnabled, progressText, hasTime, setHasTime, pipeline, healthcheck }
+  return { input, setInput, status, message, error, repairError, result, project, submit, submitPartnerSuggestion, retry, repair, rebuildHumanModel, importProject, cancel, appendTranscript, speechEnabled, progressText, hasTime, setHasTime, pipeline, healthcheck }
 }

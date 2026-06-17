@@ -1,4 +1,4 @@
-import { storeProject } from './projectModel'
+import { normalizeTechnicalModel, storeProject } from './projectModel'
 import { withCreatiaUiGuards } from './renderers/HtmlViewer'
 
 const PROJECT_EXPORT_VERSION = 1
@@ -45,15 +45,20 @@ export function buildProjectExport(project) {
     rootApp: 'Evolutia',
     version: PROJECT_EXPORT_VERSION,
     exportedAt: now,
+    id: project?.id || '',
+    mode: project?.mode || 'create',
+    metadata: project?.metadata || {},
     request: project?.creationRequest || '',
     systemPrompt: project?.systemPrompt || latestResponse.systemPrompt || '',
     state: project?.applicationState || latestResponse.state || {},
+    humanModel: project?.humanModel || latestResponse.humanModel || {},
+    technicalModel: normalizeTechnicalModel(project?.technicalModel || latestResponse),
+    evolutionHistory: project?.evolutionHistory || [],
     history: project?.generationHistory || [],
     currentApplication: project?.currentApplication || latestResponse.html || '',
     aiSuggestions: project?.aiSuggestionsHistory || [],
     continuationPlan: project?.continuationPlan || latestResponse.continuationPlan || null,
-    preloadMetadata: project?.preloadQueue || latestResponse.preload || [],
-    project
+    preloadMetadata: project?.preloadQueue || latestResponse.preload || []
   }
   const json = JSON.stringify(payload, null, 2)
   const filename = `${safeSlug(project?.creationRequest || project?.id || 'creatia-project')}.manifestation.json`
@@ -79,6 +84,58 @@ export async function shareExport({ blob, filename, title = 'Export Creatia', te
   return false
 }
 
+
+export function importHtmlIntoProject(project, importedHtml) {
+  if (!project?.id || !Array.isArray(project.generationHistory)) {
+    throw new Error('Aucun projet Creatia actif à mettre à jour.')
+  }
+
+  const html = String(importedHtml || '')
+  if (!html.trim()) {
+    throw new Error('Le fichier HTML importé est vide.')
+  }
+
+  const now = new Date().toISOString()
+  return storeProject({
+    ...project,
+    currentApplication: html,
+    generationHistory: [
+      ...(project.generationHistory || []),
+      {
+        at: now,
+        request: 'HTML imported',
+        response: {
+          source: 'html-import'
+        }
+      }
+    ],
+    evolutionHistory: [
+      ...(project.evolutionHistory || []),
+      {
+        at: now,
+        userRequest: 'HTML imported',
+        analysis: 'External HTML replaced the active application.',
+        decisions: [
+          'Current application replaced',
+          'Human model may no longer match'
+        ],
+        generatedChanges: [
+          'currentApplication updated'
+        ]
+      }
+    ],
+    metadata: {
+      ...(project.metadata || {}),
+      updatedAt: now,
+      lastExternalImport: {
+        at: now,
+        source: 'html'
+      },
+      requiresHumanModelRefresh: true
+    }
+  })
+}
+
 export function normalizeImportedProject(payload) {
   const sourceProject = payload?.project || payload
   const history = Array.isArray(payload?.history) ? payload.history : sourceProject?.generationHistory || []
@@ -91,6 +148,9 @@ export function normalizeImportedProject(payload) {
     currentApplication: payload?.currentApplication ?? sourceProject?.currentApplication ?? latestResponse.html ?? '',
     systemPrompt: payload?.systemPrompt ?? sourceProject?.systemPrompt ?? latestResponse.systemPrompt ?? '',
     applicationState: payload?.state ?? sourceProject?.applicationState ?? latestResponse.state ?? {},
+    humanModel: payload?.humanModel ?? sourceProject?.humanModel ?? latestResponse.humanModel ?? {},
+    technicalModel: normalizeTechnicalModel(payload?.technicalModel ?? sourceProject?.technicalModel ?? latestResponse),
+    evolutionHistory: Array.isArray(payload?.evolutionHistory) ? payload.evolutionHistory : sourceProject?.evolutionHistory || [],
     generationHistory: history,
     aiSuggestionsHistory: Array.isArray(payload?.aiSuggestions) ? payload.aiSuggestions : sourceProject?.aiSuggestionsHistory || [],
     continuationPlan: payload?.continuationPlan ?? sourceProject?.continuationPlan ?? latestResponse.continuationPlan ?? null,
