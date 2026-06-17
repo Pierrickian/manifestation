@@ -96,16 +96,25 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
       </label>
 
       <details className="project-menu" open={Boolean(project)}>
-        <summary>Menu projet</summary>
+        <summary>Exporter</summary>
         <div className="project-menu-actions">
-          <button type="button" className="ghost-action" onClick={handleExportHtml} disabled={!project?.currentApplication}>Exporter HTML</button>
-          <button type="button" className="ghost-action" onClick={handleExportProject} disabled={!project}>Exporter projet</button>
-          <button type="button" className="ghost-action" onClick={() => importInputRef.current?.click()} disabled={isBusy}>Importer projet</button>
+          <button type="button" className="ghost-action project-export-action" onClick={handleExportHtml} disabled={!project?.currentApplication}>
+            <span>Page web (.html)</span>
+            <small>Jouer ou partager.</small>
+          </button>
+          <button type="button" className="ghost-action project-export-action" onClick={handleExportProject} disabled={!project}>
+            <span>Projet</span>
+            <small>Continuer à créer plus tard. À réimporter ici.</small>
+          </button>
+          <button type="button" className="ghost-action project-export-action" onClick={() => importInputRef.current?.click()} disabled={isBusy}>
+            <span>Importer</span>
+            <small>Restaurer un projet exporté.</small>
+          </button>
           {lastExport?.url ? <a className="ghost-action export-link" href={lastExport.url} target="_blank" rel="noreferrer">Ouvrir</a> : null}
           {lastExport ? <button type="button" className="ghost-action" onClick={handleShareLastExport}>Partager</button> : null}
         </div>
         <input ref={importInputRef} className="visually-hidden" type="file" accept=".manifestation.json,application/json" onChange={handleImportProject} />
-        <small>HTML autonome d’abord. Export APK non implémenté.</small>
+        <small>L’export Projet sert à reprendre la création après Import. Export APK non implémenté.</small>
         {exportStatus ? <span className="project-export-status" role="status">{exportStatus}</span> : null}
       </details>
 
