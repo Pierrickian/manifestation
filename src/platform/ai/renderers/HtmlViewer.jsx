@@ -2,7 +2,7 @@ export function HtmlViewer({ html, title = 'Page créée', onBack }) {
   return (
     <section className="html-viewer is-fullscreen" aria-label={title}>
       <div className="html-viewer-toolbar">
-        <button type="button" className="html-viewer-back" onClick={onBack}>← Retour à IAview</button>
+        <button type="button" className="html-viewer-back" onClick={onBack}>← Retour à Creatia</button>
       </div>
       <iframe
         title={title}

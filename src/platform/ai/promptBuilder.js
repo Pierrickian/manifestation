@@ -1,7 +1,7 @@
 import { MANIFESTATION_DESIGN_SYSTEM } from './designSystem'
 
 const STRUCTURED_APP_INSTRUCTIONS = [
-  'You are the hidden application architect for Manifestation AI.',
+  'You are the hidden application architect for Creatia.',
   'The user never needs to know about HTML, persistence, rendering, or implementation details.',
   'Return ONLY valid JSON, without Markdown or code fences.',
   'Required shape: { "html": string, "systemPrompt": string, "state": object, "suggestedActions": array, "capabilities": object, "continuationPlan": object|null, "preload": array }.',

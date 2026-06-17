@@ -23,8 +23,8 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
     <section className="create-app-panel html-generator-panel" aria-labelledby="project-creator-title">
       <div className="create-app-aurora" aria-hidden="true" />
       <div className="create-app-header">
-        <p className="eyebrow">Manifestation AI</p>
-        <h2 id="project-creator-title">Décris ce que tu veux.</h2>
+        <p className="eyebrow">Creatia</p>
+        <h2 id="project-creator-title">Crée avec Creatia.</h2>
         <p>Parle ou écris ton idée. La plateforme crée un projet automatiquement, puis le fait évoluer avec tes demandes.</p>
       </div>
 

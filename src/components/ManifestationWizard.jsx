@@ -13,7 +13,7 @@ import { MesQuestionsApp } from '../features/MesQuestionsApp'
 import { EnigmiaApp } from '../features/EnigmiaApp'
 import { CreateYourApp } from '../features/create-your-app/CreateYourApp'
 import { HtmlAppGenerator } from '../features/html-app-generator/HtmlAppGenerator'
-import { DEFAULT_RULE_ID, ENIGMIA_RULE_ID, FLOW_RULE_ID, MES_QUESTIONS_RULE_ID, NARRATIA_RULE_ID, RECONCILIATION_RULE_ID, getRules, hasRule, isGuidedJourneyRule } from '../core/engine/ruleRegistry'
+import { CREATIA_RULE_ID, DEFAULT_RULE_ID, ENIGMIA_RULE_ID, FLOW_RULE_ID, MES_QUESTIONS_RULE_ID, NARRATIA_RULE_ID, RECONCILIATION_RULE_ID, getRules, hasRule, isGuidedJourneyRule } from '../core/engine/ruleRegistry'
 import { getInitialRuleIdFromUrl, readRuleUrlState, useRuleUrlSync } from '../hooks/useRuleUrlSync'
 
 const PHASE_PASSAGES = {
@@ -178,6 +178,7 @@ function readActiveRuleId() {
 function readInitialPortalView() {
   if (typeof window === 'undefined') return 'home'
   const { ruleId } = readRuleUrlState(window.location)
+  if (ruleId === CREATIA_RULE_ID) return 'html-app-generator'
   return ruleId && hasRule(ruleId) ? 'app' : 'home'
 }
 
@@ -489,7 +490,7 @@ export function ManifestationWizard() {
     localStorage.setItem(RULE_SETTINGS_KEY, ruleId)
     resetJourney()
     setHasConfiguredApp(false)
-    setPortalView('app')
+    setPortalView(ruleId === CREATIA_RULE_ID ? 'html-app-generator' : 'app')
   }
 
   function goHome() {
@@ -502,13 +503,6 @@ export function ManifestationWizard() {
     resetJourney()
     setHasConfiguredApp(false)
     setPortalView('create-app')
-  }
-
-  function openHtmlAppGenerator() {
-    resetJourney()
-    setHasConfiguredApp(false)
-    setHtmlGeneratorDebug(null)
-    setPortalView('html-app-generator')
   }
 
   const { selectRuleFromUi } = useRuleUrlSync({
@@ -935,7 +929,7 @@ export function ManifestationWizard() {
       {portalView === 'home' ? (
         <>
           <section className="wizard-hero">
-            <h1>Manifestation AI</h1>
+            <h1>Creatia</h1>
           </section>
 
           <AppChooser
@@ -943,7 +937,6 @@ export function ManifestationWizard() {
             activeRuleId={activeRuleId}
             onRuleChange={selectRuleFromUi}
             onCreateYourApp={openCreateYourApp}
-            onHtmlAppGenerator={openHtmlAppGenerator}
           />
         </>
       ) : portalView === 'html-app-generator' ? (
@@ -1213,7 +1206,7 @@ function ReconciliationStep({
   )
 }
 
-function AppChooser({ rules, activeRuleId, onRuleChange, onCreateYourApp, onHtmlAppGenerator }) {
+function AppChooser({ rules, activeRuleId, onRuleChange, onCreateYourApp }) {
   return (
     <section className="app-chooser" aria-labelledby="app-chooser-title">
       <div className="app-chooser-header">
@@ -1233,14 +1226,6 @@ function AppChooser({ rules, activeRuleId, onRuleChange, onCreateYourApp, onHtml
             <small>{rule.description}</small>
           </button>
         ))}
-        <button
-          type="button"
-          className="rule-option create-app-option"
-          onClick={onHtmlAppGenerator}
-        >
-          <span>Create / Co-Create</span>
-          <small>Décris une application, puis fais-la évoluer naturellement avec l’IA.</small>
-        </button>
         <button
           type="button"
           className="rule-option create-app-option"
