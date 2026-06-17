@@ -4,6 +4,7 @@ export const FLOW_RULE_ID = 'flow'
 export const NARRATIA_RULE_ID = 'narratia'
 export const MES_QUESTIONS_RULE_ID = 'mes-questions'
 export const ENIGMIA_RULE_ID = 'enigmia'
+export const CREATIA_RULE_ID = 'creatia'
 
 export const ruleRegistry = {
   [DEFAULT_RULE_ID]: {
@@ -47,6 +48,13 @@ export const ruleRegistry = {
     description: 'Résoudre des énigmes logiques générées par IA avec trois contenants et une seule bonne réponse.',
     family: 'enigmia',
     isEnabled: () => true
+  },
+  [CREATIA_RULE_ID]: {
+    id: CREATIA_RULE_ID,
+    label: 'Creatia',
+    description: 'Créer ou co-créer une application autonome avec génération adaptative.',
+    family: 'creatia',
+    isEnabled: () => true
   }
 }
 
@@ -56,7 +64,8 @@ export const defaultRuleSet = [
   FLOW_RULE_ID,
   NARRATIA_RULE_ID,
   MES_QUESTIONS_RULE_ID,
-  ENIGMIA_RULE_ID
+  ENIGMIA_RULE_ID,
+  CREATIA_RULE_ID
 ]
 
 export function getRule(ruleId) {

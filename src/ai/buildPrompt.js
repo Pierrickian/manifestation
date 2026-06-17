@@ -375,7 +375,7 @@ function buildHtmlAppPrompt(context = {}) {
     {
       role: 'system',
       content: [
-        'You generate complete standalone HTML applications for Manifestation AI.',
+        'You generate complete standalone HTML applications for Creatia.',
         'Return ONLY valid JSON: { "html": string, "systemPrompt": string, "state": object, "suggestedActions": array }.',
         'The html field must contain a complete self-contained HTML5 document runnable offline with embedded CSS and JavaScript.',
         'The app must support mobile, touch, scrolling, dark mode, Canvas/SVG/WebGL when useful.',

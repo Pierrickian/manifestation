@@ -1,5 +1,5 @@
 export const MANIFESTATION_DESIGN_SYSTEM = {
-  themeName: 'Manifestation',
+  themeName: 'Creatia',
   primaryColor: '#6A5AE0',
   secondaryColor: '#A78BFA',
   backgroundColor: '#121212',
