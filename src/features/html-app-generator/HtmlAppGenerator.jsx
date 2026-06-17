@@ -4,13 +4,14 @@ import { useAiApplicationController } from '../../platform/ai/hooks/useAiApplica
 import { AiInputComposer } from '../../platform/ai/components/AiInputComposer'
 import { AiLoadingState } from '../../platform/ai/components/AiLoadingState'
 import { HtmlViewer } from '../../platform/ai/renderers/HtmlViewer'
-import { buildHtmlExport, buildProjectExport, exportHtmlProject, exportProjectJson, normalizeImportedProject, shareExport } from '../../platform/ai/projectExport'
+import { buildHtmlExport, buildProjectExport, exportHtmlProject, exportProjectJson, importHtmlIntoProject, normalizeImportedProject, shareExport } from '../../platform/ai/projectExport'
 
 export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
   const [isViewingHtml, setIsViewingHtml] = useState(false)
   const [exportStatus, setExportStatus] = useState(null)
   const [lastExport, setLastExport] = useState(null)
   const importInputRef = useRef(null)
+  const htmlImportInputRef = useRef(null)
   const [mode, setMode] = useState('create')
   const [aiActivity, setAiActivity] = useState({ active: false, log: [] })
 
@@ -115,6 +116,31 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
     await shareGeneratedExport(lastExport, lastExport.kind)
   }
 
+
+  async function handleImportHtml(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!project) {
+      setExportStatus('Importe ou crée d’abord un projet Creatia avant de remplacer son HTML.')
+      return
+    }
+    if (!file.name.endsWith('.html') && file.type !== 'text/html') {
+      setExportStatus('Choisis un fichier .html exporté puis modifié.')
+      return
+    }
+
+    try {
+      const importedHtml = await file.text()
+      const updatedProject = importHtmlIntoProject(project, importedHtml)
+      controller.importProject(updatedProject)
+      setMode(updatedProject.mode || 'create')
+      setExportStatus('HTML importé. Il remplace maintenant l’application du projet.')
+    } catch (error) {
+      setExportStatus(error instanceof Error ? error.message : 'Import HTML impossible pour ce fichier.')
+    }
+  }
+
   async function handleImportProject(event) {
     const file = event.target.files?.[0]
     event.target.value = ''
@@ -199,10 +225,15 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
             <span>Importer</span>
             <small>Restaurer un projet exporté.</small>
           </button>
+          <button type="button" className="ghost-action project-export-action" onClick={() => htmlImportInputRef.current?.click()} disabled={isBusy || !project}>
+            <span>Import HTML</span>
+            <small>Remplacer l’application par un .html modifié.</small>
+          </button>
           {lastExport?.url ? <a className="ghost-action export-link" href={lastExport.url} target="_blank" rel="noreferrer">Ouvrir</a> : null}
           {lastExport ? <button type="button" className="ghost-action" onClick={handleShareLastExport}>Partager</button> : null}
         </div>
         <input ref={importInputRef} className="visually-hidden" type="file" accept=".manifestation.json,application/json" onChange={handleImportProject} />
+        <input ref={htmlImportInputRef} className="visually-hidden" type="file" accept=".html,text/html" onChange={handleImportHtml} />
         <small>L’export Projet sert à reprendre la création après Import. Export APK non implémenté.</small>
         {exportStatus ? <span className="project-export-status" role="status">{exportStatus}</span> : null}
       </details>

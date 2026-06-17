@@ -82,6 +82,38 @@ export async function shareExport({ blob, filename, title = 'Export Creatia', te
   return false
 }
 
+
+export function importHtmlIntoProject(project, importedHtml) {
+  if (!project?.id || !Array.isArray(project.generationHistory)) {
+    throw new Error('Aucun projet Creatia actif à mettre à jour.')
+  }
+
+  const html = String(importedHtml || '')
+  if (!html.trim()) {
+    throw new Error('Le fichier HTML importé est vide.')
+  }
+
+  const now = new Date().toISOString()
+  return storeProject({
+    ...project,
+    currentApplication: html,
+    generationHistory: [
+      ...(project.generationHistory || []),
+      {
+        at: now,
+        request: 'HTML imported',
+        response: {
+          source: 'html-import'
+        }
+      }
+    ],
+    metadata: {
+      ...(project.metadata || {}),
+      updatedAt: now
+    }
+  })
+}
+
 export function normalizeImportedProject(payload) {
   const sourceProject = payload?.project || payload
   const history = Array.isArray(payload?.history) ? payload.history : sourceProject?.generationHistory || []
