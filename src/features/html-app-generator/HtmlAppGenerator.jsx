@@ -4,7 +4,7 @@ import { useAiApplicationController } from '../../platform/ai/hooks/useAiApplica
 import { AiInputComposer } from '../../platform/ai/components/AiInputComposer'
 import { AiLoadingState } from '../../platform/ai/components/AiLoadingState'
 import { HtmlViewer } from '../../platform/ai/renderers/HtmlViewer'
-import { exportHtmlProject, exportProjectJson, normalizeImportedProject, shareExport } from '../../platform/ai/projectExport'
+import { buildHtmlExport, buildProjectExport, exportHtmlProject, exportProjectJson, normalizeImportedProject, shareExport } from '../../platform/ai/projectExport'
 
 export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
   const [isViewingHtml, setIsViewingHtml] = useState(false)
@@ -36,19 +36,34 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
     rememberExport(exportProjectJson(project), 'project')
   }
 
-  async function handleShareLastExport() {
-    if (!lastExport) return
+  async function shareGeneratedExport(exportData, kind) {
     try {
       const shared = await shareExport({
-        blob: lastExport.blob,
-        filename: lastExport.filename,
-        title: lastExport.kind === 'html' ? 'Application HTML Creatia' : 'Projet Creatia',
-        text: lastExport.kind === 'html' ? 'Application HTML autonome exportée depuis Creatia.' : 'Projet Creatia exporté depuis Evolutia.'
+        blob: exportData.blob,
+        filename: exportData.filename,
+        title: kind === 'html' ? 'Application HTML Creatia' : 'Projet Creatia',
+        text: kind === 'html' ? 'Application HTML autonome exportée depuis Creatia.' : 'Projet Creatia exporté depuis Evolutia.'
       })
-      setExportStatus(shared ? 'Partage ouvert.' : 'Partage indisponible sur ce navigateur. Le fichier est déjà téléchargé.')
+      setLastExport({ ...exportData, kind })
+      setExportStatus(shared ? 'Partage ouvert.' : 'Partage indisponible sur ce navigateur. Tu peux télécharger le fichier puis le partager depuis ton appareil.')
     } catch (error) {
-      setExportStatus(error?.name === 'AbortError' ? 'Partage annulé.' : 'Partage indisponible. Le fichier est déjà téléchargé.')
+      setExportStatus(error?.name === 'AbortError' ? 'Partage annulé.' : 'Partage indisponible. Tu peux télécharger le fichier puis le partager depuis ton appareil.')
     }
+  }
+
+  async function handleShareHtml() {
+    if (!project?.currentApplication) return
+    await shareGeneratedExport(buildHtmlExport(project), 'html')
+  }
+
+  async function handleShareProject() {
+    if (!project) return
+    await shareGeneratedExport(buildProjectExport(project), 'project')
+  }
+
+  async function handleShareLastExport() {
+    if (!lastExport) return
+    await shareGeneratedExport(lastExport, lastExport.kind)
   }
 
   async function handleImportProject(event) {
@@ -102,9 +117,17 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
             <span>Page web (.html)</span>
             <small>Jouer ou partager.</small>
           </button>
+          <button type="button" className="ghost-action project-export-action project-share-action" onClick={handleShareHtml} disabled={!project?.currentApplication}>
+            <span>Partager la page</span>
+            <small>Même si elle est déjà téléchargée.</small>
+          </button>
           <button type="button" className="ghost-action project-export-action" onClick={handleExportProject} disabled={!project}>
             <span>Projet</span>
             <small>Continuer à créer plus tard. À réimporter ici.</small>
+          </button>
+          <button type="button" className="ghost-action project-export-action project-share-action" onClick={handleShareProject} disabled={!project}>
+            <span>Partager le projet</span>
+            <small>Même s’il est déjà téléchargé.</small>
           </button>
           <button type="button" className="ghost-action project-export-action" onClick={() => importInputRef.current?.click()} disabled={isBusy}>
             <span>Importer</span>
