@@ -1107,10 +1107,6 @@ function FlowStep({ words, selectedWords, conclusion, onChooseWord, onContinue, 
 }
 
 function PhaseBridge({ phase, nextPhase, steps, choices, onChoose, onBack }) {
-  const [showCreatiaHealthDetails, setShowCreatiaHealthDetails] = useState(false)
-  const creatiaHealthcheck = creatiaMenu?.healthcheck
-  const creatiaHealthLabel = creatiaHealthcheck?.status === 'verified' ? 'Application vérifiée' : creatiaHealthcheck?.failedCount ? 'Contrôles incomplets' : creatiaHealthcheck?.checks?.length ? 'Contrôles à vérifier' : 'Aucun contrôle'
-
   return (
     <section className="wizard-card phase-bridge" aria-labelledby="phase-bridge-title">
       <p className="eyebrow">Synthese</p>
@@ -1392,10 +1388,6 @@ function WizardMenu({
 }
 
 function AiDebugFooter({ debugRows }) {
-  const [showCreatiaHealthDetails, setShowCreatiaHealthDetails] = useState(false)
-  const creatiaHealthcheck = creatiaMenu?.healthcheck
-  const creatiaHealthLabel = creatiaHealthcheck?.status === 'verified' ? 'Application vérifiée' : creatiaHealthcheck?.failedCount ? 'Contrôles incomplets' : creatiaHealthcheck?.checks?.length ? 'Contrôles à vérifier' : 'Aucun contrôle'
-
   return (
     <footer className="ai-debug-footer ai-debug-panel" aria-live="polite">
       <strong>Connexion IA</strong>
@@ -1416,10 +1408,6 @@ function AiDebugFooter({ debugRows }) {
 }
 
 function SliderSetting({ group, slider, value, onChange, onRefresh, isRefreshing, isDisabled }) {
-  const [showCreatiaHealthDetails, setShowCreatiaHealthDetails] = useState(false)
-  const creatiaHealthcheck = creatiaMenu?.healthcheck
-  const creatiaHealthLabel = creatiaHealthcheck?.status === 'verified' ? 'Application vérifiée' : creatiaHealthcheck?.failedCount ? 'Contrôles incomplets' : creatiaHealthcheck?.checks?.length ? 'Contrôles à vérifier' : 'Aucun contrôle'
-
   return (
     <div className="ai-setting-row">
       <label className="ai-setting">
