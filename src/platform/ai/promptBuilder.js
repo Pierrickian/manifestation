@@ -4,7 +4,8 @@ const STRUCTURED_APP_INSTRUCTIONS = [
   'You are the hidden application architect for Creatia / Evolutia. The goal is not to generate HTML; the goal is to translate natural-language intentions into design decisions, then render the technical consequence.',
   'The user never needs to know about HTML, CSS, JavaScript, React, components, frameworks, databases, APIs, persistence, rendering, or implementation details.',
   'Return ONLY valid JSON, without Markdown or code fences.',
-  'Required shape: { "humanModel": object, "analysis": string, "decisions": array, "generatedChanges": array, "html": string, "files": object, "systemPrompt": string, "state": object, "suggestedActions": array, "capabilities": object, "runtimeCapabilities": object, "continuationPlan": object|null, "preload": array }.',
+  'Return one explicit response kind. Final applications use { "kind": "html_app", "humanModel": object, "analysis": string, "decisions": array, "generatedChanges": array, "html": string, "files": object, "systemPrompt": string, "state": object, "suggestedActions": array, "capabilities": object, "runtimeCapabilities": object, "continuationPlan": object|null, "preload": array }.',
+  'Intermediate capability negotiation uses { "kind": "capability_request", "requestedCapabilities": object, "reason": string, "retryPrompt": string }. Clarification uses { "kind": "clarification_request", "question": string }. Genuine failures use { "kind": "generation_error", "error": string }.',
   'humanModel must describe the human level: { "purpose": string, "audience": string, "tone": string, "emotion": string, "journey": string, "sections": array }.',
   'analysis must explain the design reasoning before implementation: goal, audience, desired emotion, UX journey, readability, information density, interactions, and business constraints when relevant.',
   'decisions must list the design decisions derived from the user intention before code generation.',
@@ -34,8 +35,36 @@ const STRUCTURED_APP_INSTRUCTIONS = [
 ]
 
 export function normalizeStructuredAiResponse(payload = {}) {
+  const explicitKind = typeof payload.kind === 'string' ? payload.kind : ''
+  if (explicitKind === 'capability_request') {
+    return {
+      kind: 'capability_request',
+      requestedCapabilities: payload.requestedCapabilities && typeof payload.requestedCapabilities === 'object' ? payload.requestedCapabilities : {},
+      reason: payload.reason || '',
+      retryPrompt: payload.retryPrompt || ''
+    }
+  }
+  if (explicitKind === 'clarification_request') {
+    return { kind: 'clarification_request', question: payload.question || payload.message || '' }
+  }
+  if (explicitKind === 'generation_error') {
+    return { kind: 'generation_error', error: payload.error || payload.message || 'Generation failed.' }
+  }
+  if (!explicitKind && payload.requestedCapabilities && typeof payload.requestedCapabilities === 'object') {
+    return {
+      kind: 'capability_request',
+      requestedCapabilities: payload.requestedCapabilities,
+      reason: payload.reason || '',
+      retryPrompt: payload.retryPrompt || ''
+    }
+  }
+  if (!explicitKind && (payload.question || payload.clarificationQuestion)) {
+    return { kind: 'clarification_request', question: payload.question || payload.clarificationQuestion || '' }
+  }
+
   if (Object.prototype.hasOwnProperty.call(payload, 'html') || payload.humanModel || payload.analysis || payload.decisions || payload.generatedChanges) {
     return {
+      kind: 'html_app',
       html: payload.html || '',
       humanModel: payload.humanModel && typeof payload.humanModel === 'object' ? payload.humanModel : {},
       files: payload.files && typeof payload.files === 'object' ? payload.files : {},
@@ -52,12 +81,16 @@ export function normalizeStructuredAiResponse(payload = {}) {
     }
   }
 
+  if (payload && typeof payload === 'object' && Object.keys(payload).length && !payload.text) {
+    return { kind: 'generation_error', error: `Unsupported AI response shape: ${Object.keys(payload).join(', ')}` }
+  }
+
   const text = payload.text || ''
   try {
     const parsed = JSON.parse(text)
     return normalizeStructuredAiResponse(parsed)
   } catch {
-    return { html: text, humanModel: {}, files: {}, analysis: '', decisions: [], generatedChanges: [], systemPrompt: '', state: {}, suggestedActions: [], capabilities: {}, runtimeCapabilities: {}, continuationPlan: null, preload: [] }
+    return { kind: 'html_app', html: text, humanModel: {}, files: {}, analysis: '', decisions: [], generatedChanges: [], systemPrompt: '', state: {}, suggestedActions: [], capabilities: {}, runtimeCapabilities: {}, continuationPlan: null, preload: [] }
   }
 }
 

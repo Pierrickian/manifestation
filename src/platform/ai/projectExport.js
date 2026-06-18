@@ -25,7 +25,7 @@ function downloadBlob(blob, filename) {
 }
 
 export function buildHtmlExport(project) {
-  const html = withCreatiaUiGuards(project?.currentApplication || '')
+  const html = withCreatiaUiGuards(project?.currentApplication || project?.lastValidApplication || '')
   const filename = `${safeSlug(project?.creationRequest || project?.id || 'creatia-app')}.html`
   return { html, filename, blob: new Blob([html], { type: 'text/html;charset=utf-8' }) }
 }
@@ -55,7 +55,8 @@ export function buildProjectExport(project) {
     technicalModel: normalizeTechnicalModel(project?.technicalModel || latestResponse),
     evolutionHistory: project?.evolutionHistory || [],
     history: project?.generationHistory || [],
-    currentApplication: project?.currentApplication || latestResponse.html || '',
+    currentApplication: project?.currentApplication || project?.lastValidApplication || latestResponse.html || '',
+    lastValidApplication: project?.lastValidApplication || project?.currentApplication || latestResponse.html || '',
     aiSuggestions: project?.aiSuggestionsHistory || [],
     continuationPlan: project?.continuationPlan || latestResponse.continuationPlan || null,
     preloadMetadata: normalizePreloadQueue(project?.preloadQueue || latestResponse.preload || [])
@@ -92,6 +93,7 @@ export function createProjectFromImportedHtml(importedHtml, { mode = 'create', d
   }
 
   const response = {
+    kind: 'html_app',
     html,
     humanModel: {},
     files: {},
@@ -134,6 +136,8 @@ export function importHtmlIntoProject(project, importedHtml) {
   return storeProject({
     ...project,
     currentApplication: html,
+    lastValidApplication: html,
+    lastValidApplication: html,
     generationHistory: [
       ...(project.generationHistory || []),
       {
@@ -180,7 +184,8 @@ export function normalizeImportedProject(payload) {
     id: sourceProject?.id || `project-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     mode: sourceProject?.mode || 'create',
     creationRequest: payload?.request ?? sourceProject?.creationRequest ?? '',
-    currentApplication: payload?.currentApplication ?? sourceProject?.currentApplication ?? latestResponse.html ?? '',
+    currentApplication: payload?.currentApplication ?? sourceProject?.currentApplication ?? sourceProject?.lastValidApplication ?? latestResponse.html ?? '',
+    lastValidApplication: payload?.lastValidApplication ?? sourceProject?.lastValidApplication ?? payload?.currentApplication ?? sourceProject?.currentApplication ?? latestResponse.html ?? '',
     systemPrompt: payload?.systemPrompt ?? sourceProject?.systemPrompt ?? latestResponse.systemPrompt ?? '',
     applicationState: payload?.state ?? sourceProject?.applicationState ?? latestResponse.state ?? {},
     humanModel: payload?.humanModel ?? sourceProject?.humanModel ?? latestResponse.humanModel ?? {},

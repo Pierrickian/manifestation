@@ -50,7 +50,7 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
 
   const controller = useAiApplicationController({ mode, designSystem: MANIFESTATION_DESIGN_SYSTEM, speechEnabled, onDebug: recordAiActivity })
   const project = controller.project
-  const html = project?.currentApplication || ''
+  const html = project?.currentApplication || project?.lastValidApplication || ''
   const latestSuggestions = project?.aiSuggestionsHistory?.at(-1)?.suggestions || []
   const continuationPlan = mode === 'co-create' ? project?.continuationPlan : null
   const lastAutoOpenedHtmlRef = useRef('')
@@ -87,7 +87,7 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
   }
 
   function handleExportHtml() {
-    if (!project?.currentApplication) return
+    if (!project?.currentApplication && !project?.lastValidApplication) return
     rememberExport(exportHtmlProject(project), 'html')
   }
 
@@ -161,10 +161,10 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
       steps: aiActivity.log,
       pipeline: controller.pipeline,
       healthcheck: controller.healthcheck,
-      healthcheckActions: { retry: controller.retry, repair: controller.repair, canRepair: Boolean(controller.healthcheck?.isRepairable), isBusy },
+      healthcheckActions: { retry: controller.retry, repair: controller.repair, copyPrompt: handleCopyRuntimePrompt, canRepair: Boolean(controller.healthcheck?.isRepairable), canCopyPrompt: Boolean(controller.lastRuntimePrompt), isBusy },
       history: project?.evolutionHistory || []
     })
-  }, [onMenuData, aiActivity.log, controller.pipeline, controller.healthcheck, project?.generationHistory, project?.evolutionHistory, isBusy])
+  }, [onMenuData, aiActivity.log, controller.pipeline, controller.healthcheck, controller.lastRuntimePrompt, project?.generationHistory, project?.evolutionHistory, isBusy])
 
   if (html && isViewingHtml) {
     return <HtmlViewer html={html} title={project?.creationRequest || 'Application créée'} onBack={() => setIsViewingHtml(false)} aiOverlay={<CreatiaAiOverlay activity={aiActivity} />} />
@@ -189,10 +189,14 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
         </div>
       ) : null}
 
+      {controller.lastRuntimePrompt ? (
+        <button type="button" className="ghost-action" onClick={handleCopyRuntimePrompt}>Copy Runtime Prompt</button>
+      ) : null}
+
       <div className="project-menu transfer-actions">
         <div className="transfer-actions-row">
           <div className="transfer-action-pair"><button type="button" className="primary-action slim-action" onClick={() => importInputRef.current?.click()} disabled={isBusy}>Importer</button><button type="button" className="info-action" onClick={() => setActiveTransferInfo((current) => current === 'import' ? null : 'import')} aria-expanded={activeTransferInfo === 'import'} aria-label="Information importer">i</button></div>
-          <div className="transfer-action-pair"><button type="button" className="ghost-action slim-action" onClick={handleExportHtml} disabled={!project?.currentApplication}>Exporter app</button><button type="button" className="info-action" onClick={() => setActiveTransferInfo((current) => current === 'app' ? null : 'app')} aria-expanded={activeTransferInfo === 'app'} aria-label="Information exporter app">i</button></div>
+          <div className="transfer-action-pair"><button type="button" className="ghost-action slim-action" onClick={handleExportHtml} disabled={!project?.currentApplication && !project?.lastValidApplication}>Exporter app</button><button type="button" className="info-action" onClick={() => setActiveTransferInfo((current) => current === 'app' ? null : 'app')} aria-expanded={activeTransferInfo === 'app'} aria-label="Information exporter app">i</button></div>
           <div className="transfer-action-pair"><button type="button" className="ghost-action slim-action" onClick={handleExportProject} disabled={!project}>Exporter projet</button><button type="button" className="info-action" onClick={() => setActiveTransferInfo((current) => current === 'project' ? null : 'project')} aria-expanded={activeTransferInfo === 'project'} aria-label="Information exporter projet">i</button></div>
         </div>
         <input ref={importInputRef} className="visually-hidden" type="file" accept=".manifestation.json,application/json,.html,text/html" onChange={handleImport} />

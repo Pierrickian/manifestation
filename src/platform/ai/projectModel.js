@@ -73,6 +73,7 @@ export function createProject({ mode, request, response, designSystem }) {
     humanModel,
     technicalModel,
     currentApplication: response.html || '',
+    lastValidApplication: response.html || '',
     systemPrompt: response.systemPrompt || '',
     applicationState: response.state || {},
     generationHistory: [{ at: now, request, response }],
@@ -88,11 +89,13 @@ export function createProject({ mode, request, response, designSystem }) {
 export function evolveProject(project, request, response) {
   const now = new Date().toISOString()
   const currentHtml = response.html || project.currentApplication
+  const lastValidApplication = response.html || project.lastValidApplication || project.currentApplication || ''
   return {
     ...project,
     humanModel: normalizeHumanModel(response.humanModel || response.human || project.humanModel || response.state?.humanModel),
     technicalModel: normalizeTechnicalModel(response),
     currentApplication: currentHtml,
+    lastValidApplication,
     systemPrompt: response.systemPrompt || project.systemPrompt,
     applicationState: response.state || project.applicationState || {},
     continuationPlan: response.continuationPlan || project.continuationPlan || null,

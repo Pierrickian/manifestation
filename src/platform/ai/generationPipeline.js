@@ -13,8 +13,8 @@ const SMART_COMPLEXITY_TERMS = [
 const CONFIDENCE_SCORE = { low: 1, medium: 2, high: 3 }
 const AUTO_REPAIR_CONFIDENCES = new Set(['high', 'medium'])
 
-function createCheck({ id, ok, message, expected, actual, repairConfidence = 'low', repairable = false }) {
-  return { id, ok, message, expected, actual: ok ? 'Detected.' : actual, repairConfidence, repairable }
+function createCheck({ id, ok, message, expected, actual, repairConfidence = 'low', repairable = false, severity = 'critical' }) {
+  return { id, ok, message, expected, actual: ok ? 'Detected.' : actual, repairConfidence, repairable, severity }
 }
 
 function getRepairConfidence(failedChecks) {
@@ -25,7 +25,7 @@ function getRepairConfidence(failedChecks) {
 }
 
 export function isAutoRepairableHealthcheck(healthcheck = {}) {
-  return AUTO_REPAIR_CONFIDENCES.has(healthcheck.repairConfidence) && Boolean(healthcheck.failedChecks?.some((check) => check.repairable))
+  return AUTO_REPAIR_CONFIDENCES.has(healthcheck.repairConfidence) && Boolean(healthcheck.failedChecks?.some((check) => check.repairable && check.severity !== 'warning'))
 }
 
 export function detectCapabilities(input = '') {
@@ -117,6 +117,23 @@ function displaysOfflineByDefault(html = '') {
 }
 
 export function runGeneratedAppHealthcheck(response = {}, strategy = {}) {
+  if (response.kind && response.kind !== 'html_app') {
+    return {
+      status: 'skipped',
+      label: 'Intermediate Builder Response',
+      strategyId: strategy.id || 'fast',
+      depth: strategy.healthcheckDepth || 'light',
+      mode: strategy.mode || response.mode || 'create',
+      repairConfidence: 'none',
+      isRepairable: false,
+      passedCount: 0,
+      failedCount: 0,
+      warningCount: 0,
+      checks: [],
+      failedChecks: []
+    }
+  }
+
   const html = String(response.html || '')
   const capabilities = buildCapabilityContract(response.capabilities || {})
   const runtimeCapabilities = {
@@ -180,7 +197,8 @@ export function runGeneratedAppHealthcheck(response = {}, strategy = {}) {
       expected: 'A non-empty continuationPlan object for AI-to-engine collaboration memory.',
       actual: 'continuationPlan is missing, null, or empty.',
       repairConfidence: 'high',
-      repairable: true
+      repairable: true,
+      severity: 'warning'
     }))
 
     checks.push(createCheck({
@@ -190,7 +208,8 @@ export function runGeneratedAppHealthcheck(response = {}, strategy = {}) {
       expected: 'A non-empty preload array of trigger-driven future preparation entries.',
       actual: 'preload is missing or empty.',
       repairConfidence: 'high',
-      repairable: true
+      repairable: true,
+      severity: 'warning'
     }))
 
     checks.push(createCheck({
@@ -200,7 +219,8 @@ export function runGeneratedAppHealthcheck(response = {}, strategy = {}) {
       expected: 'runtimeCapabilities.aiGeneration must be true in Co-Create mode.',
       actual: `runtimeCapabilities.aiGeneration is ${String(runtimeCapabilities.aiGeneration)}.`,
       repairConfidence: 'high',
-      repairable: true
+      repairable: true,
+      severity: 'warning'
     }))
 
     checks.push(createCheck({
@@ -210,7 +230,8 @@ export function runGeneratedAppHealthcheck(response = {}, strategy = {}) {
       expected: 'The generated application exposes AI runtime status such as AI Connected, AI Generating, AI Unavailable, Reconnecting, or Local Fallback Active.',
       actual: 'No runtime AI status surface was detected.',
       repairConfidence: 'high',
-      repairable: true
+      repairable: true,
+      severity: 'warning'
     }))
 
     checks.push(createCheck({
@@ -220,7 +241,8 @@ export function runGeneratedAppHealthcheck(response = {}, strategy = {}) {
       expected: 'At least one runtime generation pathway such as requestAiGeneration, ai_request, needs_generation, preload_requested, or branch_requested.',
       actual: 'No runtime AI generation pathway was detected.',
       repairConfidence: 'high',
-      repairable: true
+      repairable: true,
+      severity: 'warning'
     }))
 
     checks.push(createCheck({
@@ -230,7 +252,8 @@ export function runGeneratedAppHealthcheck(response = {}, strategy = {}) {
       expected: 'The generated application must be capable of consuming continuationPlan during execution.',
       actual: 'No continuationPlan consumption was detected in the application runtime.',
       repairConfidence: 'high',
-      repairable: true
+      repairable: true,
+      severity: 'warning'
     }))
 
     checks.push(createCheck({
@@ -240,7 +263,8 @@ export function runGeneratedAppHealthcheck(response = {}, strategy = {}) {
       expected: 'The generated application must be capable of consuming preload entries during execution.',
       actual: 'No preload consumption was detected in the application runtime.',
       repairConfidence: 'high',
-      repairable: true
+      repairable: true,
+      severity: 'warning'
     }))
 
     checks.push(createCheck({
@@ -250,22 +274,26 @@ export function runGeneratedAppHealthcheck(response = {}, strategy = {}) {
       expected: 'Co-Create applications must not display "Offline" by default; status should reflect AI runtime state.',
       actual: 'The generated application appears to display "Offline" as a default status.',
       repairConfidence: 'medium',
-      repairable: true
+      repairable: true,
+      severity: 'warning'
     }))
   }
 
   const failedChecks = checks.filter((check) => !check.ok)
-  const repairConfidence = getRepairConfidence(failedChecks)
+  const criticalFailures = failedChecks.filter((check) => check.severity !== 'warning')
+  const warningFailures = failedChecks.filter((check) => check.severity === 'warning')
+  const repairConfidence = getRepairConfidence(criticalFailures)
   return {
-    status: failedChecks.length ? 'generated' : 'verified',
-    label: failedChecks.length ? 'Application Generated' : 'Application Verified',
+    status: criticalFailures.length ? 'generated' : warningFailures.length ? 'warning' : 'verified',
+    label: criticalFailures.length ? 'Application Generated' : warningFailures.length ? 'Application Verified with Warnings' : 'Application Verified',
     strategyId: strategy.id || 'fast',
     depth: strategy.healthcheckDepth || 'light',
     mode,
     repairConfidence,
-    isRepairable: AUTO_REPAIR_CONFIDENCES.has(repairConfidence) && failedChecks.some((check) => check.repairable),
+    isRepairable: AUTO_REPAIR_CONFIDENCES.has(repairConfidence) && criticalFailures.some((check) => check.repairable),
     passedCount: checks.length - failedChecks.length,
-    failedCount: failedChecks.length,
+    failedCount: criticalFailures.length,
+    warningCount: warningFailures.length,
     checks,
     failedChecks
   }

@@ -7,6 +7,7 @@ import { detectCapabilities, isAutoRepairableHealthcheck, runGeneratedAppHealthc
 const REQUEST_TIMEOUT_MS = 60000
 const DEFAULT_REPAIR_LIMIT = 1
 const DEEP_REPAIR_LIMIT = 3
+const MAX_CAPABILITY_NEGOTIATION_ATTEMPTS = 2
 
 const PATIENCE_IDEAS = [
   'Idée : demande une mini app pour apprendre, jouer ou visualiser une notion.',
@@ -46,6 +47,22 @@ function normalizeForProject(payload, detectedCapabilities, mode) {
     runtimeCapabilities,
     capabilities: { ...detectedCapabilities, ...(structured.capabilities || {}), runtimeCapabilities }
   }, mode)
+}
+
+function isHtmlAppResponse(response = {}) {
+  return response.kind === 'html_app' && typeof response.html === 'string'
+}
+
+function mergeCapabilityRequest(current = {}, requested = {}) {
+  const runtimeCapabilities = {
+    ...(current.runtimeCapabilities || {}),
+    ...(requested.runtimeCapabilities || {})
+  }
+  return {
+    ...current,
+    ...requested,
+    runtimeCapabilities
+  }
 }
 
 export function useAiApplicationController({ mode = 'create', designSystem, speechEnabled = false, aiProvider = requestAiCompletion, onDebug } = {}) {
@@ -108,6 +125,36 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
     return { finalStructured, verification, attempts }
   }
 
+  async function requestBuilderResponse({ requestText, capabilities, strategy, controller, requestKindTitle, negotiationAttempt = 0 }) {
+    const request = buildAiPrompt({ input: requestText, mode, designSystem, project, capabilities, strategy, hasTime })
+    setLastRuntimePrompt(JSON.stringify(request, null, 2))
+    onDebug?.({ status: 'request_ready', kind: request.kind, shortTitle: requestKindTitle, rendererType: request.metadata.rendererType, designSystem: request.metadata.designSystem?.themeName, timestamp: new Date().toISOString() })
+    onDebug?.({ status: 'ai_request', kind: request.kind, shortTitle: requestKindTitle, timestamp: new Date().toISOString() })
+    const payload = await aiProvider({ ...request, signal: controller.signal })
+    onDebug?.({ status: 'ai_response', kind: request.kind, shortTitle: project ? 'Projet évolué' : 'Projet généré', timestamp: new Date().toISOString() })
+    const structured = normalizeForProject(payload, capabilities, mode)
+
+    if (structured.kind === 'capability_request') {
+      const negotiatedCapabilities = mergeCapabilityRequest(capabilities, structured.requestedCapabilities)
+      setPipeline({ capabilities: negotiatedCapabilities, strategy })
+      onDebug?.({ status: 'capability_request', kind: structured.kind, requestedCapabilities: structured.requestedCapabilities, reason: structured.reason, timestamp: new Date().toISOString() })
+      if (negotiationAttempt >= MAX_CAPABILITY_NEGOTIATION_ATTEMPTS) {
+        throw new Error(structured.reason || 'La négociation de capacités n’a pas abouti.')
+      }
+      const retryText = structured.retryPrompt?.trim() || requestText
+      return requestBuilderResponse({
+        requestText: retryText,
+        capabilities: negotiatedCapabilities,
+        strategy,
+        controller,
+        requestKindTitle,
+        negotiationAttempt: negotiationAttempt + 1
+      })
+    }
+
+    return { structured, capabilities, payload }
+  }
+
   async function submitWithText(requestText) {
     const trimmed = requestText.trim()
     if (!trimmed) {
@@ -122,7 +169,6 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
     setStatus('loading')
     setError(null)
     setRepairError(null)
-    setResult(null)
     setHealthcheck(null)
     setIdeaIndex(0)
     setMessage(progressText)
@@ -139,25 +185,44 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
     }, 9000)
 
     try {
-      const request = buildAiPrompt({ input: trimmed, mode, designSystem, project, capabilities: detectedCapabilities, strategy: selectedStrategy, hasTime })
-      setLastRuntimePrompt(JSON.stringify(request, null, 2))
       const requestShortTitle = project ? 'Évolution du projet' : 'Création du projet'
-      onDebug?.({ status: 'request_ready', kind: request.kind, shortTitle: requestShortTitle, rendererType: request.metadata.rendererType, designSystem: request.metadata.designSystem?.themeName, timestamp: new Date().toISOString() })
-      onDebug?.({ status: 'ai_request', kind: request.kind, shortTitle: requestShortTitle, timestamp: new Date().toISOString() })
-      const payload = await aiProvider({ ...request, signal: controller.signal })
-      onDebug?.({ status: 'ai_response', kind: request.kind, shortTitle: project ? 'Projet évolué' : 'Projet généré', timestamp: new Date().toISOString() })
-      const structured = normalizeForProject(payload, detectedCapabilities, mode)
+      const { structured, capabilities: negotiatedCapabilities, payload } = await requestBuilderResponse({
+        requestText: trimmed,
+        capabilities: detectedCapabilities,
+        strategy: selectedStrategy,
+        controller,
+        requestKindTitle: requestShortTitle
+      })
+
+      if (structured.kind === 'clarification_request') {
+        setStatus('idle')
+        setMessage(structured.question || 'Creatia a besoin d’une précision avant de générer.')
+        onDebug?.({ status: 'clarification_request', kind: structured.kind, question: structured.question, timestamp: new Date().toISOString() })
+        return
+      }
+
+      if (structured.kind === 'generation_error') {
+        throw new Error(structured.error || 'La génération a échoué.')
+      }
+
+      if (!isHtmlAppResponse(structured)) {
+        throw new Error('Réponse IA intermédiaire non finalisée.')
+      }
+
       const initialHealthcheck = runGeneratedAppHealthcheck(structured, { ...selectedStrategy, mode })
       const repairResult = await runRepairLoop({
         originalRequest: trimmed,
         initialStructured: structured,
         initialHealthcheck,
-        detectedCapabilities,
+        detectedCapabilities: negotiatedCapabilities,
         selectedStrategy,
         controller,
         maxAttempts: getRepairLimit(),
         reason: 'auto'
       })
+      if (!isHtmlAppResponse(repairResult.finalStructured)) {
+        throw new Error('La réparation a retourné une réponse intermédiaire au lieu d’une application.')
+      }
       setHealthcheck({ ...repairResult.verification, repairAttempts: repairResult.attempts })
       const nextProject = storeProject(project ? evolveProject(project, trimmed, repairResult.finalStructured) : createProject({ mode, request: trimmed, response: repairResult.finalStructured, designSystem }))
       setProject(nextProject)
@@ -259,6 +324,9 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
         maxAttempts: getRepairLimit(),
         reason: 'manual'
       })
+      if (!isHtmlAppResponse(repairResult.finalStructured)) {
+        throw new Error('La réparation a retourné une réponse intermédiaire au lieu d’une application.')
+      }
       const nextProject = storeProject(evolveProject(project, originalRequest, repairResult.finalStructured))
       setProject(nextProject)
       setResult(repairResult.finalStructured)
@@ -321,8 +389,9 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
     } : nextProject
     setProject(migratedProject)
     const latestResponse = migratedProject?.generationHistory?.at(-1)?.response || null
-    const fallbackResponse = migratedProject?.currentApplication ? {
-      html: migratedProject.currentApplication,
+    const fallbackHtml = migratedProject?.currentApplication || migratedProject?.lastValidApplication || ''
+    const fallbackResponse = fallbackHtml ? {
+      html: fallbackHtml,
       systemPrompt: migratedProject.systemPrompt,
       state: migratedProject.applicationState,
       suggestedActions: migratedProject.aiSuggestionsHistory?.at(-1)?.suggestions || [],
