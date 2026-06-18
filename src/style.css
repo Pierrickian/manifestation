@@ -2472,3 +2472,75 @@ p {
   color: rgba(255, 250, 244, 0.68);
   margin: 0;
 }
+
+.transfer-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.transfer-actions-row {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+}
+
+.slim-action {
+  min-height: 42px;
+  padding: 9px 12px;
+}
+
+.info-action {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 250, 244, 0.2);
+  border-radius: 999px;
+  color: #fffaf4;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-weight: 900;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+}
+
+.quick-open-card {
+  border-color: rgba(120, 255, 186, 0.32);
+}
+
+.human-model-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.human-model-field {
+  display: grid;
+  gap: 5px;
+}
+
+.human-model-field span {
+  color: rgba(255, 250, 244, 0.72);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.human-model-field input {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 250, 244, 0.14);
+  border-radius: 12px;
+  color: #fffaf4;
+  font: inherit;
+  min-height: 42px;
+  padding: 9px 11px;
+}
+
+@media (max-width: 620px) {
+  .transfer-actions-row {
+    grid-template-columns: 1fr;
+  }
+
+  .info-action {
+    width: 100%;
+  }
+}

@@ -10,6 +10,7 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
   const [isViewingHtml, setIsViewingHtml] = useState(false)
   const [exportStatus, setExportStatus] = useState(null)
   const [lastExport, setLastExport] = useState(null)
+  const [showTransferInfo, setShowTransferInfo] = useState(false)
   const importInputRef = useRef(null)
   const [mode, setMode] = useState('create')
   const [aiActivity, setAiActivity] = useState({ active: false, log: [] })
@@ -144,13 +145,17 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
 
   useEffect(() => {
     onMenuData?.({
-      journal: aiActivity.log,
+      journal: (project?.generationHistory || []).map((entry, index) => ({
+        id: `${entry.at || 'prompt'}-${index}`,
+        title: entry.request || 'Demande utilisateur',
+        timestamp: entry.at || new Date().toISOString()
+      })).reverse(),
       steps: aiActivity.log,
       pipeline: controller.pipeline,
       healthcheck: controller.healthcheck,
       history: project?.evolutionHistory || []
     })
-  }, [onMenuData, aiActivity.log, controller.pipeline, controller.healthcheck, project?.evolutionHistory])
+  }, [onMenuData, aiActivity.log, controller.pipeline, controller.healthcheck, project?.generationHistory, project?.evolutionHistory])
 
   if (html && isViewingHtml) {
     return <HtmlViewer html={html} title={project?.creationRequest || 'Application créée'} onBack={() => setIsViewingHtml(false)} aiOverlay={<CreatiaAiOverlay activity={aiActivity} />} />
@@ -167,36 +172,26 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
 
       <CreatiaAiOverlay activity={aiActivity} />
 
+      {html ? (
+        <div className="iaview-ready-card quick-open-card">
+          <strong>{project.creationRequest}</strong>
+          <span>Application prête.</span>
+          <div className="create-app-actions"><button type="button" className="primary-action" onClick={() => setIsViewingHtml(true)}>Ouvrir l’application</button><button type="button" className="ghost-action" onClick={handleCopyExternalPrompt}>Copier le prompt</button></div>
+        </div>
+      ) : null}
 
-
-
-      <div className="project-menu import-menu">
-        <button type="button" className="primary-action project-export-action" onClick={() => importInputRef.current?.click()} disabled={isBusy}>
-          <span>Importer</span>
-          <small>Charge un projet complet ou une application seule.</small>
-        </button>
+      <div className="project-menu transfer-actions">
+        <div className="transfer-actions-row">
+          <button type="button" className="primary-action slim-action" onClick={() => importInputRef.current?.click()} disabled={isBusy}>Importer</button>
+          <button type="button" className="ghost-action slim-action" onClick={handleExportHtml} disabled={!project?.currentApplication}>Application seule</button>
+          <button type="button" className="ghost-action slim-action" onClick={handleExportProject} disabled={!project}>Projet complet</button>
+          <button type="button" className="info-action" onClick={() => setShowTransferInfo((visible) => !visible)} aria-expanded={showTransferInfo} aria-label="Informations import export">i</button>
+        </div>
         <input ref={importInputRef} className="visually-hidden" type="file" accept=".manifestation.json,application/json,.html,text/html" onChange={handleImport} />
+        {showTransferInfo ? <small>Importer charge un projet complet ou une application seule. Application seule sert à ouvrir ailleurs. Projet complet garde le contexte et l’historique pour continuer.</small> : null}
+        {lastExport?.url ? <a className="ghost-action export-link" href={lastExport.url} target="_blank" rel="noreferrer">Ouvrir le téléchargement</a> : null}
         {exportStatus ? <span className="project-export-status" role="status">{exportStatus}</span> : null}
       </div>
-
-      <details className="project-menu" open={Boolean(project)}>
-        <summary>Exporter</summary>
-        <div className="project-menu-actions">
-          <button type="button" className="ghost-action project-export-action" onClick={handleExportHtml} disabled={!project?.currentApplication}>
-            <span>Application seule</span>
-            <small>Pour ouvrir ailleurs. Ne garde pas l’historique de création.</small>
-          </button>
-          <button type="button" className="ghost-action project-export-action" onClick={handleExportProject} disabled={!project}>
-            <span>Projet complet</span>
-            <small>Application + contexte + historique pour continuer plus tard.</small>
-          </button>
-          {lastExport?.url ? <a className="ghost-action export-link" href={lastExport.url} target="_blank" rel="noreferrer">Ouvrir le téléchargement</a> : null}
-        </div>
-        <small>Application seule : pratique à ouvrir ailleurs. Projet complet : reprend la création avec le contexte.</small>
-      </details>
-
-
-
 
       <AiInputComposer
         value={controller.input}
@@ -223,14 +218,6 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
 
       {controller.error ? <div className="create-app-status error" role="alert"><strong>Oups</strong><span>{controller.error}</span>{controller.lastPrompt ? <button type="button" className="ghost-action" onClick={controller.retry} disabled={isBusy}>Réessayer la même demande</button> : null}</div> : null}
       {controller.repairError ? <div className="create-app-status error" role="alert"><strong>Réparation</strong><span>{controller.repairError}</span></div> : null}
-      {html ? (
-        <div className="iaview-ready-card">
-          <strong>{project.creationRequest}</strong>
-          <span>Projet enregistré automatiquement. Demande une évolution ou ouvre l’application.</span>
-          <div className="create-app-actions"><button type="button" className="primary-action" onClick={() => setIsViewingHtml(true)}>Ouvrir l’application</button><button type="button" className="ghost-action" onClick={handleCopyExternalPrompt}>Copier un brief pour une autre IA</button></div>
-        </div>
-      ) : null}
-
       <details className="project-menu advanced-options">
         <summary>Options avancées</summary>
         <label className="ai-time-option">
@@ -247,13 +234,20 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
           <div className="human-model-help">
             <strong>Contexte utilisé par l’IA</strong>
             <p>Ces éléments aident Creatia à garder la même intention quand tu demandes une évolution.</p>
-            <dl className="human-model-list">
-              <div><dt>But</dt><dd>{project.humanModel.purpose || 'À préciser dans ta prochaine demande'}</dd></div>
-              <div><dt>Pour qui</dt><dd>{project.humanModel.audience || 'À préciser dans ta prochaine demande'}</dd></div>
-              <div><dt>Style</dt><dd>{project.humanModel.tone || 'À préciser dans ta prochaine demande'}</dd></div>
-              <div><dt>Ressenti</dt><dd>{project.humanModel.emotion || 'À préciser dans ta prochaine demande'}</dd></div>
-              <div><dt>Parcours</dt><dd>{project.humanModel.journey || 'À préciser dans ta prochaine demande'}</dd></div>
-            </dl>
+            <div className="human-model-editor">
+              {[
+                ['purpose', 'But'],
+                ['audience', 'Pour qui'],
+                ['tone', 'Style'],
+                ['emotion', 'Ressenti'],
+                ['journey', 'Parcours']
+              ].map(([field, label]) => (
+                <label key={field} className="human-model-field">
+                  <span>{label}</span>
+                  <input type="text" value={project.humanModel[field] || ''} onChange={(event) => controller.updateHumanModelField(field, event.target.value)} placeholder="À préciser" disabled={isBusy} />
+                </label>
+              ))}
+            </div>
           </div>
         ) : null}
       </details>

@@ -309,7 +309,24 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
     setMessage('Projet importé. Tu peux continuer Create ou Co-Create immédiatement.')
   }
 
+
+  function updateHumanModelField(field, value) {
+    if (!project) return
+    const nextProject = storeProject({
+      ...project,
+      humanModel: {
+        ...(project.humanModel || {}),
+        [field]: value
+      },
+      metadata: {
+        ...(project.metadata || {}),
+        updatedAt: new Date().toISOString()
+      }
+    })
+    setProject(nextProject)
+  }
+
   function cancel() { abortRef.current?.abort() }
 
-  return { input, setInput, status, message, error, repairError, result, project, submit, submitPartnerSuggestion, retry, repair, rebuildHumanModel, importProject, cancel, appendTranscript, speechEnabled, progressText, hasTime, setHasTime, pipeline, healthcheck, lastPrompt }
+  return { input, setInput, status, message, error, repairError, result, project, submit, submitPartnerSuggestion, retry, repair, rebuildHumanModel, updateHumanModelField, importProject, cancel, appendTranscript, speechEnabled, progressText, hasTime, setHasTime, pipeline, healthcheck, lastPrompt }
 }
