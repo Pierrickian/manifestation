@@ -126,27 +126,20 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
     setIsViewingHtml(true)
   }, [controller.result?.html])
 
-  async function handleCopyExternalPrompt() {
-    if (!project && !controller.lastPrompt) return
-    const history = (project?.evolutionHistory || []).slice(-6).map((entry, index) => `${index + 1}. Demande: ${entry.userRequest || 'Non précisée'}\nAnalyse: ${entry.analysis || 'Non précisée'}\nChangements: ${(entry.generatedChanges || []).join(', ') || 'Non précisés'}`).join('\n\n')
-    const prompt = [
-      'Tu es une IA experte en création d’applications web autonomes.',
-      'Refais une version complète, exécutable dans un navigateur, en un seul fichier avec styles et interactions intégrés.',
-      `Demande initiale: ${project?.creationRequest || controller.lastPrompt || 'Non précisée'}`,
-      controller.lastPrompt ? `Dernière demande utilisateur: ${controller.lastPrompt}` : '',
-      project?.humanModel ? `Contexte utilisateur: ${JSON.stringify(project.humanModel, null, 2)}` : '',
-      history ? `Historique utile:\n${history}` : '',
-      html ? `Version actuelle à améliorer ou reconstruire:\n${html}` : '',
-      'Retourne uniquement le code final complet, sans explication autour.'
-    ].filter(Boolean).join('\n\n')
+  async function handleCopyRuntimePrompt() {
+    if (!controller.lastRuntimePrompt) {
+      setExportStatus('Aucun prompt runtime disponible pour le moment.')
+      return
+    }
 
     try {
-      await navigator.clipboard.writeText(prompt)
-      setExportStatus('Brief copié. Tu peux le coller dans une autre IA.')
+      await navigator.clipboard.writeText(controller.lastRuntimePrompt)
+      setExportStatus('Prompt runtime copié.')
     } catch {
-      setExportStatus('Copie automatique indisponible. Sélectionne et copie le brief manuellement depuis ton navigateur.')
+      setExportStatus('Copie automatique indisponible. Sélectionne et copie le prompt runtime manuellement depuis ton navigateur.')
     }
   }
+
 
   useEffect(() => {
     onMenuData?.({
@@ -182,7 +175,7 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
         <div className="iaview-ready-card quick-open-card">
           <strong>{project.creationRequest}</strong>
           <span>Application prête.</span>
-          <div className="create-app-actions"><button type="button" className="primary-action" onClick={() => setIsViewingHtml(true)}>Ouvrir l’application</button><button type="button" className="ghost-action" onClick={handleCopyExternalPrompt}>Copier le prompt</button></div>
+          <div className="create-app-actions"><button type="button" className="primary-action" onClick={() => setIsViewingHtml(true)}>Ouvrir l’application</button><button type="button" className="ghost-action" onClick={handleCopyRuntimePrompt} disabled={!controller.lastRuntimePrompt}>Copy Runtime Prompt</button></div>
         </div>
       ) : null}
 

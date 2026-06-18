@@ -49,6 +49,7 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
   const [healthcheck, setHealthcheck] = useState(null)
   const [repairError, setRepairError] = useState(null)
   const [lastPrompt, setLastPrompt] = useState('')
+  const [lastRuntimePrompt, setLastRuntimePrompt] = useState('')
   const abortRef = useRef(null)
   const timeoutRef = useRef(null)
 
@@ -81,6 +82,7 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
         attempt,
         maxAttempts
       })
+      setLastRuntimePrompt(JSON.stringify(repairRequest, null, 2))
       onDebug?.({ status: 'repair_ready', reason, attempt, maxAttempts, kind: repairRequest.kind, shortTitle: `Réparation IA ${attempt}/${maxAttempts}`, healthcheck: verification, timestamp: new Date().toISOString() })
       onDebug?.({ status: 'ai_request', kind: repairRequest.kind, shortTitle: `Réparation IA ${attempt}/${maxAttempts}`, timestamp: new Date().toISOString() })
       const repairedPayload = await aiProvider({ ...repairRequest, signal: controller.signal })
@@ -126,6 +128,7 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
 
     try {
       const request = buildAiPrompt({ input: trimmed, mode, designSystem, project, capabilities: detectedCapabilities, strategy: selectedStrategy, hasTime })
+      setLastRuntimePrompt(JSON.stringify(request, null, 2))
       const requestShortTitle = project ? 'Évolution du projet' : 'Création du projet'
       onDebug?.({ status: 'request_ready', kind: request.kind, shortTitle: requestShortTitle, rendererType: request.metadata.rendererType, designSystem: request.metadata.designSystem?.themeName, timestamp: new Date().toISOString() })
       onDebug?.({ status: 'ai_request', kind: request.kind, shortTitle: requestShortTitle, timestamp: new Date().toISOString() })
@@ -262,6 +265,7 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
 
     try {
       const request = buildHumanModelRefreshPrompt({ project, designSystem })
+      setLastRuntimePrompt(JSON.stringify(request, null, 2))
       onDebug?.({ status: 'request_ready', kind: request.kind, shortTitle: 'Rebuild Human Model', rendererType: request.metadata.rendererType, timestamp: new Date().toISOString() })
       onDebug?.({ status: 'ai_request', kind: request.kind, shortTitle: 'Rebuild Human Model', timestamp: new Date().toISOString() })
       const payload = await aiProvider({ ...request, signal: controller.signal })
@@ -328,5 +332,5 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
 
   function cancel() { abortRef.current?.abort() }
 
-  return { input, setInput, status, message, error, repairError, result, project, submit, submitPartnerSuggestion, retry, repair, rebuildHumanModel, updateHumanModelField, importProject, cancel, appendTranscript, speechEnabled, progressText, hasTime, setHasTime, pipeline, healthcheck, lastPrompt }
+  return { input, setInput, status, message, error, repairError, result, project, submit, submitPartnerSuggestion, retry, repair, rebuildHumanModel, updateHumanModelField, importProject, cancel, appendTranscript, speechEnabled, progressText, hasTime, setHasTime, pipeline, healthcheck, lastPrompt, lastRuntimePrompt }
 }
