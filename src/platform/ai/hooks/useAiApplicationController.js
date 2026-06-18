@@ -48,6 +48,8 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
   const [pipeline, setPipeline] = useState(null)
   const [healthcheck, setHealthcheck] = useState(null)
   const [repairError, setRepairError] = useState(null)
+  const [lastPrompt, setLastPrompt] = useState('')
+  const [lastRuntimePrompt, setLastRuntimePrompt] = useState('')
   const abortRef = useRef(null)
   const timeoutRef = useRef(null)
 
@@ -80,6 +82,7 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
         attempt,
         maxAttempts
       })
+      setLastRuntimePrompt(JSON.stringify(repairRequest, null, 2))
       onDebug?.({ status: 'repair_ready', reason, attempt, maxAttempts, kind: repairRequest.kind, shortTitle: `Réparation IA ${attempt}/${maxAttempts}`, healthcheck: verification, timestamp: new Date().toISOString() })
       onDebug?.({ status: 'ai_request', kind: repairRequest.kind, shortTitle: `Réparation IA ${attempt}/${maxAttempts}`, timestamp: new Date().toISOString() })
       const repairedPayload = await aiProvider({ ...repairRequest, signal: controller.signal })
@@ -101,6 +104,7 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
       return
     }
 
+    setLastPrompt(trimmed)
     const controller = new AbortController()
     abortRef.current = controller
     setStatus('loading')
@@ -124,6 +128,7 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
 
     try {
       const request = buildAiPrompt({ input: trimmed, mode, designSystem, project, capabilities: detectedCapabilities, strategy: selectedStrategy, hasTime })
+      setLastRuntimePrompt(JSON.stringify(request, null, 2))
       const requestShortTitle = project ? 'Évolution du projet' : 'Création du projet'
       onDebug?.({ status: 'request_ready', kind: request.kind, shortTitle: requestShortTitle, rendererType: request.metadata.rendererType, designSystem: request.metadata.designSystem?.themeName, timestamp: new Date().toISOString() })
       onDebug?.({ status: 'ai_request', kind: request.kind, shortTitle: requestShortTitle, timestamp: new Date().toISOString() })
@@ -147,7 +152,7 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
       setResult(repairResult.finalStructured)
       setInput('')
       setStatus('success')
-      setMessage(project ? 'Le projet a évolué.' : 'Le projet est prêt.')
+      setMessage(repairResult.finalStructured.html ? (project ? 'Le projet a évolué.' : 'Le projet est prêt.') : 'La requête n’a pas abouti. Tu peux réessayer avec la même demande.')
       onDebug?.({
         ...(payload.debug || {}),
         status: 'success',
@@ -197,7 +202,13 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
   }
 
   async function retry() {
-    const originalRequest = project?.creationRequest || input
+    const originalRequest = lastPrompt || project?.generationHistory?.at(-1)?.request || project?.creationRequest || input
+    if (!originalRequest?.trim()) {
+      setStatus('error')
+      setError('Aucune demande précédente à réessayer.')
+      return
+    }
+    setMessage('Nouvel essai avec la même demande…')
     await submitWithText(originalRequest)
   }
 
@@ -254,6 +265,7 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
 
     try {
       const request = buildHumanModelRefreshPrompt({ project, designSystem })
+      setLastRuntimePrompt(JSON.stringify(request, null, 2))
       onDebug?.({ status: 'request_ready', kind: request.kind, shortTitle: 'Rebuild Human Model', rendererType: request.metadata.rendererType, timestamp: new Date().toISOString() })
       onDebug?.({ status: 'ai_request', kind: request.kind, shortTitle: 'Rebuild Human Model', timestamp: new Date().toISOString() })
       const payload = await aiProvider({ ...request, signal: controller.signal })
@@ -301,7 +313,24 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
     setMessage('Projet importé. Tu peux continuer Create ou Co-Create immédiatement.')
   }
 
+
+  function updateHumanModelField(field, value) {
+    if (!project) return
+    const nextProject = storeProject({
+      ...project,
+      humanModel: {
+        ...(project.humanModel || {}),
+        [field]: value
+      },
+      metadata: {
+        ...(project.metadata || {}),
+        updatedAt: new Date().toISOString()
+      }
+    })
+    setProject(nextProject)
+  }
+
   function cancel() { abortRef.current?.abort() }
 
-  return { input, setInput, status, message, error, repairError, result, project, submit, submitPartnerSuggestion, retry, repair, rebuildHumanModel, importProject, cancel, appendTranscript, speechEnabled, progressText, hasTime, setHasTime, pipeline, healthcheck }
+  return { input, setInput, status, message, error, repairError, result, project, submit, submitPartnerSuggestion, retry, repair, rebuildHumanModel, updateHumanModelField, importProject, cancel, appendTranscript, speechEnabled, progressText, hasTime, setHasTime, pipeline, healthcheck, lastPrompt, lastRuntimePrompt }
 }

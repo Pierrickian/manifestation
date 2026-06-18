@@ -359,6 +359,7 @@ export function ManifestationWizard() {
   const [mesQuestionsDebug, setMesQuestionsDebug] = useState(null)
   const [enigmiaDebug, setEnigmiaDebug] = useState(null)
   const [htmlGeneratorDebug, setHtmlGeneratorDebug] = useState(null)
+  const [creatiaMenu, setCreatiaMenu] = useState({})
   const [hasConfiguredApp, setHasConfiguredApp] = useState(false)
   const [showAiDebug, setShowAiDebug] = useState(false)
   const [portalView, setPortalView] = useState(readInitialPortalView)
@@ -924,6 +925,7 @@ export function ManifestationWizard() {
         onHome={goHome}
         showAiDebug={showAiDebug}
         onShowAiDebugChange={setShowAiDebug}
+        creatiaMenu={portalView === 'html-app-generator' ? creatiaMenu : null}
       />
 
       {portalView === 'home' ? (
@@ -941,7 +943,7 @@ export function ManifestationWizard() {
         </>
       ) : portalView === 'html-app-generator' ? (
         <>
-          <HtmlAppGenerator onClose={goHome} onDebug={setHtmlGeneratorDebug} speechEnabled />
+          <HtmlAppGenerator onClose={goHome} onDebug={setHtmlGeneratorDebug} onMenuData={setCreatiaMenu} speechEnabled />
           {showAiDebug ? <AiDebugFooter debugRows={getDebugRows(null, htmlGeneratorDebug)} /> : null}
         </>
       ) : portalView === 'create-app' ? (
@@ -1299,8 +1301,13 @@ function AppSetupStep({
 function WizardMenu({
   onHome,
   showAiDebug,
-  onShowAiDebugChange
+  onShowAiDebugChange,
+  creatiaMenu
 }) {
+  const [showCreatiaHealthDetails, setShowCreatiaHealthDetails] = useState(false)
+  const creatiaHealthcheck = creatiaMenu?.healthcheck
+  const creatiaHealthLabel = creatiaHealthcheck?.status === 'verified' ? 'Application vérifiée' : creatiaHealthcheck?.failedCount ? 'Contrôles incomplets' : creatiaHealthcheck?.checks?.length ? 'Contrôles à vérifier' : 'Aucun contrôle'
+
   return (
     <details className="wizard-menu compact-menu">
       <summary aria-label="Menu" title="Menu">
@@ -1311,13 +1318,70 @@ function WizardMenu({
         <button type="button" className="menu-home-action" onClick={onHome}>Accueil</button>
       </div>
 
+
+
+      {creatiaMenu ? (
+        <div className="menu-evolutia-panels">
+          <details className="ai-submenu">
+            <summary>Journal IA</summary>
+            {creatiaMenu.journal?.length ? (
+              <ol className="menu-journal-list">
+                {creatiaMenu.journal.map((entry) => (
+                  <li key={entry.id} className={entry.type}>
+                    <strong>{entry.title}</strong>
+                    <time dateTime={entry.timestamp}>{new Date(entry.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</time>
+                  </li>
+                ))}
+              </ol>
+            ) : <small>Aucun appel Creatia pour le moment.</small>}
+          </details>
+
+          <details className="ai-submenu">
+            <summary>Étapes IA</summary>
+            {creatiaMenu.steps?.length ? (
+              <ol className="menu-journal-list">
+                {creatiaMenu.steps.map((entry) => <li key={entry.id}><strong>{entry.title}</strong><time dateTime={entry.timestamp}>{new Date(entry.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</time></li>)}
+              </ol>
+            ) : <small>Aucune étape enregistrée.</small>}
+          </details>
+
+          {creatiaMenu.pipeline ? (
+            <details className="ai-submenu">
+              <summary>Chemin technique</summary>
+              <strong>{creatiaMenu.pipeline.strategy.label}</strong>
+              <small>{creatiaMenu.pipeline.strategy.description}</small>
+            </details>
+          ) : null}
+
+          {creatiaHealthcheck ? (
+            <details className="ai-submenu">
+              <summary>Contrôles de test</summary>
+              <strong>{creatiaHealthLabel}</strong>
+              <small>{creatiaHealthcheck.passedCount ?? creatiaHealthcheck.checks.filter((check) => check.ok).length}/{creatiaHealthcheck.checks.length} validés</small>
+              <div className="menu-health-actions">
+                <button type="button" className="ghost-action" onClick={() => setShowCreatiaHealthDetails((visible) => !visible)}>{showCreatiaHealthDetails ? 'Masquer' : 'View details'}</button>
+                <button type="button" className="ghost-action" onClick={creatiaMenu.healthcheckActions?.retry} disabled={creatiaMenu.healthcheckActions?.isBusy}>Retry</button>
+                <button type="button" className="primary-action" onClick={creatiaMenu.healthcheckActions?.repair} disabled={creatiaMenu.healthcheckActions?.isBusy || !creatiaMenu.healthcheckActions?.canRepair}>Repair</button>
+              </div>
+              {showCreatiaHealthDetails ? (
+                <ul className="menu-health-details">
+                  {creatiaHealthcheck.checks.map((check) => (
+                    <li key={check.id} className={check.ok ? 'passed' : 'failed'}><strong>{check.ok ? '✓' : '×'} {check.id}</strong><span>{check.message}</span>{!check.ok ? <small>{check.expected} · {check.actual}</small> : null}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </details>
+          ) : null}
+        </div>
+      ) : null}
+
       <label className="debug-toggle">
         <input
           type="checkbox"
           checked={showAiDebug}
           onChange={(event) => onShowAiDebugChange(event.target.checked)}
         />
-        <span>Debug IA</span>
+        <span>Connexion IA</span>
       </label>
     </details>
   )
@@ -1326,7 +1390,7 @@ function WizardMenu({
 function AiDebugFooter({ debugRows }) {
   return (
     <footer className="ai-debug-footer ai-debug-panel" aria-live="polite">
-      <strong>Debug IA</strong>
+      <strong>Connexion IA</strong>
       {debugRows.length ? (
         <dl>
           {debugRows.map(([label, value]) => (

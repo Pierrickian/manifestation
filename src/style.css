@@ -2404,3 +2404,212 @@ p {
 .human-model-refresh-warning .primary-action {
   margin-top: 0.85rem;
 }
+
+.debug-menu[open] {
+  bottom: max(14px, env(safe-area-inset-bottom));
+  left: max(14px, env(safe-area-inset-left));
+  max-height: min(72vh, 680px);
+  max-width: min(520px, calc(100vw - 28px));
+  overflow: auto;
+  position: fixed;
+  right: auto;
+  width: calc(100vw - 28px);
+  z-index: 130;
+  backdrop-filter: blur(18px);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+}
+
+.debug-section {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.debug-section > strong {
+  color: #fffaf4;
+  font-weight: 900;
+}
+
+.menu-evolutia-panels {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.menu-journal-list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.menu-journal-list li {
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.menu-journal-list time,
+.menu-evolutia-panels small {
+  color: rgba(255, 250, 244, 0.62);
+  font-size: 0.72rem;
+}
+
+.import-menu .primary-action {
+  margin-top: 0;
+}
+
+.human-model-help {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.human-model-help p {
+  color: rgba(255, 250, 244, 0.68);
+  margin: 0;
+}
+
+.transfer-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.transfer-actions-row {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+}
+
+.slim-action {
+  min-height: 42px;
+  padding: 9px 12px;
+}
+
+.info-action {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 250, 244, 0.2);
+  border-radius: 999px;
+  color: #fffaf4;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-weight: 900;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+}
+
+.quick-open-card {
+  border-color: rgba(120, 255, 186, 0.32);
+}
+
+.human-model-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.human-model-field {
+  display: grid;
+  gap: 5px;
+}
+
+.human-model-field span {
+  color: rgba(255, 250, 244, 0.72);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.human-model-field input {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 250, 244, 0.14);
+  border-radius: 12px;
+  color: #fffaf4;
+  font: inherit;
+  min-height: 42px;
+  padding: 9px 11px;
+}
+
+@media (max-width: 620px) {
+  .transfer-actions-row {
+    grid-template-columns: 1fr;
+  }
+
+  .info-action {
+    width: 100%;
+  }
+}
+
+.transfer-action-pair {
+  align-items: center;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.menu-health-actions {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 10px;
+}
+
+.menu-health-actions .ghost-action,
+.menu-health-actions .primary-action {
+  font-size: 0.82rem;
+  margin-top: 0;
+  min-height: 38px;
+  padding: 8px 10px;
+}
+
+.menu-health-details {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.menu-health-details li {
+  border: 1px solid rgba(255, 250, 244, 0.12);
+  border-radius: 10px;
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+}
+
+.menu-health-details li.passed {
+  border-color: rgba(120, 255, 186, 0.28);
+}
+
+.menu-health-details li.failed {
+  border-color: rgba(255, 122, 122, 0.34);
+}
+
+.menu-health-details strong,
+.menu-health-details span,
+.menu-health-details small,
+.menu-evolutia-panels strong,
+.menu-evolutia-panels summary {
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.transfer-actions-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 620px) {
+  .info-action {
+    width: 34px;
+  }
+}
+
+.transfer-actions-row {
+  grid-template-columns: 1fr;
+}
