@@ -12,6 +12,10 @@ const SMART_COMPLEXITY_TERMS = [
 
 const CONFIDENCE_SCORE = { low: 1, medium: 2, high: 3 }
 const AUTO_REPAIR_CONFIDENCES = new Set(['high', 'medium'])
+const REQUIRED_COCREATE_REPAIR_CHECKS = new Set([
+  'cocreate_continuation_plan_exists',
+  'cocreate_preload_entries_exist'
+])
 
 function createCheck({ id, ok, message, expected, actual, repairConfidence = 'low', repairable = false, severity = 'critical' }) {
   return { id, ok, message, expected, actual: ok ? 'Detected.' : actual, repairConfidence, repairable, severity }
@@ -25,7 +29,11 @@ function getRepairConfidence(failedChecks) {
 }
 
 export function isAutoRepairableHealthcheck(healthcheck = {}) {
-  return AUTO_REPAIR_CONFIDENCES.has(healthcheck.repairConfidence) && Boolean(healthcheck.failedChecks?.some((check) => check.repairable && check.severity !== 'warning'))
+  const repairableChecks = healthcheck.failedChecks?.filter((check) => (
+    check.repairable
+    && (check.severity !== 'warning' || REQUIRED_COCREATE_REPAIR_CHECKS.has(check.id))
+  )) || []
+  return AUTO_REPAIR_CONFIDENCES.has(healthcheck.repairConfidence) && repairableChecks.length > 0
 }
 
 export function detectCapabilities(input = '') {
@@ -300,7 +308,9 @@ export function runGeneratedAppHealthcheck(response = {}, strategy = {}) {
   const failedChecks = checks.filter((check) => !check.ok)
   const criticalFailures = failedChecks.filter((check) => check.severity !== 'warning')
   const warningFailures = failedChecks.filter((check) => check.severity === 'warning')
-  const repairConfidence = getRepairConfidence(criticalFailures)
+  const requiredCoCreateWarnings = warningFailures.filter((check) => REQUIRED_COCREATE_REPAIR_CHECKS.has(check.id))
+  const repairTargets = criticalFailures.length ? criticalFailures : requiredCoCreateWarnings
+  const repairConfidence = getRepairConfidence(repairTargets)
   return {
     status: criticalFailures.length ? 'generated' : warningFailures.length ? 'warning' : 'verified',
     label: criticalFailures.length ? 'Application Generated' : warningFailures.length ? 'Application Verified with Warnings' : 'Application Verified',
@@ -308,7 +318,7 @@ export function runGeneratedAppHealthcheck(response = {}, strategy = {}) {
     depth: strategy.healthcheckDepth || 'light',
     mode,
     repairConfidence,
-    isRepairable: AUTO_REPAIR_CONFIDENCES.has(repairConfidence) && criticalFailures.some((check) => check.repairable),
+    isRepairable: AUTO_REPAIR_CONFIDENCES.has(repairConfidence) && repairTargets.some((check) => check.repairable),
     passedCount: checks.length - failedChecks.length,
     failedCount: criticalFailures.length,
     warningCount: warningFailures.length,
