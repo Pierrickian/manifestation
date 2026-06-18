@@ -21,8 +21,9 @@ const STRUCTURED_APP_INSTRUCTIONS = [
   'state stores persistent application state and decisions that future evolutions must preserve.',
   'currentApplication/html is the single authoritative active HTML source. files stores optional supporting technical artifacts only, for example { "styles.css": string, "app.js": string }; do not duplicate the complete HTML document in files["index.html"].',
   'capabilities must declare expected runtime capabilities, for example { "webgl": true, "audio": false, "simulation": true }.',
-  'suggestedActions contains concise creative next steps only when collaboration mode is enabled; otherwise return an empty array.',
-  'continuationPlan and preload are exclusive to co-create mode. In create mode return null and an empty array.',
+  'suggestedActions is only for visible, user-facing evolution buttons in Co-Create mode. Keep each item short, actionable, optional, and user-centric, for example "Add a shop", "Add a harder level", or "Add a minimap". In create mode return an empty array.',
+  'continuationPlan is the durable AI-to-engine collaboration memory for Co-Create mode, not a UI feature and not a list of buttons. Use it to preserve the AI role such as game master, narrator, coach, teacher, or simulation director; long-term objectives; collaboration rules; continuity instructions; orchestration logic; expected callbacks; and session strategy. In create mode return null.',
+  'preload is the Co-Create future-preparation channel for anticipation and latency hiding, not a user suggestion and not a continuationPlan duplicate. Return an array of future generation candidates, prepared prompts, prepared branches, probable future content, or optional prepared fragments. Put trigger definitions on preload entries, for example { "trigger": "monster_defeated", "preparedPrompt": "...", "confidence": 0.9 }. In create mode return an empty array.',
   'If the app has an intro or description panel with a Play, Start, Jouer, Lancer, or Commencer button, make that panel interactive and hide/remove it as soon as the user starts so the actual game or app receives focus.',
   'Do not use external dependencies or remote assets unless the user explicitly requests them.'
 ]
@@ -60,7 +61,7 @@ export function buildAiPrompt({ input, mode = 'create', designSystem = MANIFESTA
   const userPayload = {
     task,
     mode,
-    collaboration: isCoCreate ? 'Co-Create enabled: AI suggestions, continuationPlan and preload proposals are allowed when useful.' : 'Create mode: generation-focused; suggestedActions must be empty, continuationPlan must be null, preload must be empty.',
+    collaboration: isCoCreate ? 'Co-Create enabled: suggestedActions may expose visible user choices; continuationPlan must preserve AI↔engine collaboration memory; preload may request trigger-driven future preparation for latency hiding.' : 'Create mode: generation-focused; suggestedActions must be empty, continuationPlan must be null, preload must be empty.',
     userRequest: input.trim(),
     currentProject: project ? {
       creationRequest: project.creationRequest,
@@ -69,6 +70,8 @@ export function buildAiPrompt({ input, mode = 'create', designSystem = MANIFESTA
       applicationState: project.applicationState,
       humanModel: project.humanModel,
       technicalModel: project.technicalModel,
+      continuationPlan: project.continuationPlan,
+      preloadQueue: project.preloadQueue || [],
       evolutionHistory: project.evolutionHistory?.slice(-8) || [],
       generationHistory: project.generationHistory?.slice(-5) || [],
       metadata: project.metadata

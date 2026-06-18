@@ -52,7 +52,6 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
   const project = controller.project
   const html = project?.currentApplication || ''
   const latestSuggestions = project?.aiSuggestionsHistory?.at(-1)?.suggestions || []
-  const preloadQueue = mode === 'co-create' ? project?.preloadQueue || [] : []
   const continuationPlan = mode === 'co-create' ? project?.continuationPlan : null
   const lastAutoOpenedHtmlRef = useRef('')
   const isBusy = controller.status === 'loading' || controller.status === 'repairing' || controller.status === 'refreshingHumanModel'
@@ -262,14 +261,8 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
       ) : null}
       {mode === 'co-create' && continuationPlan ? (
         <div className="ai-suggestions-card">
-          <strong>Plan de continuation</strong>
+          <strong>Plan de collaboration</strong>
           <span>{continuationPlan.summary || continuationPlan.nextContact || 'L’IA propose une suite de collaboration.'}</span>
-        </div>
-      ) : null}
-      {mode === 'co-create' && preloadQueue.length ? (
-        <div className="ai-suggestions-card">
-          <strong>Preload proposé</strong>
-          <div>{preloadQueue.map((item, index) => <button type="button" key={`${item.task || 'preload'}-${index}`} onClick={() => controller.submitPartnerSuggestion(item.task || item.reason || 'Préparer le contenu suivant')} disabled={isBusy}>{item.priority || 'Soon'} · {item.task || item.reason}</button>)}</div>
         </div>
       ) : null}
 

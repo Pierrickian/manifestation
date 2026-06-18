@@ -1,4 +1,4 @@
-import { createProject, normalizeTechnicalModel, storeProject } from './projectModel'
+import { createProject, normalizePreloadQueue, normalizeTechnicalModel, storeProject } from './projectModel'
 import { withCreatiaUiGuards } from './renderers/HtmlViewer'
 
 const PROJECT_EXPORT_VERSION = 1
@@ -58,7 +58,7 @@ export function buildProjectExport(project) {
     currentApplication: project?.currentApplication || latestResponse.html || '',
     aiSuggestions: project?.aiSuggestionsHistory || [],
     continuationPlan: project?.continuationPlan || latestResponse.continuationPlan || null,
-    preloadMetadata: project?.preloadQueue || latestResponse.preload || []
+    preloadMetadata: normalizePreloadQueue(project?.preloadQueue || latestResponse.preload || [])
   }
   const json = JSON.stringify(payload, null, 2)
   const filename = `${safeSlug(project?.creationRequest || project?.id || 'creatia-project')}.manifestation.json`
@@ -189,7 +189,7 @@ export function normalizeImportedProject(payload) {
     generationHistory: history,
     aiSuggestionsHistory: Array.isArray(payload?.aiSuggestions) ? payload.aiSuggestions : sourceProject?.aiSuggestionsHistory || [],
     continuationPlan: payload?.continuationPlan ?? sourceProject?.continuationPlan ?? latestResponse.continuationPlan ?? null,
-    preloadQueue: Array.isArray(payload?.preloadMetadata) ? payload.preloadMetadata : sourceProject?.preloadQueue || latestResponse.preload || [],
+    preloadQueue: normalizePreloadQueue(Array.isArray(payload?.preloadMetadata) ? payload.preloadMetadata : sourceProject?.preloadQueue || latestResponse.preload || []),
     capabilities: sourceProject?.capabilities || latestResponse.capabilities || {},
     metadata: { renderer: 'html', ...(sourceProject?.metadata || {}) }
   }

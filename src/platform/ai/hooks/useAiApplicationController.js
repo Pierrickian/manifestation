@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { requestAiCompletion } from '../aiProvider'
 import { buildAiPrompt, buildHumanModelRefreshPrompt, buildRepairPrompt, normalizeStructuredAiResponse } from '../promptBuilder'
-import { createProject, evolveProject, refreshProjectHumanModel, storeProject } from '../projectModel'
+import { createProject, evolveProject, normalizePreloadQueue, refreshProjectHumanModel, storeProject } from '../projectModel'
 import { detectCapabilities, isAutoRepairableHealthcheck, runGeneratedAppHealthcheck, selectGenerationStrategy } from '../generationPipeline'
 
 const REQUEST_TIMEOUT_MS = 60000
@@ -293,16 +293,20 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
   }
 
   function importProject(nextProject) {
-    setProject(nextProject)
-    const latestResponse = nextProject?.generationHistory?.at(-1)?.response || null
+    const migratedProject = nextProject ? {
+      ...nextProject,
+      preloadQueue: normalizePreloadQueue(nextProject.preloadQueue || [])
+    } : nextProject
+    setProject(migratedProject)
+    const latestResponse = migratedProject?.generationHistory?.at(-1)?.response || null
     const fallbackResponse = nextProject?.currentApplication ? {
-      html: nextProject.currentApplication,
-      systemPrompt: nextProject.systemPrompt,
-      state: nextProject.applicationState,
-      suggestedActions: nextProject.aiSuggestionsHistory?.at(-1)?.suggestions || [],
-      continuationPlan: nextProject.continuationPlan,
-      preload: nextProject.preloadQueue || [],
-      capabilities: nextProject.capabilities || {}
+      html: migratedProject.currentApplication,
+      systemPrompt: migratedProject.systemPrompt,
+      state: migratedProject.applicationState,
+      suggestedActions: migratedProject.aiSuggestionsHistory?.at(-1)?.suggestions || [],
+      continuationPlan: migratedProject.continuationPlan,
+      preload: migratedProject.preloadQueue || [],
+      capabilities: migratedProject.capabilities || {}
     } : null
     setResult(latestResponse?.html ? latestResponse : fallbackResponse)
     setInput('')
