@@ -97,7 +97,7 @@ function isNonEmptyObject(value) {
 }
 
 function hasRuntimeAiGenerationPath(html = '') {
-  return /requestAiGeneration|needs_generation|preload_requested|preload_consumed|branch_requested|content_exhausted|ai_request|postMessage\s*\(/i.test(String(html))
+  return /requestAiGeneration|needs_generation|preload_requested|preload_consumed|branch_requested|content_exhausted|ai_request|data-ai-trigger|data-runtime-trigger|data-generation-trigger|postMessage\s*\(/i.test(String(html))
 }
 
 function exposesRuntimeAiStatus(html = '') {

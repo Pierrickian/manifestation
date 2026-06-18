@@ -566,6 +566,88 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     renderDiagnostics();
     return true;
   }
+  const runtimeCallbackEvents = ['ai_request', 'needs_generation', 'preload_requested', 'branch_requested', 'content_exhausted', 'runtime_generation_requested'];
+  function createRuntimeRequestFromSource(trigger, detail = {}) {
+    return {
+      trigger: trigger || detail.trigger || detail.type || 'runtime_generation',
+      state: detail.state || getRuntimeState(),
+      continuationPlan: detail.continuationPlan || window.continuationPlan || window.__continuationPlan || null,
+      preload: detail.preload || window.preload || window.__preload || [],
+      context: {
+        ...detail.context,
+        source: detail.source || 'runtime_callback',
+        label: detail.label || '',
+        detail
+      }
+    };
+  }
+  function dispatchRuntimeCallbackRequest(trigger, detail = {}) {
+    addEvent('runtime_callback_requested', { trigger, detail });
+    if (typeof window.requestAiGeneration !== 'function') {
+      addDecision('Blocked because: Runtime AI callback requested before requestAiGeneration was available.', { trigger, detail });
+      return null;
+    }
+    return window.requestAiGeneration(createRuntimeRequestFromSource(trigger, detail));
+  }
+  function runtimeTriggerFromElement(element) {
+    if (!element) return '';
+    return element.dataset.aiTrigger
+      || element.dataset.runtimeTrigger
+      || element.dataset.generationTrigger
+      || element.dataset.preloadTrigger
+      || element.dataset.trigger
+      || element.getAttribute('data-ai-trigger')
+      || element.getAttribute('data-runtime-trigger')
+      || element.getAttribute('data-generation-trigger')
+      || '';
+  }
+  function installRuntimeCallbackBridge() {
+    if (window.__creatiaRuntimeCallbackBridgeInstalled) return;
+    window.__creatiaRuntimeCallbackBridgeInstalled = true;
+    runtimeCallbackEvents.forEach((eventName) => {
+      window.addEventListener(eventName, (event) => {
+        const detail = event?.detail && typeof event.detail === 'object' ? event.detail : {};
+        dispatchRuntimeCallbackRequest(detail.trigger || eventName, { ...detail, source: eventName });
+      });
+    });
+    document.addEventListener('click', (event) => {
+      const target = event.target?.closest?.('button, [role="button"], a, [data-ai-trigger], [data-runtime-trigger], [data-generation-trigger], [data-preload-trigger], [data-trigger]');
+      if (!target || target.closest?.('.creatia-runtime-debug-panel')) return;
+      const trigger = runtimeTriggerFromElement(target);
+      const needsAi = trigger
+        || target.dataset.aiCallback === 'true'
+        || target.dataset.needsGeneration === 'true'
+        || target.getAttribute('aria-haspopup') === 'dialog' && /ai|generation|continue|next/i.test(target.textContent || '');
+      if (!needsAi) return;
+      if (target.dataset.creatiaRuntimeRequestPending === 'true') {
+        addDecision('Blocked because: Request already in progress for this in-game AI callback button.', { trigger });
+        return;
+      }
+      target.dataset.creatiaRuntimeRequestPending = 'true';
+      dispatchRuntimeCallbackRequest(trigger || 'button_ai_callback', {
+        source: 'button_click',
+        label: (target.textContent || '').trim(),
+        dataset: { ...target.dataset },
+        href: target.getAttribute('href') || ''
+      })?.finally?.(() => {
+        delete target.dataset.creatiaRuntimeRequestPending;
+      });
+    }, true);
+    const maybeWrapEmit = () => {
+      if (typeof window.emit !== 'function' || window.emit.__creatiaRuntimeWrapped) return;
+      const originalEmit = window.emit;
+      window.emit = function creatiaRuntimeEmit(eventName, detail, ...rest) {
+        const result = originalEmit.apply(this, [eventName, detail, ...rest]);
+        if (runtimeCallbackEvents.includes(eventName)) {
+          dispatchRuntimeCallbackRequest(detail?.trigger || eventName, { ...(detail || {}), source: 'emit' });
+        }
+        return result;
+      };
+      window.emit.__creatiaRuntimeWrapped = true;
+    };
+    maybeWrapEmit();
+    window.setInterval(maybeWrapEmit, 1500);
+  }
   const pendingRuntimeRequests = new Map();
   window.addEventListener('message', (event) => {
     if (event.data?.source !== 'creatia-host' || event.data?.type !== 'ai-runtime-generation-result') return;
@@ -663,6 +745,7 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       }, 45000);
     });
   };
+  installRuntimeCallbackBridge();
   const originalFetch = window.fetch?.bind(window);
   if (originalFetch) {
     window.fetch = async (input, init = {}) => {
