@@ -75,9 +75,9 @@ function buildAiActivityMonitor(runtimeContext = {}) {
   .creatia-ai-activity-dot.is-active { opacity: 0.78; transform: scale(1); }
   .creatia-runtime-debug-button {
     position: fixed;
-    left: max(10px, env(safe-area-inset-left));
-    top: max(10px, env(safe-area-inset-top));
-    z-index: 2147483647;
+    top: 12px;
+    right: 12px;
+    z-index: 999999;
     min-width: 52px;
     min-height: 38px;
     border-radius: 999px;
@@ -160,6 +160,8 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     capabilityRequests: [],
     runtimeDecisions: [],
     errors: [],
+    branchValidation: { checked: false, ok: true, missing: [], roomKeys: [], assignedBranches: [] },
+    currentState: {},
     preloadState: preload.map((entry, index) => ({
       id: entry.id || 'preload-' + index,
       trigger: entry.trigger || 'contextual_followup',
@@ -197,8 +199,74 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     debugState.runtimeDecisions = debugState.runtimeDecisions.slice(0, 30);
     addEvent('runtime_decision', { message, detail });
   };
+  function getRuntimeState() {
+    const state = window.state || window.gameState || window.appState || {};
+    return {
+      branch: state.branch || state.currentBranch || '',
+      room: state.room || state.currentRoom || '',
+      depth: state.depth ?? '',
+      hp: state.hp ?? state.health ?? '',
+      torch: state.torch ?? '',
+      keys: state.keys || [],
+      corruption: state.corruption ?? '',
+      milestones: state.milestones || [],
+      aiStatus: diagnostics.status
+    };
+  }
+  function discoverRooms() {
+    return window.rooms || window.ROOMS || window.gameRooms || null;
+  }
+  function validateBranchTargets() {
+    const rooms = discoverRooms();
+    const state = window.state || window.gameState || window.appState || {};
+    const roomKeys = rooms && typeof rooms === 'object' ? Object.keys(rooms) : [];
+    const assignedBranches = Array.from(new Set([state.branch, state.currentBranch, state.room, state.currentRoom].filter(Boolean)));
+    const missing = assignedBranches.filter((branch) => roomKeys.length && !rooms[branch]);
+    debugState.branchValidation = { checked: true, ok: missing.length === 0, missing, roomKeys, assignedBranches };
+    if (missing.length) {
+      const fallback = roomKeys[0] || '';
+      addError('validateBranchTargets', 'Assigned branch missing room: ' + missing.join(', '));
+      addDecision('Blocked because: Branch target missing. Redirecting to fallback room.', { missing, fallback });
+      if (fallback && state.branch && !rooms[state.branch]) {
+        console.log('TRANSITION', state.branch, '->', fallback);
+        addEvent('branch_changed', { previousBranch: state.branch, nextBranch: fallback, reason: 'missing_branch_fallback' });
+        state.branch = fallback;
+      }
+    }
+    renderDiagnostics();
+    return debugState.branchValidation;
+  }
+  function wrapRenderFunction() {
+    if (typeof window.render !== 'function' || window.render.__creatiaSafeRender) return;
+    const originalRender = window.render;
+    window.render = function creatiaSafeRender(...args) {
+      debugState.currentState = getRuntimeState();
+      addEvent('render_started', debugState.currentState);
+      try {
+        const result = originalRender.apply(this, args);
+        debugState.currentState = getRuntimeState();
+        addEvent('render_completed', debugState.currentState);
+        return result;
+      } catch (error) {
+        addError('render', error?.message || 'Render crashed', error);
+        addDecision('Blocked because: Render crashed. Keeping last visible state and showing runtime error.', debugState.currentState);
+        renderDiagnostics();
+        return null;
+      }
+    };
+    window.render.__creatiaSafeRender = true;
+  }
+  window.onerror = (message, source, lineno, colno, error) => {
+    addError('window.onerror', String(message), error || { stack: source + ':' + lineno + ':' + colno });
+    renderDiagnostics();
+  };
+  window.onunhandledrejection = (event) => {
+    const reason = event?.reason;
+    addError('unhandledrejection', reason?.message || String(reason), reason);
+    renderDiagnostics();
+  };
   const addError = (location, reason, error) => {
-    const entry = { timestamp: now(), location, reason, stack: error?.stack || '' };
+    const entry = { timestamp: now(), location, reason, stack: error?.stack || '', currentBranch: getRuntimeState().branch || '', currentRoom: getRuntimeState().room || '' };
     debugState.errors.unshift(entry);
     debugState.errors = debugState.errors.slice(0, 20);
     diagnostics.lastAiError = reason;
@@ -214,8 +282,9 @@ function buildAiActivityMonitor(runtimeContext = {}) {
   };
   const button = document.createElement('button');
   button.type = 'button';
+  button.id = 'debugToggle';
   button.className = 'creatia-runtime-debug-button';
-  button.textContent = 'AI';
+  button.textContent = 'Debug';
   button.setAttribute('aria-label', 'Open Runtime Debug Panel');
   const panel = document.createElement('aside');
   panel.className = 'creatia-runtime-debug-panel';
@@ -261,6 +330,7 @@ function buildAiActivityMonitor(runtimeContext = {}) {
   const renderRows = (items, empty, formatter) => items.length ? items.map(formatter).join('') : '<div class="creatia-runtime-debug-row">' + empty + '</div>';
   const renderDiagnostics = () => {
     const mismatches = capabilityMismatches();
+    debugState.currentState = getRuntimeState();
     panel.innerHTML = '<h2>Runtime Debug Panel</h2>'
       + '<div class="creatia-runtime-debug-actions"><button type="button" data-creatia-debug-close>Close</button><button type="button" data-creatia-debug-export>Export Debug Snapshot</button></div>'
       + '<h3>Runtime Status</h3><div class="creatia-runtime-debug-grid">'
@@ -272,6 +342,8 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       + '<div class="creatia-runtime-debug-item"><strong>Pending Requests</strong>' + diagnostics.pendingRequests + '</div></div>'
       + '<h3>Capabilities</h3>' + (mismatches.length ? '<div class="creatia-runtime-debug-warning">Mismatches: ' + mismatches.join(', ') + '</div>' : '<div>Builder and runtime capabilities aligned.</div>')
       + '<strong>Builder Capabilities</strong><pre>' + payloadPreview(builderCapabilities) + '</pre><strong>Runtime Capabilities</strong><pre>' + payloadPreview(runtimeCapabilities) + '</pre>'
+      + '<h3>Current State</h3><pre>' + payloadPreview(debugState.currentState) + '</pre>'
+      + '<h3>Branch Integrity</h3><div class="' + (debugState.branchValidation.ok ? '' : 'creatia-runtime-debug-warning') + '">Checked: ' + boolText(debugState.branchValidation.checked) + ' · OK: ' + boolText(debugState.branchValidation.ok) + '</div><pre>' + payloadPreview(debugState.branchValidation) + '</pre>'
       + '<h3>Continuation Plan</h3><div class="creatia-runtime-debug-grid">'
       + '<div class="creatia-runtime-debug-item"><strong>Present</strong>' + boolText(diagnostics.continuationPlanLoaded) + '</div>'
       + '<div class="creatia-runtime-debug-item"><strong>Role</strong>' + (continuationPlan?.role || continuationPlan?.aiRole || '—') + '</div></div>'
@@ -312,6 +384,13 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       panel.classList.toggle('is-open');
       addEvent('debug_panel_toggled', { open: panel.classList.contains('is-open') });
     });
+    wrapRenderFunction();
+    validateBranchTargets();
+    window.setInterval(() => {
+      wrapRenderFunction();
+      debugState.currentState = getRuntimeState();
+      renderDiagnostics();
+    }, 1500);
     renderDiagnostics();
     syncGeneratedStatusText();
   };
@@ -358,6 +437,30 @@ function buildAiActivityMonitor(runtimeContext = {}) {
   };
   const begin = (title) => { pending += 1; diagnostics.pendingRequests = pending; dot.classList.add('is-active'); logStatus('Generating', title); notify('request', title); };
   const end = (title, ok) => { pending = Math.max(0, pending - 1); diagnostics.pendingRequests = pending; if (!pending) dot.classList.remove('is-active'); if (!ok) diagnostics.lastAiError = title; logStatus(ok ? (pending ? 'Generating' : 'Idle') : 'Error', title); notify(ok ? 'response' : 'error', title); };
+  const pendingRuntimeRequests = new Map();
+  window.addEventListener('message', (event) => {
+    if (event.data?.source !== 'creatia-host' || event.data?.type !== 'ai-runtime-generation-result') return;
+    const requestId = event.data.requestId;
+    const entry = debugState.aiRequests.find((item) => item.requestId === requestId);
+    if (entry) {
+      entry.status = event.data.ok ? 'Completed' : 'Failed';
+      entry.durationMs = entry.startedAt ? Math.round(performance.now() - entry.startedAt) : entry.durationMs;
+      end('Runtime AI generation result · ' + entry.trigger, Boolean(event.data.ok));
+    }
+    debugState.lastResponse = { type: event.data.responseType || 'runtime_generation', payload: event.data.payload || event.data };
+    debugState.aiResponses.unshift({ timestamp: now(), type: debugState.lastResponse.type, payload: debugState.lastResponse.payload });
+    debugState.aiResponses = debugState.aiResponses.slice(0, 30);
+    addEvent(event.data.ok ? 'generation_completed' : 'generation_failed', { requestId, responseType: debugState.lastResponse.type });
+    const resolver = pendingRuntimeRequests.get(requestId);
+    if (resolver) {
+      pendingRuntimeRequests.delete(requestId);
+      resolver(event.data);
+    }
+    if (typeof window.onAiResponse === 'function') window.onAiResponse(event.data);
+    if (event.data.ok && typeof window.applyGeneratedContent === 'function') window.applyGeneratedContent(event.data.payload);
+    if (event.data.ok && typeof window.applyGeneratedRoom === 'function') window.applyGeneratedRoom(event.data.payload);
+    renderDiagnostics();
+  });
   window.requestAiGeneration = window.requestAiGeneration || async (request = {}) => {
     log('AI request creation', request);
     if (!diagnostics.providerRegistered) {
@@ -395,7 +498,7 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     debugState.budget.estimatedTokens += requestEntry.estimatedTokens;
     addEvent('ai_request', { trigger: runtimeRequest.trigger, requestId: runtimeRequest.requestId });
     log('AI request dispatch', runtimeRequest);
-    requestEntry.status = 'Sent';
+    requestEntry.status = 'Generating';
     begin('Runtime AI generation · ' + runtimeRequest.trigger);
     requestEntry.status = 'Generating';
     addEvent('generation_started', { trigger: runtimeRequest.trigger, requestId: runtimeRequest.requestId });
@@ -406,15 +509,19 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       timestamp: new Date().toISOString()
     }, '*');
     notify('needs_generation', runtimeRequest.trigger);
-    end('Runtime AI generation queued · ' + runtimeRequest.trigger, true);
-    requestEntry.status = 'Completed';
-    requestEntry.durationMs = Math.round(performance.now() - requestEntry.startedAt);
-    debugState.lastResponse = { type: 'runtime_generation', payload: { status: 'queued', request: runtimeRequest } };
-    debugState.aiResponses.unshift({ timestamp: now(), type: 'runtime_generation', payload: debugState.lastResponse.payload });
-    debugState.aiResponses = debugState.aiResponses.slice(0, 30);
-    addEvent('generation_completed', { trigger: runtimeRequest.trigger, requestId: runtimeRequest.requestId });
+    requestEntry.status = 'Sent';
     renderDiagnostics();
-    return { status: 'queued', fallback: false, request: runtimeRequest };
+    return new Promise((resolve) => {
+      pendingRuntimeRequests.set(runtimeRequest.requestId, resolve);
+      window.setTimeout(() => {
+        if (!pendingRuntimeRequests.has(runtimeRequest.requestId)) return;
+        pendingRuntimeRequests.delete(runtimeRequest.requestId);
+        requestEntry.status = 'Failed';
+        addDecision('Blocked because: runtime generation response timed out.', { requestId: runtimeRequest.requestId });
+        end('Runtime AI generation timed out · ' + runtimeRequest.trigger, false);
+        resolve({ status: 'timeout', request: runtimeRequest });
+      }, 45000);
+    });
   };
   const originalFetch = window.fetch?.bind(window);
   if (originalFetch) {

@@ -70,9 +70,16 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
       if (mode !== 'co-create') return
       console.log('[AI RUNTIME HOST]', 'AI request reception', event.data.request || {})
       console.log('[AI RUNTIME HOST]', 'AI request dispatch to controller')
+      const requestId = event.data.request?.requestId
       controller.submitRuntimeGeneration(event.data.request || {})
-        .then(() => console.log('[AI RUNTIME HOST]', 'AI response reception'))
-        .catch((error) => console.log('[AI RUNTIME HOST]', 'AI failures', error?.message || error))
+        .then(() => {
+          console.log('[AI RUNTIME HOST]', 'AI response reception')
+          event.source?.postMessage({ source: 'creatia-host', type: 'ai-runtime-generation-result', requestId, ok: true, responseType: 'runtime_generation', payload: { status: 'completed' } }, '*')
+        })
+        .catch((error) => {
+          console.log('[AI RUNTIME HOST]', 'AI failures', error?.message || error)
+          event.source?.postMessage({ source: 'creatia-host', type: 'ai-runtime-generation-result', requestId, ok: false, responseType: 'generation_error', payload: { error: error?.message || String(error) } }, '*')
+        })
     }
 
     window.addEventListener('message', handleRuntimeGenerationRequest)
