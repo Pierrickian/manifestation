@@ -28,11 +28,23 @@ function enforceModeBoundaries(structured, mode) {
   return structured
 }
 
+function getDefaultRuntimeCapabilities(mode) {
+  return mode === 'co-create'
+    ? { aiGeneration: true, aiStreaming: false, online: true, offline: true }
+    : { aiGeneration: false, aiStreaming: false, online: false, offline: true }
+}
+
 function normalizeForProject(payload, detectedCapabilities, mode) {
   const structured = normalizeStructuredAiResponse(payload)
+  const runtimeCapabilities = {
+    ...getDefaultRuntimeCapabilities(mode),
+    ...(structured.capabilities?.runtimeCapabilities || {}),
+    ...(structured.runtimeCapabilities || {})
+  }
   return enforceModeBoundaries({
     ...structured,
-    capabilities: { ...detectedCapabilities, ...(structured.capabilities || {}) }
+    runtimeCapabilities,
+    capabilities: { ...detectedCapabilities, ...(structured.capabilities || {}), runtimeCapabilities }
   }, mode)
 }
 
@@ -88,7 +100,7 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
       const repairedPayload = await aiProvider({ ...repairRequest, signal: controller.signal })
       onDebug?.({ status: 'ai_response', kind: repairRequest.kind, shortTitle: `Réponse réparation ${attempt}/${maxAttempts}`, timestamp: new Date().toISOString() })
       finalStructured = normalizeForProject(repairedPayload, detectedCapabilities, mode)
-      verification = runGeneratedAppHealthcheck(finalStructured, { ...selectedStrategy, id: 'recovery' })
+      verification = runGeneratedAppHealthcheck(finalStructured, { ...selectedStrategy, id: 'recovery', mode })
       attempts = attempt
       onDebug?.({ status: 'repair_checked', reason, attempt, maxAttempts, healthcheck: verification, timestamp: new Date().toISOString() })
     }
@@ -135,7 +147,7 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
       const payload = await aiProvider({ ...request, signal: controller.signal })
       onDebug?.({ status: 'ai_response', kind: request.kind, shortTitle: project ? 'Projet évolué' : 'Projet généré', timestamp: new Date().toISOString() })
       const structured = normalizeForProject(payload, detectedCapabilities, mode)
-      const initialHealthcheck = runGeneratedAppHealthcheck(structured, selectedStrategy)
+      const initialHealthcheck = runGeneratedAppHealthcheck(structured, { ...selectedStrategy, mode })
       const repairResult = await runRepairLoop({
         originalRequest: trimmed,
         initialStructured: structured,
@@ -196,6 +208,16 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
       'Traite cette suggestion du partenaire créatif comme une évolution à appliquer au projet Creatia actuel.',
       'Préserve ce qui fonctionne déjà, respecte le mode Co-Create, puis retourne une application complète mise à jour.',
       `Suggestion: ${suggestionText}`
+    ].join('\n')
+    setInput(wrappedPrompt)
+    await submitWithText(wrappedPrompt)
+  }
+
+  async function submitRuntimeGeneration(runtimeRequest = {}) {
+    const wrappedPrompt = [
+      'Traite cette demande runtime émise par l’application Co-Create comme une continuation IA normale via le pipeline existant.',
+      'Préserve la continuité de session, consomme continuationPlan et preload si fournis, puis retourne une application complète mise à jour.',
+      `Runtime request: ${JSON.stringify(runtimeRequest)}`
     ].join('\n')
     setInput(wrappedPrompt)
     await submitWithText(wrappedPrompt)
@@ -299,7 +321,7 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
     } : nextProject
     setProject(migratedProject)
     const latestResponse = migratedProject?.generationHistory?.at(-1)?.response || null
-    const fallbackResponse = nextProject?.currentApplication ? {
+    const fallbackResponse = migratedProject?.currentApplication ? {
       html: migratedProject.currentApplication,
       systemPrompt: migratedProject.systemPrompt,
       state: migratedProject.applicationState,
@@ -336,5 +358,5 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
 
   function cancel() { abortRef.current?.abort() }
 
-  return { input, setInput, status, message, error, repairError, result, project, submit, submitPartnerSuggestion, retry, repair, rebuildHumanModel, updateHumanModelField, importProject, cancel, appendTranscript, speechEnabled, progressText, hasTime, setHasTime, pipeline, healthcheck, lastPrompt, lastRuntimePrompt }
+  return { input, setInput, status, message, error, repairError, result, project, submit, submitPartnerSuggestion, submitRuntimeGeneration, retry, repair, rebuildHumanModel, updateHumanModelField, importProject, cancel, appendTranscript, speechEnabled, progressText, hasTime, setHasTime, pipeline, healthcheck, lastPrompt, lastRuntimePrompt }
 }

@@ -67,7 +67,13 @@ export function buildCapabilityContract(capabilities = {}) {
     map: Boolean(capabilities.map),
     speech: Boolean(capabilities.speech),
     simulation: Boolean(capabilities.simulation),
-    audio: Boolean(capabilities.speech)
+    audio: Boolean(capabilities.speech),
+    runtimeCapabilities: {
+      aiGeneration: Boolean(capabilities.runtimeCapabilities?.aiGeneration),
+      aiStreaming: Boolean(capabilities.runtimeCapabilities?.aiStreaming),
+      online: Boolean(capabilities.runtimeCapabilities?.online),
+      offline: Boolean(capabilities.runtimeCapabilities?.offline)
+    }
   }
 }
 
@@ -86,9 +92,40 @@ function hasScrollableTextSurface(html = '') {
   return /overflow-y\s*:\s*(auto|scroll)|overflow\s*:\s*(auto|scroll)|-webkit-overflow-scrolling\s*:\s*touch|scrollable|data-scrollable/i.test(String(html))
 }
 
+function isNonEmptyObject(value) {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length)
+}
+
+function hasRuntimeAiGenerationPath(html = '') {
+  return /requestAiGeneration|needs_generation|preload_requested|preload_consumed|branch_requested|content_exhausted|ai_request|postMessage\s*\(/i.test(String(html))
+}
+
+function exposesRuntimeAiStatus(html = '') {
+  return /AI Connected|AI Generating|AI Unavailable|Reconnecting|Local Fallback Active|Connecting|Local Mode|data-ai-status|ai-status|aiStatus/i.test(String(html))
+}
+
+function consumesContinuationPlan(html = '') {
+  return /continuationPlan|continuation-plan|collaborationPlan|collaboration-plan/i.test(String(html))
+}
+
+function consumesPreload(html = '') {
+  return /\bpreload\b|preloadQueue|preload_requested|preload_consumed|preparedPrompt/i.test(String(html))
+}
+
+function displaysOfflineByDefault(html = '') {
+  return />\s*Offline\s*</i.test(String(html)) || /status[^<>"']*Offline/i.test(String(html))
+}
+
 export function runGeneratedAppHealthcheck(response = {}, strategy = {}) {
   const html = String(response.html || '')
   const capabilities = buildCapabilityContract(response.capabilities || {})
+  const runtimeCapabilities = {
+    ...capabilities.runtimeCapabilities,
+    ...(response.runtimeCapabilities || {}),
+    ...(response.capabilities?.runtimeCapabilities || {})
+  }
+  const mode = strategy.mode || response.mode || 'create'
+  const isCoCreate = mode === 'co-create'
   const checks = []
 
   checks.push(createCheck({
@@ -135,6 +172,88 @@ export function runGeneratedAppHealthcheck(response = {}, strategy = {}) {
     checks.push(createCheck({ id: 'speech_api_initialized', ok: /SpeechRecognition|webkitSpeechRecognition|speechSynthesis/i.test(html), message: 'Speech API detected.', expected: 'Speech recognition or synthesis API initialization.', actual: 'No browser speech API usage was detected.', repairConfidence: 'medium', repairable: true }))
   }
 
+  if (isCoCreate) {
+    checks.push(createCheck({
+      id: 'cocreate_continuation_plan_exists',
+      ok: isNonEmptyObject(response.continuationPlan),
+      message: 'Co-Create continuation plan detected.',
+      expected: 'A non-empty continuationPlan object for AI-to-engine collaboration memory.',
+      actual: 'continuationPlan is missing, null, or empty.',
+      repairConfidence: 'high',
+      repairable: true
+    }))
+
+    checks.push(createCheck({
+      id: 'cocreate_preload_entries_exist',
+      ok: Array.isArray(response.preload) && response.preload.length > 0,
+      message: 'Co-Create preload entries detected.',
+      expected: 'A non-empty preload array of trigger-driven future preparation entries.',
+      actual: 'preload is missing or empty.',
+      repairConfidence: 'high',
+      repairable: true
+    }))
+
+    checks.push(createCheck({
+      id: 'cocreate_runtime_ai_generation_enabled',
+      ok: runtimeCapabilities.aiGeneration === true,
+      message: 'Runtime AI generation capability enabled.',
+      expected: 'runtimeCapabilities.aiGeneration must be true in Co-Create mode.',
+      actual: `runtimeCapabilities.aiGeneration is ${String(runtimeCapabilities.aiGeneration)}.`,
+      repairConfidence: 'high',
+      repairable: true
+    }))
+
+    checks.push(createCheck({
+      id: 'cocreate_runtime_ai_status_exposed',
+      ok: exposesRuntimeAiStatus(html),
+      message: 'Runtime AI status surface detected.',
+      expected: 'The generated application exposes AI runtime status such as AI Connected, AI Generating, AI Unavailable, Reconnecting, or Local Fallback Active.',
+      actual: 'No runtime AI status surface was detected.',
+      repairConfidence: 'high',
+      repairable: true
+    }))
+
+    checks.push(createCheck({
+      id: 'cocreate_ai_generation_pathway_exists',
+      ok: hasRuntimeAiGenerationPath(html),
+      message: 'Runtime AI generation pathway detected.',
+      expected: 'At least one runtime generation pathway such as requestAiGeneration, ai_request, needs_generation, preload_requested, or branch_requested.',
+      actual: 'No runtime AI generation pathway was detected.',
+      repairConfidence: 'high',
+      repairable: true
+    }))
+
+    checks.push(createCheck({
+      id: 'cocreate_consumes_continuation_plan',
+      ok: consumesContinuationPlan(html),
+      message: 'Runtime continuationPlan consumption detected.',
+      expected: 'The generated application must be capable of consuming continuationPlan during execution.',
+      actual: 'No continuationPlan consumption was detected in the application runtime.',
+      repairConfidence: 'high',
+      repairable: true
+    }))
+
+    checks.push(createCheck({
+      id: 'cocreate_consumes_preload',
+      ok: consumesPreload(html),
+      message: 'Runtime preload consumption detected.',
+      expected: 'The generated application must be capable of consuming preload entries during execution.',
+      actual: 'No preload consumption was detected in the application runtime.',
+      repairConfidence: 'high',
+      repairable: true
+    }))
+
+    checks.push(createCheck({
+      id: 'cocreate_not_offline_by_default',
+      ok: !displaysOfflineByDefault(html),
+      message: 'Co-Create status does not default to Offline.',
+      expected: 'Co-Create applications must not display "Offline" by default; status should reflect AI runtime state.',
+      actual: 'The generated application appears to display "Offline" as a default status.',
+      repairConfidence: 'medium',
+      repairable: true
+    }))
+  }
+
   const failedChecks = checks.filter((check) => !check.ok)
   const repairConfidence = getRepairConfidence(failedChecks)
   return {
@@ -142,6 +261,7 @@ export function runGeneratedAppHealthcheck(response = {}, strategy = {}) {
     label: failedChecks.length ? 'Application Generated' : 'Application Verified',
     strategyId: strategy.id || 'fast',
     depth: strategy.healthcheckDepth || 'light',
+    mode,
     repairConfidence,
     isRepairable: AUTO_REPAIR_CONFIDENCES.has(repairConfidence) && failedChecks.some((check) => check.repairable),
     passedCount: checks.length - failedChecks.length,

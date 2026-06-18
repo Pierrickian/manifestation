@@ -58,6 +58,17 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
   const hasUnsavedAiApp = Boolean(project?.currentApplication || controller.input.trim() || isBusy)
 
   useEffect(() => {
+    function handleRuntimeGenerationRequest(event) {
+      if (event.data?.source !== 'creatia-generated-html' || event.data?.type !== 'ai-runtime-generation') return
+      if (mode !== 'co-create') return
+      controller.submitRuntimeGeneration(event.data.request || {})
+    }
+
+    window.addEventListener('message', handleRuntimeGenerationRequest)
+    return () => window.removeEventListener('message', handleRuntimeGenerationRequest)
+  }, [controller, mode])
+
+  useEffect(() => {
     if (!hasUnsavedAiApp) return undefined
 
     function confirmBeforeLeaving(event) {

@@ -4,26 +4,31 @@ const STRUCTURED_APP_INSTRUCTIONS = [
   'You are the hidden application architect for Creatia / Evolutia. The goal is not to generate HTML; the goal is to translate natural-language intentions into design decisions, then render the technical consequence.',
   'The user never needs to know about HTML, CSS, JavaScript, React, components, frameworks, databases, APIs, persistence, rendering, or implementation details.',
   'Return ONLY valid JSON, without Markdown or code fences.',
-  'Required shape: { "humanModel": object, "analysis": string, "decisions": array, "generatedChanges": array, "html": string, "files": object, "systemPrompt": string, "state": object, "suggestedActions": array, "capabilities": object, "continuationPlan": object|null, "preload": array }.',
+  'Required shape: { "humanModel": object, "analysis": string, "decisions": array, "generatedChanges": array, "html": string, "files": object, "systemPrompt": string, "state": object, "suggestedActions": array, "capabilities": object, "runtimeCapabilities": object, "continuationPlan": object|null, "preload": array }.',
   'humanModel must describe the human level: { "purpose": string, "audience": string, "tone": string, "emotion": string, "journey": string, "sections": array }.',
   'analysis must explain the design reasoning before implementation: goal, audience, desired emotion, UX journey, readability, information density, interactions, and business constraints when relevant.',
   'decisions must list the design decisions derived from the user intention before code generation.',
   'generatedChanges must list the concrete technical consequences of those decisions.',
-  'html must be a complete standalone executable HTML5 document with embedded CSS and JavaScript.',
-  'Generated applications must be self-contained.',
+  'In create mode, html must be a complete standalone executable HTML5 document with embedded CSS and JavaScript. Create mode is a single self-contained generation, may run offline, requires no runtime AI dependency, and must not expect future AI interaction.',
+  'In co-create mode, html must still be executable as an application shell, but it is an AI-driven living experience that expects runtime AI collaboration rather than a finished static offline artifact.',
+  'Generated applications must be self-contained for create mode, and must contain their runtime AI collaboration loop for co-create mode.',
   'Prefer browser-native technologies.',
   'Avoid external libraries whenever possible.',
-  'A downloaded HTML file should continue to work offline after export.',
+  'A downloaded HTML file should continue to work offline after export in create mode. In co-create mode, local procedural content is allowed only as a clearly labeled fallback and must never replace AI collaboration when AI is available.',
   'Support mobile devices, touch events, scrolling, dark mode, Canvas/SVG/WebGL when useful, and offline execution.',
   'Every generated screen or panel that contains informational text, instructions, logs, descriptions, story content, results, settings, or help must be vertically scrollable on mobile, even when the first version appears short.',
   'Use safe scroll containers such as main, section, .screen, .panel, or .content with overflow-y: auto and -webkit-overflow-scrolling: touch; avoid locking text-heavy interfaces behind fixed 100vh layouts without scroll.',
   'systemPrompt is a hidden evolution prompt that explains how to continue evolving this specific project.',
   'state stores persistent application state and decisions that future evolutions must preserve.',
   'currentApplication/html is the single authoritative active HTML source. files stores optional supporting technical artifacts only, for example { "styles.css": string, "app.js": string }; do not duplicate the complete HTML document in files["index.html"].',
-  'capabilities must declare expected runtime capabilities, for example { "webgl": true, "audio": false, "simulation": true }.',
+  'capabilities must declare expected app capabilities, for example { "webgl": true, "audio": false, "simulation": true }.',
+  'runtimeCapabilities must always declare { "aiGeneration": boolean, "aiStreaming": boolean, "online": boolean, "offline": boolean }. In co-create mode aiGeneration and online must be true; offline may be true only as a fallback capability. In create mode aiGeneration should be false unless the user explicitly asks for runtime AI.',
   'suggestedActions is only for visible, user-facing evolution buttons in Co-Create mode. Keep each item short, actionable, optional, and user-centric, for example "Add a shop", "Add a harder level", or "Add a minimap". In create mode return an empty array.',
-  'continuationPlan is the durable AI-to-engine collaboration memory for Co-Create mode, not a UI feature and not a list of buttons. Use it to preserve the AI role such as game master, narrator, coach, teacher, or simulation director; long-term objectives; collaboration rules; continuity instructions; orchestration logic; expected callbacks; and session strategy. In create mode return null.',
-  'preload is the Co-Create future-preparation channel for anticipation and latency hiding, not a user suggestion and not a continuationPlan duplicate. Return an array of future generation candidates, prepared prompts, prepared branches, probable future content, or optional prepared fragments. Put trigger definitions on preload entries, for example { "trigger": "monster_defeated", "preparedPrompt": "...", "confidence": 0.9 }. In create mode return an empty array.',
+  'continuationPlan is mandatory in Co-Create mode. It is the durable AI-to-engine collaboration memory, not a UI feature and not a list of buttons. Use it to preserve the AI role such as game master, narrator, coach, teacher, or simulation director; long-term objectives; world/teaching/simulation rules; narrative continuity; collaboration rules; orchestration logic; expected callbacks; and session strategy. In create mode return null.',
+  'preload is mandatory and non-empty in Co-Create mode. It is the future-preparation channel for anticipation and latency hiding, not a user suggestion and not a continuationPlan duplicate. Return future generation candidates, prepared prompts, prepared branches, probable future content, or optional prepared fragments. Put trigger definitions on preload entries, for example { "trigger": "monster_defeated", "preparedPrompt": "...", "confidence": 0.9 }. In create mode return an empty array.',
+  'Co-Create HTML must include a runtime AI protocol surface that can call or stub requestAiGeneration({ trigger, state, continuationPlan, preload, context }), emit runtime events such as ai_request, needs_generation, state_transition, user_choice, milestone_reached, content_exhausted, branch_requested, preload_requested, or preload_consumed, consume continuationPlan and preload during execution, expose runtime AI status such as AI Connected, AI Generating, AI Unavailable, Reconnecting, or Local Fallback Active, preserve session continuity, and resume after reconnection.',
+  'In Co-Create mode, generating a static application that never requests AI content, only uses local procedural generation, behaves identically with or without AI, or exposes suggestions without a runtime collaboration mechanism is invalid.',
+  'Co-Create applications must never display "Offline" by default; status text must reflect the actual AI runtime state such as Connecting, AI Connected, AI Unavailable, Reconnecting, or Local Mode.',
   'If the app has an intro or description panel with a Play, Start, Jouer, Lancer, or Commencer button, make that panel interactive and hide/remove it as soon as the user starts so the actual game or app receives focus.',
   'Do not use external dependencies or remote assets unless the user explicitly requests them.'
 ]
@@ -41,6 +46,7 @@ export function normalizeStructuredAiResponse(payload = {}) {
       state: payload.state && typeof payload.state === 'object' ? payload.state : {},
       suggestedActions: Array.isArray(payload.suggestedActions) ? payload.suggestedActions : [],
       capabilities: payload.capabilities && typeof payload.capabilities === 'object' ? payload.capabilities : {},
+      runtimeCapabilities: payload.runtimeCapabilities && typeof payload.runtimeCapabilities === 'object' ? payload.runtimeCapabilities : payload.capabilities?.runtimeCapabilities || {},
       continuationPlan: payload.continuationPlan && typeof payload.continuationPlan === 'object' ? payload.continuationPlan : null,
       preload: Array.isArray(payload.preload) ? payload.preload : []
     }
@@ -51,7 +57,7 @@ export function normalizeStructuredAiResponse(payload = {}) {
     const parsed = JSON.parse(text)
     return normalizeStructuredAiResponse(parsed)
   } catch {
-    return { html: text, humanModel: {}, files: {}, analysis: '', decisions: [], generatedChanges: [], systemPrompt: '', state: {}, suggestedActions: [], capabilities: {}, continuationPlan: null, preload: [] }
+    return { html: text, humanModel: {}, files: {}, analysis: '', decisions: [], generatedChanges: [], systemPrompt: '', state: {}, suggestedActions: [], capabilities: {}, runtimeCapabilities: {}, continuationPlan: null, preload: [] }
   }
 }
 
@@ -61,7 +67,7 @@ export function buildAiPrompt({ input, mode = 'create', designSystem = MANIFESTA
   const userPayload = {
     task,
     mode,
-    collaboration: isCoCreate ? 'Co-Create enabled: suggestedActions may expose visible user choices; continuationPlan must preserve AI↔engine collaboration memory; preload may request trigger-driven future preparation for latency hiding.' : 'Create mode: generation-focused; suggestedActions must be empty, continuationPlan must be null, preload must be empty.',
+    collaboration: isCoCreate ? 'Co-Create enabled: generate a living AI collaboration loop. suggestedActions may expose visible user choices; continuationPlan is mandatory AI↔engine collaboration memory; preload is mandatory trigger-driven future preparation for latency hiding; the runtime must consume both and expose AI status.' : 'Create mode: generation-focused standalone application; suggestedActions must be empty, continuationPlan must be null, preload must be empty, and no runtime AI loop is required.',
     userRequest: input.trim(),
     currentProject: project ? {
       creationRequest: project.creationRequest,
@@ -85,6 +91,9 @@ export function buildAiPrompt({ input, mode = 'create', designSystem = MANIFESTA
       hasTimeAuthorized: Boolean(hasTime)
     },
     detectedCapabilities: capabilities,
+    requiredRuntimeCapabilities: isCoCreate
+      ? { aiGeneration: true, aiStreaming: false, online: true, offline: true }
+      : { aiGeneration: false, aiStreaming: false, online: false, offline: true },
     renderer: 'html',
     designSystem
   }

@@ -94,6 +94,24 @@ function buildAiActivityMonitor() {
   };
   const begin = (title) => { pending += 1; dot.classList.add('is-active'); notify('request', title); };
   const end = (title, ok) => { pending = Math.max(0, pending - 1); if (!pending) dot.classList.remove('is-active'); notify(ok ? 'response' : 'error', title); };
+  window.requestAiGeneration = window.requestAiGeneration || async (request = {}) => {
+    const runtimeRequest = {
+      trigger: request.trigger || 'runtime_generation',
+      state: request.state || {},
+      continuationPlan: request.continuationPlan || window.continuationPlan || window.__continuationPlan || null,
+      preload: request.preload || window.preload || window.__preload || [],
+      context: request.context || {}
+    };
+    begin('Runtime AI generation · ' + runtimeRequest.trigger);
+    window.parent?.postMessage({
+      source: 'creatia-generated-html',
+      type: 'ai-runtime-generation',
+      request: runtimeRequest,
+      timestamp: new Date().toISOString()
+    }, '*');
+    notify('needs_generation', runtimeRequest.trigger);
+    return { status: 'queued', fallback: true, request: runtimeRequest };
+  };
   const originalFetch = window.fetch?.bind(window);
   if (originalFetch) {
     window.fetch = async (input, init = {}) => {
