@@ -53,6 +53,13 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
   const html = project?.currentApplication || project?.lastValidApplication || ''
   const latestSuggestions = project?.aiSuggestionsHistory?.at(-1)?.suggestions || []
   const continuationPlan = mode === 'co-create' ? project?.continuationPlan : null
+  const runtimeContext = {
+    mode,
+    capabilities: project?.capabilities || {},
+    runtimeCapabilities: project?.capabilities?.runtimeCapabilities || {},
+    continuationPlan: project?.continuationPlan || null,
+    preload: project?.preloadQueue || []
+  }
   const lastAutoOpenedHtmlRef = useRef('')
   const isBusy = controller.status === 'loading' || controller.status === 'repairing' || controller.status === 'refreshingHumanModel'
   const hasUnsavedAiApp = Boolean(project?.currentApplication || controller.input.trim() || isBusy)
@@ -61,7 +68,11 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
     function handleRuntimeGenerationRequest(event) {
       if (event.data?.source !== 'creatia-generated-html' || event.data?.type !== 'ai-runtime-generation') return
       if (mode !== 'co-create') return
+      console.log('[AI RUNTIME HOST]', 'AI request reception', event.data.request || {})
+      console.log('[AI RUNTIME HOST]', 'AI request dispatch to controller')
       controller.submitRuntimeGeneration(event.data.request || {})
+        .then(() => console.log('[AI RUNTIME HOST]', 'AI response reception'))
+        .catch((error) => console.log('[AI RUNTIME HOST]', 'AI failures', error?.message || error))
     }
 
     window.addEventListener('message', handleRuntimeGenerationRequest)
@@ -167,7 +178,7 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
   }, [onMenuData, aiActivity.log, controller.pipeline, controller.healthcheck, controller.lastRuntimePrompt, project?.generationHistory, project?.evolutionHistory, isBusy])
 
   if (html && isViewingHtml) {
-    return <HtmlViewer html={html} title={project?.creationRequest || 'Application créée'} onBack={() => setIsViewingHtml(false)} aiOverlay={<CreatiaAiOverlay activity={aiActivity} />} />
+    return <HtmlViewer html={html} title={project?.creationRequest || 'Application créée'} onBack={() => setIsViewingHtml(false)} aiOverlay={<CreatiaAiOverlay activity={aiActivity} />} runtimeContext={runtimeContext} />
   }
 
   return (

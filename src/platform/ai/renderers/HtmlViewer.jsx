@@ -38,7 +38,12 @@ function buildStartPanelGuardStyle() {
 </style>`
 }
 
-function buildAiActivityMonitor() {
+function serializeRuntimeContext(context = {}) {
+  return JSON.stringify(context || {}).replace(/</g, '\\u003c')
+}
+
+function buildAiActivityMonitor(runtimeContext = {}) {
+  const serializedContext = serializeRuntimeContext(runtimeContext)
   return `
 <style data-creatia-ui-guard="ai-activity">
   .creatia-ai-activity-dot {
@@ -68,6 +73,24 @@ function buildAiActivityMonitor() {
     animation: creatiaAiSpin 850ms linear infinite;
   }
   .creatia-ai-activity-dot.is-active { opacity: 0.78; transform: scale(1); }
+  .creatia-runtime-diagnostics {
+    position: fixed;
+    left: max(10px, env(safe-area-inset-left));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    z-index: 2147483647;
+    max-width: min(330px, calc(100vw - 20px));
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,.18);
+    background: rgba(12, 10, 24, .72);
+    color: white;
+    font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace;
+    box-shadow: 0 14px 36px rgba(0,0,0,.28);
+    backdrop-filter: blur(12px);
+    pointer-events: none;
+  }
+  .creatia-runtime-diagnostics strong { display: block; margin-bottom: 4px; font-size: 12px; }
+  .creatia-runtime-diagnostics span { display: block; opacity: .82; }
   @keyframes creatiaAiSpin { to { transform: rotate(360deg); } }
 </style>
 <script data-creatia-ui-guard="ai-activity">
@@ -77,9 +100,94 @@ function buildAiActivityMonitor() {
   const dot = document.createElement('div');
   dot.className = 'creatia-ai-activity-dot';
   dot.setAttribute('aria-hidden', 'true');
-  const ready = () => document.body && document.body.appendChild(dot);
+  const runtimeContext = ${serializedContext};
+  const runtimeCapabilities = runtimeContext.runtimeCapabilities || runtimeContext.capabilities?.runtimeCapabilities || {};
+  const continuationPlan = runtimeContext.continuationPlan || null;
+  const preload = Array.isArray(runtimeContext.preload) ? runtimeContext.preload : [];
+  window.__creatiaRuntimeContext = runtimeContext;
+  window.__continuationPlan = continuationPlan;
+  window.__preload = preload;
+  window.continuationPlan = window.continuationPlan || continuationPlan;
+  window.preload = window.preload || preload;
+  const diagnostics = {
+    status: 'Disconnected',
+    providerRegistered: false,
+    providerConnected: false,
+    runtimeCapabilities,
+    continuationPlanLoaded: Boolean(continuationPlan && Object.keys(continuationPlan).length),
+    preloadEntries: preload.length,
+    pendingRequests: 0,
+    lastAiError: ''
+  };
+  const log = (...args) => console.log('[AI RUNTIME]', ...args);
+  const logStatus = (nextStatus, reason) => {
+    const previousStatus = diagnostics.status;
+    diagnostics.status = nextStatus;
+    console.log('[AI STATUS]', previousStatus, '->', nextStatus, reason);
+    renderDiagnostics();
+    syncGeneratedStatusText();
+  };
+  const panel = document.createElement('div');
+  panel.className = 'creatia-runtime-diagnostics';
+  panel.setAttribute('aria-live', 'polite');
+  const renderDiagnostics = () => {
+    panel.innerHTML = '<strong>AI Status: ' + diagnostics.status + '</strong>'
+      + '<span>Provider Registered: ' + String(diagnostics.providerRegistered) + '</span>'
+      + '<span>Provider Connected: ' + String(diagnostics.providerConnected) + '</span>'
+      + '<span>Capabilities: ' + JSON.stringify(diagnostics.runtimeCapabilities) + '</span>'
+      + '<span>ContinuationPlan Loaded: ' + String(diagnostics.continuationPlanLoaded) + '</span>'
+      + '<span>Preload Entries: ' + diagnostics.preloadEntries + '</span>'
+      + '<span>Pending Requests: ' + diagnostics.pendingRequests + '</span>'
+      + '<span>Last AI Error: ' + (diagnostics.lastAiError || 'none') + '</span>';
+  };
+  const syncGeneratedStatusText = () => {
+    if (!diagnostics.providerRegistered || diagnostics.status === 'Unavailable') return;
+    const walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT);
+    const replacements = [];
+    while (walker.nextNode()) {
+      if ((walker.currentNode.nodeValue || '').trim() === 'AI Unavailable') replacements.push(walker.currentNode);
+    }
+    replacements.forEach((node) => {
+      log('status text override', 'AI Unavailable -> AI Idle', 'reason=provider_registered');
+      node.nodeValue = node.nodeValue.replace('AI Unavailable', 'AI Idle');
+    });
+  };
+  const ready = () => {
+    if (!document.body) return;
+    document.body.appendChild(dot);
+    document.body.appendChild(panel);
+    renderDiagnostics();
+    syncGeneratedStatusText();
+  };
   if (document.body) ready(); else document.addEventListener('DOMContentLoaded', ready, { once: true });
   let pending = 0;
+  const hasHostBridge = window.parent && window.parent !== window;
+  log('provider discovery', { hasHostBridge, runtimeCapabilities });
+  log('runtime capabilities', runtimeCapabilities);
+  log('continuationPlan loading', { loaded: diagnostics.continuationPlanLoaded });
+  log('preload loading', { entries: diagnostics.preloadEntries });
+  if (hasHostBridge) {
+    diagnostics.providerRegistered = true;
+    diagnostics.providerConnected = true;
+    window.CreatiaRuntime = {
+      diagnostics,
+      aiProvider: 'postMessage-parent-bridge',
+      requestAiGeneration: (...args) => window.requestAiGeneration(...args),
+      registerAiProvider(provider) {
+        diagnostics.providerRegistered = Boolean(provider);
+        diagnostics.providerConnected = Boolean(provider);
+        log('provider registration', { providerRegistered: diagnostics.providerRegistered });
+        logStatus(diagnostics.providerRegistered ? 'Connected' : 'Unavailable', diagnostics.providerRegistered ? 'provider_registered' : 'provider_missing');
+      }
+    };
+    log('provider registration', { provider: window.CreatiaRuntime.aiProvider, providerRegistered: true });
+    logStatus('Connected', 'parent_bridge_registered');
+    logStatus('Idle', 'provider_ready_no_pending_request');
+  } else {
+    window.CreatiaRuntime = { diagnostics, aiProvider: null, requestAiGeneration: (...args) => window.requestAiGeneration(...args), registerAiProvider: () => {} };
+    log('provider registration', { provider: null, providerRegistered: false });
+    logStatus('Unavailable', 'provider_missing_no_parent_bridge');
+  }
   const isAiUrl = (input) => String(typeof input === 'string' ? input : input?.url || '').includes('/api/ai');
   const titleFromBody = (body) => {
     try {
@@ -92,9 +200,16 @@ function buildAiActivityMonitor() {
   const notify = (status, title) => {
     window.parent?.postMessage({ source: 'creatia-generated-html', type: 'ai-activity', status, title, timestamp: new Date().toISOString() }, '*');
   };
-  const begin = (title) => { pending += 1; dot.classList.add('is-active'); notify('request', title); };
-  const end = (title, ok) => { pending = Math.max(0, pending - 1); if (!pending) dot.classList.remove('is-active'); notify(ok ? 'response' : 'error', title); };
+  const begin = (title) => { pending += 1; diagnostics.pendingRequests = pending; dot.classList.add('is-active'); logStatus('Generating', title); notify('request', title); };
+  const end = (title, ok) => { pending = Math.max(0, pending - 1); diagnostics.pendingRequests = pending; if (!pending) dot.classList.remove('is-active'); if (!ok) diagnostics.lastAiError = title; logStatus(ok ? (pending ? 'Generating' : 'Idle') : 'Error', title); notify(ok ? 'response' : 'error', title); };
   window.requestAiGeneration = window.requestAiGeneration || async (request = {}) => {
+    log('AI request creation', request);
+    if (!diagnostics.providerRegistered) {
+      diagnostics.lastAiError = 'No runtime AI provider registered.';
+      log('AI failures', diagnostics.lastAiError);
+      logStatus('Unavailable', 'provider_missing_before_request');
+      return { status: 'unavailable', error: diagnostics.lastAiError };
+    }
     const runtimeRequest = {
       trigger: request.trigger || 'runtime_generation',
       state: request.state || {},
@@ -102,6 +217,7 @@ function buildAiActivityMonitor() {
       preload: request.preload || window.preload || window.__preload || [],
       context: request.context || {}
     };
+    log('AI request dispatch', runtimeRequest);
     begin('Runtime AI generation · ' + runtimeRequest.trigger);
     window.parent?.postMessage({
       source: 'creatia-generated-html',
@@ -110,7 +226,8 @@ function buildAiActivityMonitor() {
       timestamp: new Date().toISOString()
     }, '*');
     notify('needs_generation', runtimeRequest.trigger);
-    return { status: 'queued', fallback: true, request: runtimeRequest };
+    end('Runtime AI generation queued · ' + runtimeRequest.trigger, true);
+    return { status: 'queued', fallback: false, request: runtimeRequest };
   };
   const originalFetch = window.fetch?.bind(window);
   if (originalFetch) {
@@ -120,9 +237,12 @@ function buildAiActivityMonitor() {
       begin(title);
       try {
         const response = await originalFetch(input, init);
+        log('AI response reception', { ok: response.ok, status: response.status });
         end(title, response.ok);
         return response;
       } catch (error) {
+        diagnostics.lastAiError = error?.message || 'Fetch failed';
+        log('AI failures', diagnostics.lastAiError);
         end(title, false);
         throw error;
       }
@@ -132,16 +252,16 @@ function buildAiActivityMonitor() {
 </script>`
 }
 
-export function withCreatiaUiGuards(html = '') {
+export function withCreatiaUiGuards(html = '', runtimeContext = {}) {
   const source = html || '<!doctype html><html><body></body></html>'
-  const guards = `${buildStartPanelGuardStyle()}${buildStartPanelGuardScript()}${buildAiActivityMonitor()}`
+  const guards = `${buildStartPanelGuardStyle()}${buildStartPanelGuardScript()}${buildAiActivityMonitor(runtimeContext)}`
 
   if (source.includes('data-creatia-ui-guard="ai-activity"')) return source
   if (/<\/body>/i.test(source)) return source.replace(/<\/body>/i, `${guards}</body>`)
   return `${source}${guards}`
 }
 
-export function HtmlViewer({ html, title = 'Page créée', onBack, aiOverlay = null }) {
+export function HtmlViewer({ html, title = 'Page créée', onBack, aiOverlay = null, runtimeContext = {} }) {
   return (
     <section className="html-viewer is-fullscreen" aria-label={title}>
       <div className="html-viewer-toolbar">
@@ -151,7 +271,7 @@ export function HtmlViewer({ html, title = 'Page créée', onBack, aiOverlay = n
       <iframe
         title={title}
         sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-popups allow-modals allow-downloads"
-        srcDoc={withCreatiaUiGuards(html)}
+        srcDoc={withCreatiaUiGuards(html, runtimeContext)}
       />
     </section>
   )

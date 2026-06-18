@@ -25,7 +25,13 @@ function downloadBlob(blob, filename) {
 }
 
 export function buildHtmlExport(project) {
-  const html = withCreatiaUiGuards(project?.currentApplication || project?.lastValidApplication || '')
+  const html = withCreatiaUiGuards(project?.currentApplication || project?.lastValidApplication || '', {
+    mode: project?.mode || 'create',
+    capabilities: project?.capabilities || {},
+    runtimeCapabilities: project?.capabilities?.runtimeCapabilities || {},
+    continuationPlan: project?.continuationPlan || null,
+    preload: normalizePreloadQueue(project?.preloadQueue || [])
+  })
   const filename = `${safeSlug(project?.creationRequest || project?.id || 'creatia-app')}.html`
   return { html, filename, blob: new Blob([html], { type: 'text/html;charset=utf-8' }) }
 }
