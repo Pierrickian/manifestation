@@ -73,24 +73,54 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     animation: creatiaAiSpin 850ms linear infinite;
   }
   .creatia-ai-activity-dot.is-active { opacity: 0.78; transform: scale(1); }
-  .creatia-runtime-diagnostics {
+  .creatia-runtime-debug-button {
     position: fixed;
     left: max(10px, env(safe-area-inset-left));
-    bottom: max(10px, env(safe-area-inset-bottom));
+    top: max(10px, env(safe-area-inset-top));
     z-index: 2147483647;
-    max-width: min(330px, calc(100vw - 20px));
-    padding: 10px 12px;
-    border-radius: 14px;
+    min-width: 52px;
+    min-height: 38px;
+    border-radius: 999px;
     border: 1px solid rgba(255,255,255,.18);
-    background: rgba(12, 10, 24, .72);
+    background: rgba(12, 10, 24, .86);
     color: white;
-    font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace;
+    font: 700 12px/1 system-ui, sans-serif;
     box-shadow: 0 14px 36px rgba(0,0,0,.28);
     backdrop-filter: blur(12px);
-    pointer-events: none;
+    pointer-events: auto;
   }
-  .creatia-runtime-diagnostics strong { display: block; margin-bottom: 4px; font-size: 12px; }
-  .creatia-runtime-diagnostics span { display: block; opacity: .82; }
+  .creatia-runtime-debug-panel {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 2147483647;
+    max-height: min(78vh, 720px);
+    overflow: auto;
+    padding: 14px;
+    border-radius: 22px 22px 0 0;
+    border: 1px solid rgba(255,255,255,.18);
+    background: rgba(12, 10, 24, .96);
+    color: white;
+    font: 12px/1.4 system-ui, sans-serif;
+    box-shadow: 0 -18px 48px rgba(0,0,0,.36);
+    backdrop-filter: blur(16px);
+    transform: translateY(105%);
+    transition: transform 180ms ease;
+  }
+  .creatia-runtime-debug-panel.is-open { transform: translateY(0); }
+  .creatia-runtime-debug-panel h2 { margin: 0 0 10px; font-size: 16px; }
+  .creatia-runtime-debug-panel h3 { margin: 14px 0 6px; font-size: 13px; color: #ffeeb3; }
+  .creatia-runtime-debug-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; background: rgba(255,255,255,.08); padding: 8px; border-radius: 10px; max-height: 180px; overflow: auto; }
+  .creatia-runtime-debug-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .creatia-runtime-debug-item { background: rgba(255,255,255,.07); border-radius: 10px; padding: 7px; }
+  .creatia-runtime-debug-item strong { display: block; font-size: 10px; text-transform: uppercase; opacity: .7; }
+  .creatia-runtime-debug-row { border: 1px solid rgba(255,255,255,.12); border-radius: 10px; padding: 7px; margin: 5px 0; background: rgba(255,255,255,.05); }
+  .creatia-runtime-debug-warning { color: #ffd166; }
+  .creatia-runtime-debug-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+  .creatia-runtime-debug-actions button { border: 0; border-radius: 999px; padding: 8px 10px; font-weight: 700; }
+  @media (min-width: 720px) {
+    .creatia-runtime-debug-panel { inset: 12px auto 12px 12px; width: 380px; max-height: none; border-radius: 18px; transform: translateX(-110%); }
+    .creatia-runtime-debug-panel.is-open { transform: translateX(0); }
+  }
   @keyframes creatiaAiSpin { to { transform: rotate(360deg); } }
 </style>
 <script data-creatia-ui-guard="ai-activity">
@@ -119,26 +149,147 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     pendingRequests: 0,
     lastAiError: ''
   };
+  const builderCapabilities = runtimeContext.capabilities || {};
+  const debugState = {
+    mode: runtimeContext.mode || 'create',
+    builderCapabilities,
+    runtimeCapabilities,
+    eventStream: [],
+    aiRequests: [],
+    aiResponses: [],
+    capabilityRequests: [],
+    runtimeDecisions: [],
+    errors: [],
+    preloadState: preload.map((entry, index) => ({
+      id: entry.id || 'preload-' + index,
+      trigger: entry.trigger || 'contextual_followup',
+      confidence: entry.confidence ?? null,
+      preparedPrompt: entry.preparedPrompt || entry.prompt || '',
+      consumed: Boolean(entry.consumed),
+      applied: Boolean(entry.applied),
+      createdAt: entry.createdAt || entry.at || new Date().toISOString(),
+      status: entry.consumed ? 'Consumed' : entry.applied ? 'Applied' : 'Waiting',
+      flow: ['Created', 'Stored', entry.consumed ? 'Consumed' : entry.applied ? 'Applied' : 'Waiting']
+    })),
+    budget: {
+      aiCallsThisSession: 0,
+      aiCallsThisMinute: 0,
+      estimatedTokens: 0,
+      preloadsGenerated: preload.length,
+      preloadsConsumed: preload.filter((entry) => entry.consumed).length,
+      preloadsDiscarded: preload.filter((entry) => entry.discarded).length
+    },
+    lastResponse: null
+  };
+  const sessionStart = Date.now();
   const log = (...args) => console.log('[AI RUNTIME]', ...args);
+  const now = () => new Date().toISOString();
+  const payloadPreview = (value) => {
+    try { return JSON.stringify(value, null, 2).slice(0, 1200); } catch { return String(value).slice(0, 1200); }
+  };
+  const addEvent = (type, detail = {}) => {
+    debugState.eventStream.unshift({ timestamp: now(), type, detail });
+    debugState.eventStream = debugState.eventStream.slice(0, 80);
+    renderDiagnostics();
+  };
+  const addDecision = (message, detail = {}) => {
+    debugState.runtimeDecisions.unshift({ timestamp: now(), message, detail });
+    debugState.runtimeDecisions = debugState.runtimeDecisions.slice(0, 30);
+    addEvent('runtime_decision', { message, detail });
+  };
+  const addError = (location, reason, error) => {
+    const entry = { timestamp: now(), location, reason, stack: error?.stack || '' };
+    debugState.errors.unshift(entry);
+    debugState.errors = debugState.errors.slice(0, 20);
+    diagnostics.lastAiError = reason;
+    addEvent('generation_failed', entry);
+  };
   const logStatus = (nextStatus, reason) => {
     const previousStatus = diagnostics.status;
     diagnostics.status = nextStatus;
     console.log('[AI STATUS]', previousStatus, '->', nextStatus, reason);
+    addEvent('ai_status_transition', { previousStatus, nextStatus, reason });
     renderDiagnostics();
     syncGeneratedStatusText();
   };
-  const panel = document.createElement('div');
-  panel.className = 'creatia-runtime-diagnostics';
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'creatia-runtime-debug-button';
+  button.textContent = 'AI';
+  button.setAttribute('aria-label', 'Open Runtime Debug Panel');
+  const panel = document.createElement('aside');
+  panel.className = 'creatia-runtime-debug-panel';
   panel.setAttribute('aria-live', 'polite');
+  panel.setAttribute('aria-label', 'Runtime Debug Panel');
+  const boolText = (value) => value ? 'Yes' : 'No';
+  function buildDebugSnapshot() {
+    return {
+      exportedAt: now(),
+      runtimeStatus: diagnostics,
+      capabilities: { builder: builderCapabilities, runtime: runtimeCapabilities, mismatches: capabilityMismatches() },
+      continuationPlan,
+      preloadState: debugState.preloadState,
+      eventHistory: debugState.eventStream,
+      aiRequests: debugState.aiRequests,
+      aiResponses: debugState.aiResponses,
+      capabilityRequests: debugState.capabilityRequests,
+      runtimeDecisions: debugState.runtimeDecisions,
+      budget: debugState.budget,
+      errors: debugState.errors
+    };
+  }
+  function exportDebugSnapshot() {
+    const snapshot = buildDebugSnapshot();
+    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'creatia-runtime-debug-snapshot.json';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    addEvent('debug_snapshot_exported', { entries: debugState.eventStream.length });
+  }
+  const capabilityMismatches = () => {
+    const keys = Array.from(new Set([...Object.keys(builderCapabilities || {}), ...Object.keys(runtimeCapabilities || {})]));
+    return keys.filter((key) => {
+      if (key === 'runtimeCapabilities') return false;
+      return JSON.stringify(builderCapabilities?.[key]) !== JSON.stringify(runtimeCapabilities?.[key]);
+    });
+  };
+  const renderRows = (items, empty, formatter) => items.length ? items.map(formatter).join('') : '<div class="creatia-runtime-debug-row">' + empty + '</div>';
   const renderDiagnostics = () => {
-    panel.innerHTML = '<strong>AI Status: ' + diagnostics.status + '</strong>'
-      + '<span>Provider Registered: ' + String(diagnostics.providerRegistered) + '</span>'
-      + '<span>Provider Connected: ' + String(diagnostics.providerConnected) + '</span>'
-      + '<span>Capabilities: ' + JSON.stringify(diagnostics.runtimeCapabilities) + '</span>'
-      + '<span>ContinuationPlan Loaded: ' + String(diagnostics.continuationPlanLoaded) + '</span>'
-      + '<span>Preload Entries: ' + diagnostics.preloadEntries + '</span>'
-      + '<span>Pending Requests: ' + diagnostics.pendingRequests + '</span>'
-      + '<span>Last AI Error: ' + (diagnostics.lastAiError || 'none') + '</span>';
+    const mismatches = capabilityMismatches();
+    panel.innerHTML = '<h2>Runtime Debug Panel</h2>'
+      + '<div class="creatia-runtime-debug-actions"><button type="button" data-creatia-debug-close>Close</button><button type="button" data-creatia-debug-export>Export Debug Snapshot</button></div>'
+      + '<h3>Runtime Status</h3><div class="creatia-runtime-debug-grid">'
+      + '<div class="creatia-runtime-debug-item"><strong>Application Mode</strong>' + debugState.mode + '</div>'
+      + '<div class="creatia-runtime-debug-item"><strong>AI Status</strong>' + diagnostics.status + '</div>'
+      + '<div class="creatia-runtime-debug-item"><strong>Provider Registered</strong>' + boolText(diagnostics.providerRegistered) + '</div>'
+      + '<div class="creatia-runtime-debug-item"><strong>Provider Connected</strong>' + boolText(diagnostics.providerConnected) + '</div>'
+      + '<div class="creatia-runtime-debug-item"><strong>Runtime Online</strong>' + boolText(Boolean(runtimeCapabilities.online || diagnostics.providerConnected)) + '</div>'
+      + '<div class="creatia-runtime-debug-item"><strong>Pending Requests</strong>' + diagnostics.pendingRequests + '</div></div>'
+      + '<h3>Capabilities</h3>' + (mismatches.length ? '<div class="creatia-runtime-debug-warning">Mismatches: ' + mismatches.join(', ') + '</div>' : '<div>Builder and runtime capabilities aligned.</div>')
+      + '<strong>Builder Capabilities</strong><pre>' + payloadPreview(builderCapabilities) + '</pre><strong>Runtime Capabilities</strong><pre>' + payloadPreview(runtimeCapabilities) + '</pre>'
+      + '<h3>Continuation Plan</h3><div class="creatia-runtime-debug-grid">'
+      + '<div class="creatia-runtime-debug-item"><strong>Present</strong>' + boolText(diagnostics.continuationPlanLoaded) + '</div>'
+      + '<div class="creatia-runtime-debug-item"><strong>Role</strong>' + (continuationPlan?.role || continuationPlan?.aiRole || '—') + '</div></div>'
+      + '<div><strong>Objectives</strong><pre>' + payloadPreview(continuationPlan?.objectives || continuationPlan?.longTermObjectives || []) + '</pre></div>'
+      + '<div><strong>Callbacks</strong><pre>' + payloadPreview(continuationPlan?.callbacks || continuationPlan?.expectedCallbacks || []) + '</pre></div>'
+      + '<div><strong>Rules</strong><pre>' + payloadPreview(continuationPlan?.rules || continuationPlan?.collaborationRules || []) + '</pre></div>'
+      + '<details><summary>Full continuationPlan JSON</summary><pre>' + payloadPreview(continuationPlan) + '</pre></details>'
+      + '<h3>Preload</h3><div>Preload Entries: ' + debugState.preloadState.length + '</div>'
+      + renderRows(debugState.preloadState, 'No preload entries.', (entry) => '<div class="creatia-runtime-debug-row"><strong>' + entry.trigger + '</strong><div>Status: ' + entry.status + ' · Confidence: ' + (entry.confidence ?? '—') + '</div><div>Consumed: ' + boolText(entry.consumed) + ' · Applied: ' + boolText(entry.applied) + '</div><div>Created At: ' + entry.createdAt + '</div><details><summary>Prepared Prompt</summary><pre>' + payloadPreview(entry.preparedPrompt) + '</pre></details><div>Flow: ' + entry.flow.join(' ↓ ') + '</div></div>')
+      + '<h3>AI Request Log</h3>' + renderRows(debugState.aiRequests, 'No AI requests yet.', (entry) => '<div class="creatia-runtime-debug-row"><strong>' + entry.trigger + '</strong><div>' + entry.timestamp + ' · ' + entry.requestId + ' · ' + entry.status + '</div><div>Duration: ' + (entry.durationMs ?? '—') + 'ms · Estimated Tokens: ' + (entry.estimatedTokens ?? '—') + '</div></div>')
+      + '<h3>Last AI Response</h3><div class="creatia-runtime-debug-row"><strong>Response Type</strong>' + (debugState.lastResponse?.type || 'none') + '<pre>' + payloadPreview(debugState.lastResponse?.payload || {}) + '</pre></div>'
+      + '<h3>Capability Negotiation</h3>' + renderRows(debugState.capabilityRequests, 'No capability requests.', (entry) => '<div class="creatia-runtime-debug-row"><strong>' + entry.status + '</strong><pre>' + payloadPreview(entry.requestedCapabilities) + '</pre></div>')
+      + '<h3>Event Stream</h3>' + renderRows(debugState.eventStream, 'No runtime events yet.', (entry) => '<div class="creatia-runtime-debug-row"><strong>' + entry.type + '</strong><div>' + entry.timestamp + '</div><pre>' + payloadPreview(entry.detail) + '</pre></div>')
+      + '<h3>Budget</h3><pre>' + payloadPreview(debugState.budget) + '</pre>'
+      + '<h3>Runtime Decision Explainer</h3>' + renderRows(debugState.runtimeDecisions, 'No blocked decisions.', (entry) => '<div class="creatia-runtime-debug-row"><strong>Why was this request blocked?</strong><div>' + entry.message + '</div><pre>' + payloadPreview(entry.detail) + '</pre></div>')
+      + '<h3>Last Error</h3>' + renderRows(debugState.errors, 'No runtime errors.', (entry) => '<div class="creatia-runtime-debug-row"><strong>' + entry.location + '</strong><div>' + entry.timestamp + '</div><div>' + entry.reason + '</div><pre>' + (entry.stack || '') + '</pre></div>');
+    panel.querySelector('[data-creatia-debug-close]')?.addEventListener('click', () => panel.classList.remove('is-open'));
+    panel.querySelector('[data-creatia-debug-export]')?.addEventListener('click', exportDebugSnapshot);
   };
   const syncGeneratedStatusText = () => {
     if (!diagnostics.providerRegistered || diagnostics.status === 'Unavailable') return;
@@ -155,7 +306,12 @@ function buildAiActivityMonitor(runtimeContext = {}) {
   const ready = () => {
     if (!document.body) return;
     document.body.appendChild(dot);
+    document.body.appendChild(button);
     document.body.appendChild(panel);
+    button.addEventListener('click', () => {
+      panel.classList.toggle('is-open');
+      addEvent('debug_panel_toggled', { open: panel.classList.contains('is-open') });
+    });
     renderDiagnostics();
     syncGeneratedStatusText();
   };
@@ -207,18 +363,42 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     if (!diagnostics.providerRegistered) {
       diagnostics.lastAiError = 'No runtime AI provider registered.';
       log('AI failures', diagnostics.lastAiError);
+      addDecision('Blocked because: Provider not connected.', { request });
+      addError('requestAiGeneration', diagnostics.lastAiError);
       logStatus('Unavailable', 'provider_missing_before_request');
       return { status: 'unavailable', error: diagnostics.lastAiError };
     }
+    if (diagnostics.pendingRequests > 0) {
+      addDecision('Blocked because: Request already in progress.', { pendingRequests: diagnostics.pendingRequests });
+    }
     const runtimeRequest = {
+      requestId: request.requestId || 'runtime-' + Date.now() + '-' + Math.random().toString(16).slice(2),
       trigger: request.trigger || 'runtime_generation',
       state: request.state || {},
       continuationPlan: request.continuationPlan || window.continuationPlan || window.__continuationPlan || null,
       preload: request.preload || window.preload || window.__preload || [],
       context: request.context || {}
     };
+    const requestEntry = {
+      timestamp: now(),
+      trigger: runtimeRequest.trigger,
+      requestId: runtimeRequest.requestId,
+      status: 'Queued',
+      durationMs: null,
+      estimatedTokens: Math.ceil(payloadPreview(runtimeRequest).length / 4),
+      startedAt: performance.now()
+    };
+    debugState.aiRequests.unshift(requestEntry);
+    debugState.aiRequests = debugState.aiRequests.slice(0, 50);
+    debugState.budget.aiCallsThisSession += 1;
+    debugState.budget.aiCallsThisMinute = debugState.aiRequests.filter((entry) => Date.parse(entry.timestamp) > Date.now() - 60000).length;
+    debugState.budget.estimatedTokens += requestEntry.estimatedTokens;
+    addEvent('ai_request', { trigger: runtimeRequest.trigger, requestId: runtimeRequest.requestId });
     log('AI request dispatch', runtimeRequest);
+    requestEntry.status = 'Sent';
     begin('Runtime AI generation · ' + runtimeRequest.trigger);
+    requestEntry.status = 'Generating';
+    addEvent('generation_started', { trigger: runtimeRequest.trigger, requestId: runtimeRequest.requestId });
     window.parent?.postMessage({
       source: 'creatia-generated-html',
       type: 'ai-runtime-generation',
@@ -227,6 +407,13 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     }, '*');
     notify('needs_generation', runtimeRequest.trigger);
     end('Runtime AI generation queued · ' + runtimeRequest.trigger, true);
+    requestEntry.status = 'Completed';
+    requestEntry.durationMs = Math.round(performance.now() - requestEntry.startedAt);
+    debugState.lastResponse = { type: 'runtime_generation', payload: { status: 'queued', request: runtimeRequest } };
+    debugState.aiResponses.unshift({ timestamp: now(), type: 'runtime_generation', payload: debugState.lastResponse.payload });
+    debugState.aiResponses = debugState.aiResponses.slice(0, 30);
+    addEvent('generation_completed', { trigger: runtimeRequest.trigger, requestId: runtimeRequest.requestId });
+    renderDiagnostics();
     return { status: 'queued', fallback: false, request: runtimeRequest };
   };
   const originalFetch = window.fetch?.bind(window);
@@ -234,15 +421,33 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     window.fetch = async (input, init = {}) => {
       if (!isAiUrl(input)) return originalFetch(input, init);
       const title = titleFromBody(init?.body);
+      const requestId = 'fetch-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+      const requestEntry = { timestamp: now(), trigger: title, requestId, status: 'Sent', durationMs: null, estimatedTokens: Math.ceil(String(init?.body || '').length / 4), startedAt: performance.now() };
+      debugState.aiRequests.unshift(requestEntry);
+      debugState.aiRequests = debugState.aiRequests.slice(0, 50);
+      debugState.budget.aiCallsThisSession += 1;
+      debugState.budget.aiCallsThisMinute = debugState.aiRequests.filter((entry) => Date.parse(entry.timestamp) > Date.now() - 60000).length;
+      debugState.budget.estimatedTokens += requestEntry.estimatedTokens;
+      addEvent('ai_request', { trigger: title, requestId });
       begin(title);
       try {
+        requestEntry.status = 'Generating';
         const response = await originalFetch(input, init);
         log('AI response reception', { ok: response.ok, status: response.status });
+        requestEntry.status = response.ok ? 'Completed' : 'Failed';
+        requestEntry.durationMs = Math.round(performance.now() - requestEntry.startedAt);
+        debugState.lastResponse = { type: response.ok ? 'html_app' : 'generation_error', payload: { status: response.status, ok: response.ok } };
+        debugState.aiResponses.unshift({ timestamp: now(), type: debugState.lastResponse.type, payload: debugState.lastResponse.payload });
+        addEvent(response.ok ? 'generation_completed' : 'generation_failed', { trigger: title, requestId, status: response.status });
         end(title, response.ok);
+        renderDiagnostics();
         return response;
       } catch (error) {
         diagnostics.lastAiError = error?.message || 'Fetch failed';
         log('AI failures', diagnostics.lastAiError);
+        requestEntry.status = 'Failed';
+        requestEntry.durationMs = Math.round(performance.now() - requestEntry.startedAt);
+        addError('fetch', diagnostics.lastAiError, error);
         end(title, false);
         throw error;
       }
