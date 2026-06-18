@@ -1,6 +1,6 @@
 import { useSpeechInput } from '../hooks/useSpeechInput'
 
-export function AiInputComposer({ value, onChange, onSubmit, onTranscript, disabled, speechEnabled, statusMessage, placeholder }) {
+export function AiInputComposer({ value, onChange, onSubmit, onRetry, canRetry = false, onTranscript, disabled, speechEnabled, statusMessage, placeholder }) {
   const speech = useSpeechInput({ enabled: speechEnabled, onTranscript, onStatus: statusMessage })
 
   return (
@@ -15,7 +15,8 @@ export function AiInputComposer({ value, onChange, onSubmit, onTranscript, disab
             {speech.isListening ? '● Écoute…' : '🎙️ Micro'}
           </button>
         ) : null}
-        <button type="button" className="primary-action" onClick={onSubmit} disabled={disabled}>{disabled ? 'Génération…' : 'Envoyer'}</button>
+        {canRetry ? <button type="button" className="ghost-action" onClick={onRetry} disabled={disabled}>Réessayer</button> : null}
+        <button type="button" className="primary-action" onClick={onSubmit} disabled={disabled}>{disabled ? 'Génération…' : 'Générer'}</button>
       </div>
     </div>
   )

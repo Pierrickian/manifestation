@@ -4,7 +4,7 @@ import { useAiApplicationController } from '../../platform/ai/hooks/useAiApplica
 import { AiInputComposer } from '../../platform/ai/components/AiInputComposer'
 import { AiLoadingState } from '../../platform/ai/components/AiLoadingState'
 import { HtmlViewer } from '../../platform/ai/renderers/HtmlViewer'
-import { buildHtmlExport, buildProjectExport, exportHtmlProject, exportProjectJson, importHtmlIntoProject, normalizeImportedProject, shareExport } from '../../platform/ai/projectExport'
+import { buildHtmlExport, buildProjectExport, createProjectFromImportedHtml, exportHtmlProject, exportProjectJson, importHtmlIntoProject, normalizeImportedProject, shareExport } from '../../platform/ai/projectExport'
 
 export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
   const [isViewingHtml, setIsViewingHtml] = useState(false)
@@ -55,6 +55,7 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
   const preloadQueue = mode === 'co-create' ? project?.preloadQueue || [] : []
   const continuationPlan = mode === 'co-create' ? project?.continuationPlan : null
   const [showHealthcheckDetails, setShowHealthcheckDetails] = useState(false)
+  const lastAutoOpenedHtmlRef = useRef('')
   const isBusy = controller.status === 'loading' || controller.status === 'repairing' || controller.status === 'refreshingHumanModel'
   const hasUnsavedAiApp = Boolean(project?.currentApplication || controller.input.trim() || isBusy)
 
@@ -73,7 +74,7 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
 
   function rememberExport(exportData, kind) {
     setLastExport({ ...exportData, kind })
-    setExportStatus(kind === 'html' ? 'HTML exporté dans les téléchargements.' : 'Projet exporté dans les téléchargements.')
+    setExportStatus(kind === 'html' ? 'Application téléchargée.' : 'Projet complet téléchargé.')
   }
 
   function handleExportHtml() {
@@ -91,8 +92,8 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
       const shared = await shareExport({
         blob: exportData.blob,
         filename: exportData.filename,
-        title: kind === 'html' ? 'Application HTML Creatia' : 'Projet Creatia',
-        text: kind === 'html' ? 'Application HTML autonome exportée depuis Creatia.' : 'Projet Creatia exporté depuis Evolutia.'
+        title: kind === 'html' ? 'Application Creatia' : 'Projet Creatia',
+        text: kind === 'html' ? 'Application autonome exportée depuis Creatia.' : 'Projet complet Creatia exporté depuis Evolutia.'
       })
       setLastExport({ ...exportData, kind })
       setExportStatus(shared ? 'Partage ouvert.' : 'Partage indisponible sur ce navigateur. Tu peux télécharger le fichier puis le partager depuis ton appareil.')
@@ -121,23 +122,19 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
-    if (!project) {
-      setExportStatus('Importe ou crée d’abord un projet Creatia avant de remplacer son HTML.')
-      return
-    }
     if (!file.name.endsWith('.html') && file.type !== 'text/html') {
-      setExportStatus('Choisis un fichier .html exporté puis modifié.')
+      setExportStatus('Choisis un fichier d’application exporté puis modifié.')
       return
     }
 
     try {
       const importedHtml = await file.text()
-      const updatedProject = importHtmlIntoProject(project, importedHtml)
+      const updatedProject = project ? importHtmlIntoProject(project, importedHtml) : createProjectFromImportedHtml(importedHtml, { mode, designSystem: MANIFESTATION_DESIGN_SYSTEM })
       controller.importProject(updatedProject)
       setMode(updatedProject.mode || 'create')
-      setExportStatus('HTML importé. Il remplace maintenant l’application du projet.')
+      setExportStatus(project ? 'Application importée. Elle remplace celle du projet.' : 'Application importée. Un projet a été créé pour pouvoir la faire évoluer.')
     } catch (error) {
-      setExportStatus(error instanceof Error ? error.message : 'Import HTML impossible pour ce fichier.')
+      setExportStatus(error instanceof Error ? error.message : 'Import impossible pour ce fichier.')
     }
   }
 
@@ -146,7 +143,7 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
     event.target.value = ''
     if (!file) return
     if (!file.name.endsWith('.manifestation.json')) {
-      setExportStatus('Choisis un fichier .manifestation.json exporté depuis Creatia.')
+      setExportStatus('Choisis un fichier projet exporté depuis Creatia.')
       return
     }
 
@@ -155,9 +152,39 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
       const importedProject = normalizeImportedProject(payload)
       controller.importProject(importedProject)
       setMode(importedProject.mode || 'create')
-      setExportStatus('Projet importé sans perte. Tu peux continuer la création.')
+      setExportStatus('Projet complet importé. L’application, le contexte et l’historique sont restaurés.')
     } catch (error) {
       setExportStatus(error instanceof Error ? error.message : 'Import impossible pour ce fichier.')
+    }
+  }
+
+
+  useEffect(() => {
+    if (controller.status !== 'success' || !html || !controller.result?.html) return
+    if (lastAutoOpenedHtmlRef.current === html) return
+    lastAutoOpenedHtmlRef.current = html
+    setIsViewingHtml(true)
+  }, [controller.status, controller.result, html])
+
+  async function handleCopyExternalPrompt() {
+    if (!project && !controller.lastPrompt) return
+    const history = (project?.evolutionHistory || []).slice(-6).map((entry, index) => `${index + 1}. Demande: ${entry.userRequest || 'Non précisée'}\nAnalyse: ${entry.analysis || 'Non précisée'}\nChangements: ${(entry.generatedChanges || []).join(', ') || 'Non précisés'}`).join('\n\n')
+    const prompt = [
+      'Tu es une IA experte en création d’applications web autonomes.',
+      'Refais une version complète, exécutable dans un navigateur, en un seul fichier avec styles et interactions intégrés.',
+      `Demande initiale: ${project?.creationRequest || controller.lastPrompt || 'Non précisée'}`,
+      controller.lastPrompt ? `Dernière demande utilisateur: ${controller.lastPrompt}` : '',
+      project?.humanModel ? `Contexte utilisateur: ${JSON.stringify(project.humanModel, null, 2)}` : '',
+      history ? `Historique utile:\n${history}` : '',
+      html ? `Version actuelle à améliorer ou reconstruire:\n${html}` : '',
+      'Retourne uniquement le code final complet, sans explication autour.'
+    ].filter(Boolean).join('\n\n')
+
+    try {
+      await navigator.clipboard.writeText(prompt)
+      setExportStatus('Brief copié. Tu peux le coller dans une autre IA.')
+    } catch {
+      setExportStatus('Copie automatique indisponible. Sélectionne et copie le brief manuellement depuis ton navigateur.')
     }
   }
 
@@ -187,8 +214,8 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
         <small>Autorise Planner, validations plus profondes, boucles de réparation et revues qualité quand l’IA le juge utile.</small>
       </label>
 
-      <details className="project-menu ai-journal-menu">
-        <summary>Journal IA</summary>
+      <details className="project-menu ai-journal-menu debug-menu">
+        <summary>Debug</summary>
         {aiActivity.log.length ? (
           <ol>
             {aiActivity.log.map((entry) => (
@@ -200,22 +227,55 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
             ))}
           </ol>
         ) : <small>Aucun appel IA Creatia pour le moment.</small>}
+
+        {project?.evolutionHistory?.length ? (
+          <div className="debug-section">
+            <strong>Historique d’évolution</strong>
+            <ol className="evolution-history-list">
+              {project.evolutionHistory.slice(-3).reverse().map((entry, index) => (
+                <li key={`${entry.at || 'evolution'}-${index}`}>
+                  <strong>{entry.userRequest}</strong>
+                  {entry.analysis ? <span>{entry.analysis}</span> : null}
+                  {entry.decisions?.length ? <small>Décisions : {entry.decisions.join(' · ')}</small> : null}
+                  {entry.generatedChanges?.length ? <small>Changements : {entry.generatedChanges.join(' · ')}</small> : null}
+                </li>
+              ))}
+            </ol>
+          </div>
+        ) : null}
+        {controller.healthcheck ? (
+          <div className={`debug-section ai-verification-card ${controller.healthcheck.status}`}>
+            <strong>{controller.healthcheck.label}</strong>
+            <span>Contrôles : {controller.healthcheck.passedCount ?? controller.healthcheck.checks.filter((check) => check.ok).length}/{controller.healthcheck.checks.length} validés</span>
+            <div className="ai-repair-actions">
+              <button type="button" className="ghost-action" onClick={() => setShowHealthcheckDetails((visible) => !visible)}>{showHealthcheckDetails ? 'Masquer' : 'Voir les détails'}</button>
+              {controller.healthcheck.status !== 'verified' ? <button type="button" className="primary-action" onClick={controller.repair} disabled={isBusy || !controller.healthcheck.isRepairable}>Réparer</button> : null}
+            </div>
+            {showHealthcheckDetails ? (
+              <ul className="ai-healthcheck-details">
+                {controller.healthcheck.checks.map((check) => (
+                  <li key={check.id} className={check.ok ? 'passed' : 'failed'}><strong>{check.ok ? '✓' : '×'} {check.id}</strong><span>{check.message}</span>{!check.ok ? <small>Attendu: {check.expected} · Reçu: {check.actual}</small> : null}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
       </details>
 
       <details className="project-menu" open={Boolean(project)}>
         <summary>Exporter</summary>
         <div className="project-menu-actions">
           <button type="button" className="ghost-action project-export-action" onClick={handleExportHtml} disabled={!project?.currentApplication}>
-            <span>Page web (.html)</span>
-            <small>Jouer ou partager.</small>
+            <span>Application seule</span>
+            <small>Pour jouer ou partager. Elle ne garde pas l’historique de création.</small>
           </button>
           <button type="button" className="ghost-action project-export-action project-share-action" onClick={handleShareHtml} disabled={!project?.currentApplication}>
             <span>Partager la page</span>
             <small>Même si elle est déjà téléchargée.</small>
           </button>
           <button type="button" className="ghost-action project-export-action" onClick={handleExportProject} disabled={!project}>
-            <span>Projet</span>
-            <small>Continuer à créer plus tard. À réimporter ici.</small>
+            <span>Projet complet</span>
+            <small>Application + contexte + historique pour continuer plus tard.</small>
           </button>
           <button type="button" className="ghost-action project-export-action project-share-action" onClick={handleShareProject} disabled={!project}>
             <span>Partager le projet</span>
@@ -225,16 +285,16 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
             <span>Importer</span>
             <small>Restaurer un projet exporté.</small>
           </button>
-          <button type="button" className="ghost-action project-export-action" onClick={() => htmlImportInputRef.current?.click()} disabled={isBusy || !project}>
-            <span>Import HTML</span>
-            <small>Remplacer l’application par un .html modifié.</small>
+          <button type="button" className="ghost-action project-export-action" onClick={() => htmlImportInputRef.current?.click()} disabled={isBusy}>
+            <span>Importer une application seule</span>
+            <small>Fonctionne même sans projet déjà chargé.</small>
           </button>
           {lastExport?.url ? <a className="ghost-action export-link" href={lastExport.url} target="_blank" rel="noreferrer">Ouvrir</a> : null}
           {lastExport ? <button type="button" className="ghost-action" onClick={handleShareLastExport}>Partager</button> : null}
         </div>
         <input ref={importInputRef} className="visually-hidden" type="file" accept=".manifestation.json,application/json" onChange={handleImportProject} />
         <input ref={htmlImportInputRef} className="visually-hidden" type="file" accept=".html,text/html" onChange={handleImportHtml} />
-        <small>L’export Projet sert à reprendre la création après Import. Export APK non implémenté.</small>
+        <small>Application seule : pratique à ouvrir ou partager. Projet complet : application, contexte et historique pour reprendre la création.</small>
         {exportStatus ? <span className="project-export-status" role="status">{exportStatus}</span> : null}
       </details>
 
@@ -250,6 +310,8 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
         value={controller.input}
         onChange={controller.setInput}
         onSubmit={controller.submit}
+        onRetry={controller.retry}
+        canRetry={Boolean(controller.lastPrompt) && !isBusy}
         onTranscript={controller.appendTranscript}
         disabled={isBusy}
         speechEnabled={speechEnabled}
@@ -262,18 +324,18 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
       {project?.metadata?.requiresHumanModelRefresh ? (
         <div className="create-app-status warning human-model-refresh-warning" role="alert">
           <strong>Modèle humain à vérifier</strong>
-          <span>An external HTML file replaced the application. The human model may no longer match the current application. Ask the AI to analyze the current application and rebuild its human model.</span>
-          <button type="button" className="primary-action" onClick={controller.rebuildHumanModel} disabled={isBusy}>Rebuild Human Model</button>
+          <span>Une application seule a remplacé le projet actif. Le contexte de création peut ne plus correspondre. Demande à l’IA de relire l’application pour reconstruire ce contexte.</span>
+          <button type="button" className="primary-action" onClick={controller.rebuildHumanModel} disabled={isBusy}>Reconstruire le contexte</button>
         </div>
       ) : null}
 
-      {controller.error ? <div className="create-app-status error" role="alert"><strong>Oups</strong><span>{controller.error}</span></div> : null}
+      {controller.error ? <div className="create-app-status error" role="alert"><strong>Oups</strong><span>{controller.error}</span>{controller.lastPrompt ? <button type="button" className="ghost-action" onClick={controller.retry} disabled={isBusy}>Réessayer la même demande</button> : null}</div> : null}
       {controller.repairError ? <div className="create-app-status error" role="alert"><strong>Réparation</strong><span>{controller.repairError}</span></div> : null}
       {html ? (
         <div className="iaview-ready-card">
           <strong>{project.creationRequest}</strong>
-          <span>Projet enregistré automatiquement. {controller.healthcheck?.label || 'Application Generated'}. Demande une évolution ou ouvre l’application.</span>
-          <button type="button" className="primary-action" onClick={() => setIsViewingHtml(true)}>Ouvrir l’application</button>
+          <span>Projet enregistré automatiquement. Demande une évolution ou ouvre l’application.</span>
+          <div className="create-app-actions"><button type="button" className="primary-action" onClick={() => setIsViewingHtml(true)}>Ouvrir l’application</button><button type="button" className="ghost-action" onClick={handleCopyExternalPrompt}>Copier un brief pour une autre IA</button></div>
         </div>
       ) : null}
 
@@ -290,47 +352,6 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
         </details>
       ) : null}
 
-      {project?.evolutionHistory?.length ? (
-        <details className="project-menu">
-          <summary>Historique d’évolution</summary>
-          <ol className="evolution-history-list">
-            {project.evolutionHistory.slice(-3).reverse().map((entry, index) => (
-              <li key={`${entry.at || 'evolution'}-${index}`}>
-                <strong>{entry.userRequest}</strong>
-                {entry.analysis ? <span>{entry.analysis}</span> : null}
-                {entry.decisions?.length ? <small>Décisions : {entry.decisions.join(' · ')}</small> : null}
-                {entry.generatedChanges?.length ? <small>Changements : {entry.generatedChanges.join(' · ')}</small> : null}
-              </li>
-            ))}
-          </ol>
-        </details>
-      ) : null}
-
-      {controller.healthcheck ? (
-        <div className={`ai-verification-card ${controller.healthcheck.status}`}>
-          <strong>{controller.healthcheck.label}</strong>
-          <span>Healthcheck: {controller.healthcheck.passedCount ?? controller.healthcheck.checks.filter((check) => check.ok).length}/{controller.healthcheck.checks.length} passed</span>
-          <small>Repair confidence: {controller.healthcheck.repairConfidence || 'none'}{controller.healthcheck.repairAttempts ? ` · ${controller.healthcheck.repairAttempts} repair attempt(s)` : ''}</small>
-          <div className="ai-repair-actions">
-            <button type="button" className="ghost-action" onClick={() => setShowHealthcheckDetails((visible) => !visible)}>
-              {showHealthcheckDetails ? 'Hide Details' : 'View Details'}
-            </button>
-            <button type="button" className="ghost-action" onClick={controller.retry} disabled={isBusy}>Retry</button>
-            <button type="button" className="primary-action" onClick={controller.repair} disabled={isBusy || controller.healthcheck.status === 'verified' || !controller.healthcheck.isRepairable}>Repair</button>
-          </div>
-          {showHealthcheckDetails ? (
-            <ul className="ai-healthcheck-details">
-              {controller.healthcheck.checks.map((check) => (
-                <li key={check.id} className={check.ok ? 'passed' : 'failed'}>
-                  <strong>{check.ok ? '✓' : '×'} {check.id}</strong>
-                  <span>{check.message}</span>
-                  {!check.ok ? <small>Expected: {check.expected} · Actual: {check.actual}</small> : null}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-      ) : null}
 
       {mode === 'co-create' && latestSuggestions.length ? (
         <div className="ai-suggestions-card">

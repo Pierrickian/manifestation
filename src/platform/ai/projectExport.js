@@ -1,4 +1,4 @@
-import { normalizeTechnicalModel, storeProject } from './projectModel'
+import { createProject, normalizeTechnicalModel, storeProject } from './projectModel'
 import { withCreatiaUiGuards } from './renderers/HtmlViewer'
 
 const PROJECT_EXPORT_VERSION = 1
@@ -85,6 +85,41 @@ export async function shareExport({ blob, filename, title = 'Export Creatia', te
 }
 
 
+export function createProjectFromImportedHtml(importedHtml, { mode = 'create', designSystem } = {}) {
+  const html = String(importedHtml || '')
+  if (!html.trim()) {
+    throw new Error('Le fichier importé est vide.')
+  }
+
+  const response = {
+    html,
+    humanModel: {},
+    files: {},
+    analysis: 'Application importée directement.',
+    decisions: ['Application active créée depuis un import direct'],
+    generatedChanges: ['Application active renseignée'],
+    systemPrompt: '',
+    state: {},
+    suggestedActions: [],
+    capabilities: {}
+  }
+  const project = createProject({
+    mode,
+    request: 'Application importée',
+    response,
+    designSystem
+  })
+
+  return storeProject({
+    ...project,
+    metadata: {
+      ...(project.metadata || {}),
+      lastExternalImport: { at: new Date().toISOString(), source: 'html' },
+      requiresHumanModelRefresh: true
+    }
+  })
+}
+
 export function importHtmlIntoProject(project, importedHtml) {
   if (!project?.id || !Array.isArray(project.generationHistory)) {
     throw new Error('Aucun projet Creatia actif à mettre à jour.')
@@ -92,7 +127,7 @@ export function importHtmlIntoProject(project, importedHtml) {
 
   const html = String(importedHtml || '')
   if (!html.trim()) {
-    throw new Error('Le fichier HTML importé est vide.')
+    throw new Error('Le fichier importé est vide.')
   }
 
   const now = new Date().toISOString()

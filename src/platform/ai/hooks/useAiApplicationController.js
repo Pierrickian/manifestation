@@ -48,6 +48,7 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
   const [pipeline, setPipeline] = useState(null)
   const [healthcheck, setHealthcheck] = useState(null)
   const [repairError, setRepairError] = useState(null)
+  const [lastPrompt, setLastPrompt] = useState('')
   const abortRef = useRef(null)
   const timeoutRef = useRef(null)
 
@@ -101,6 +102,7 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
       return
     }
 
+    setLastPrompt(trimmed)
     const controller = new AbortController()
     abortRef.current = controller
     setStatus('loading')
@@ -147,7 +149,7 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
       setResult(repairResult.finalStructured)
       setInput('')
       setStatus('success')
-      setMessage(project ? 'Le projet a évolué.' : 'Le projet est prêt.')
+      setMessage(repairResult.finalStructured.html ? (project ? 'Le projet a évolué.' : 'Le projet est prêt.') : 'La requête n’a pas abouti. Tu peux réessayer avec la même demande.')
       onDebug?.({
         ...(payload.debug || {}),
         status: 'success',
@@ -197,7 +199,13 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
   }
 
   async function retry() {
-    const originalRequest = project?.creationRequest || input
+    const originalRequest = lastPrompt || project?.generationHistory?.at(-1)?.request || project?.creationRequest || input
+    if (!originalRequest?.trim()) {
+      setStatus('error')
+      setError('Aucune demande précédente à réessayer.')
+      return
+    }
+    setMessage('Nouvel essai avec la même demande…')
     await submitWithText(originalRequest)
   }
 
@@ -303,5 +311,5 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
 
   function cancel() { abortRef.current?.abort() }
 
-  return { input, setInput, status, message, error, repairError, result, project, submit, submitPartnerSuggestion, retry, repair, rebuildHumanModel, importProject, cancel, appendTranscript, speechEnabled, progressText, hasTime, setHasTime, pipeline, healthcheck }
+  return { input, setInput, status, message, error, repairError, result, project, submit, submitPartnerSuggestion, retry, repair, rebuildHumanModel, importProject, cancel, appendTranscript, speechEnabled, progressText, hasTime, setHasTime, pipeline, healthcheck, lastPrompt }
 }
