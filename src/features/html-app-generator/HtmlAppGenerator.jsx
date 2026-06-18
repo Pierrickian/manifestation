@@ -4,14 +4,13 @@ import { useAiApplicationController } from '../../platform/ai/hooks/useAiApplica
 import { AiInputComposer } from '../../platform/ai/components/AiInputComposer'
 import { AiLoadingState } from '../../platform/ai/components/AiLoadingState'
 import { HtmlViewer } from '../../platform/ai/renderers/HtmlViewer'
-import { buildHtmlExport, buildProjectExport, createProjectFromImportedHtml, exportHtmlProject, exportProjectJson, importHtmlIntoProject, normalizeImportedProject, shareExport } from '../../platform/ai/projectExport'
+import { createProjectFromImportedHtml, exportHtmlProject, exportProjectJson, importHtmlIntoProject, normalizeImportedProject } from '../../platform/ai/projectExport'
 
-export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
+export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled = true }) {
   const [isViewingHtml, setIsViewingHtml] = useState(false)
   const [exportStatus, setExportStatus] = useState(null)
   const [lastExport, setLastExport] = useState(null)
   const importInputRef = useRef(null)
-  const htmlImportInputRef = useRef(null)
   const [mode, setMode] = useState('create')
   const [aiActivity, setAiActivity] = useState({ active: false, log: [] })
 
@@ -54,7 +53,6 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
   const latestSuggestions = project?.aiSuggestionsHistory?.at(-1)?.suggestions || []
   const preloadQueue = mode === 'co-create' ? project?.preloadQueue || [] : []
   const continuationPlan = mode === 'co-create' ? project?.continuationPlan : null
-  const [showHealthcheckDetails, setShowHealthcheckDetails] = useState(false)
   const lastAutoOpenedHtmlRef = useRef('')
   const isBusy = controller.status === 'loading' || controller.status === 'repairing' || controller.status === 'refreshingHumanModel'
   const hasUnsavedAiApp = Boolean(project?.currentApplication || controller.input.trim() || isBusy)
@@ -87,49 +85,26 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
     rememberExport(exportProjectJson(project), 'project')
   }
 
-  async function shareGeneratedExport(exportData, kind) {
-    try {
-      const shared = await shareExport({
-        blob: exportData.blob,
-        filename: exportData.filename,
-        title: kind === 'html' ? 'Application Creatia' : 'Projet Creatia',
-        text: kind === 'html' ? 'Application autonome exportée depuis Creatia.' : 'Projet complet Creatia exporté depuis Evolutia.'
-      })
-      setLastExport({ ...exportData, kind })
-      setExportStatus(shared ? 'Partage ouvert.' : 'Partage indisponible sur ce navigateur. Tu peux télécharger le fichier puis le partager depuis ton appareil.')
-    } catch (error) {
-      setExportStatus(error?.name === 'AbortError' ? 'Partage annulé.' : 'Partage indisponible. Tu peux télécharger le fichier puis le partager depuis ton appareil.')
-    }
-  }
-
-  async function handleShareHtml() {
-    if (!project?.currentApplication) return
-    await shareGeneratedExport(buildHtmlExport(project), 'html')
-  }
-
-  async function handleShareProject() {
-    if (!project) return
-    await shareGeneratedExport(buildProjectExport(project), 'project')
-  }
-
-  async function handleShareLastExport() {
-    if (!lastExport) return
-    await shareGeneratedExport(lastExport, lastExport.kind)
-  }
 
 
-  async function handleImportHtml(event) {
+
+  async function handleImport(event) {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
-    if (!file.name.endsWith('.html') && file.type !== 'text/html') {
-      setExportStatus('Choisis un fichier d’application exporté puis modifié.')
-      return
-    }
 
     try {
-      const importedHtml = await file.text()
-      const updatedProject = project ? importHtmlIntoProject(project, importedHtml) : createProjectFromImportedHtml(importedHtml, { mode, designSystem: MANIFESTATION_DESIGN_SYSTEM })
+      const text = await file.text()
+      const isProjectFile = file.name.endsWith('.manifestation.json') || file.type === 'application/json' || /^\s*[{[]/.test(text)
+      if (isProjectFile) {
+        const importedProject = normalizeImportedProject(JSON.parse(text))
+        controller.importProject(importedProject)
+        setMode(importedProject.mode || 'create')
+        setExportStatus('Projet complet importé. L’application, le contexte et l’historique sont restaurés.')
+        return
+      }
+
+      const updatedProject = project ? importHtmlIntoProject(project, text) : createProjectFromImportedHtml(text, { mode, designSystem: MANIFESTATION_DESIGN_SYSTEM })
       controller.importProject(updatedProject)
       setMode(updatedProject.mode || 'create')
       setExportStatus(project ? 'Application importée. Elle remplace celle du projet.' : 'Application importée. Un projet a été créé pour pouvoir la faire évoluer.')
@@ -138,33 +113,12 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
     }
   }
 
-  async function handleImportProject(event) {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (!file) return
-    if (!file.name.endsWith('.manifestation.json')) {
-      setExportStatus('Choisis un fichier projet exporté depuis Creatia.')
-      return
-    }
-
-    try {
-      const payload = JSON.parse(await file.text())
-      const importedProject = normalizeImportedProject(payload)
-      controller.importProject(importedProject)
-      setMode(importedProject.mode || 'create')
-      setExportStatus('Projet complet importé. L’application, le contexte et l’historique sont restaurés.')
-    } catch (error) {
-      setExportStatus(error instanceof Error ? error.message : 'Import impossible pour ce fichier.')
-    }
-  }
-
 
   useEffect(() => {
-    if (controller.status !== 'success' || !html || !controller.result?.html) return
-    if (lastAutoOpenedHtmlRef.current === html) return
+    if (!html || lastAutoOpenedHtmlRef.current === html) return
     lastAutoOpenedHtmlRef.current = html
     setIsViewingHtml(true)
-  }, [controller.status, controller.result, html])
+  }, [html])
 
   async function handleCopyExternalPrompt() {
     if (!project && !controller.lastPrompt) return
@@ -188,6 +142,16 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
     }
   }
 
+  useEffect(() => {
+    onMenuData?.({
+      journal: aiActivity.log,
+      steps: aiActivity.log,
+      pipeline: controller.pipeline,
+      healthcheck: controller.healthcheck,
+      history: project?.evolutionHistory || []
+    })
+  }, [onMenuData, aiActivity.log, controller.pipeline, controller.healthcheck, project?.evolutionHistory])
+
   if (html && isViewingHtml) {
     return <HtmlViewer html={html} title={project?.creationRequest || 'Application créée'} onBack={() => setIsViewingHtml(false)} aiOverlay={<CreatiaAiOverlay activity={aiActivity} />} />
   }
@@ -203,108 +167,36 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
 
       <CreatiaAiOverlay activity={aiActivity} />
 
-      <div className="mode-selector" aria-label="Mode de création">
-        <button type="button" className={mode === 'create' ? 'active' : ''} onClick={() => setMode('create')}>Create</button>
-        <button type="button" className={mode === 'co-create' ? 'active' : ''} onClick={() => setMode('co-create')}>Co-Create</button>
+
+
+
+      <div className="project-menu import-menu">
+        <button type="button" className="primary-action project-export-action" onClick={() => importInputRef.current?.click()} disabled={isBusy}>
+          <span>Importer</span>
+          <small>Charge un projet complet ou une application seule.</small>
+        </button>
+        <input ref={importInputRef} className="visually-hidden" type="file" accept=".manifestation.json,application/json,.html,text/html" onChange={handleImport} />
+        {exportStatus ? <span className="project-export-status" role="status">{exportStatus}</span> : null}
       </div>
-
-      <label className="ai-time-option">
-        <input type="checkbox" checked={controller.hasTime} onChange={(event) => controller.setHasTime(event.target.checked)} disabled={isBusy} />
-        <span>I Have Time</span>
-        <small>Autorise Planner, validations plus profondes, boucles de réparation et revues qualité quand l’IA le juge utile.</small>
-      </label>
-
-      <details className="project-menu ai-journal-menu debug-menu">
-        <summary>Debug</summary>
-        {aiActivity.log.length ? (
-          <ol>
-            {aiActivity.log.map((entry) => (
-              <li key={entry.id} className={entry.type}>
-                <span>{entry.type === 'request' ? '↗' : entry.type === 'error' ? '!' : '↙'}</span>
-                <strong>{entry.title}</strong>
-                <time dateTime={entry.timestamp}>{new Date(entry.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</time>
-              </li>
-            ))}
-          </ol>
-        ) : <small>Aucun appel IA Creatia pour le moment.</small>}
-
-        {project?.evolutionHistory?.length ? (
-          <div className="debug-section">
-            <strong>Historique d’évolution</strong>
-            <ol className="evolution-history-list">
-              {project.evolutionHistory.slice(-3).reverse().map((entry, index) => (
-                <li key={`${entry.at || 'evolution'}-${index}`}>
-                  <strong>{entry.userRequest}</strong>
-                  {entry.analysis ? <span>{entry.analysis}</span> : null}
-                  {entry.decisions?.length ? <small>Décisions : {entry.decisions.join(' · ')}</small> : null}
-                  {entry.generatedChanges?.length ? <small>Changements : {entry.generatedChanges.join(' · ')}</small> : null}
-                </li>
-              ))}
-            </ol>
-          </div>
-        ) : null}
-        {controller.healthcheck ? (
-          <div className={`debug-section ai-verification-card ${controller.healthcheck.status}`}>
-            <strong>{controller.healthcheck.label}</strong>
-            <span>Contrôles : {controller.healthcheck.passedCount ?? controller.healthcheck.checks.filter((check) => check.ok).length}/{controller.healthcheck.checks.length} validés</span>
-            <div className="ai-repair-actions">
-              <button type="button" className="ghost-action" onClick={() => setShowHealthcheckDetails((visible) => !visible)}>{showHealthcheckDetails ? 'Masquer' : 'Voir les détails'}</button>
-              {controller.healthcheck.status !== 'verified' ? <button type="button" className="primary-action" onClick={controller.repair} disabled={isBusy || !controller.healthcheck.isRepairable}>Réparer</button> : null}
-            </div>
-            {showHealthcheckDetails ? (
-              <ul className="ai-healthcheck-details">
-                {controller.healthcheck.checks.map((check) => (
-                  <li key={check.id} className={check.ok ? 'passed' : 'failed'}><strong>{check.ok ? '✓' : '×'} {check.id}</strong><span>{check.message}</span>{!check.ok ? <small>Attendu: {check.expected} · Reçu: {check.actual}</small> : null}</li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
-        ) : null}
-      </details>
 
       <details className="project-menu" open={Boolean(project)}>
         <summary>Exporter</summary>
         <div className="project-menu-actions">
           <button type="button" className="ghost-action project-export-action" onClick={handleExportHtml} disabled={!project?.currentApplication}>
             <span>Application seule</span>
-            <small>Pour jouer ou partager. Elle ne garde pas l’historique de création.</small>
-          </button>
-          <button type="button" className="ghost-action project-export-action project-share-action" onClick={handleShareHtml} disabled={!project?.currentApplication}>
-            <span>Partager la page</span>
-            <small>Même si elle est déjà téléchargée.</small>
+            <small>Pour ouvrir ailleurs. Ne garde pas l’historique de création.</small>
           </button>
           <button type="button" className="ghost-action project-export-action" onClick={handleExportProject} disabled={!project}>
             <span>Projet complet</span>
             <small>Application + contexte + historique pour continuer plus tard.</small>
           </button>
-          <button type="button" className="ghost-action project-export-action project-share-action" onClick={handleShareProject} disabled={!project}>
-            <span>Partager le projet</span>
-            <small>Même s’il est déjà téléchargé.</small>
-          </button>
-          <button type="button" className="ghost-action project-export-action" onClick={() => importInputRef.current?.click()} disabled={isBusy}>
-            <span>Importer</span>
-            <small>Restaurer un projet exporté.</small>
-          </button>
-          <button type="button" className="ghost-action project-export-action" onClick={() => htmlImportInputRef.current?.click()} disabled={isBusy}>
-            <span>Importer une application seule</span>
-            <small>Fonctionne même sans projet déjà chargé.</small>
-          </button>
-          {lastExport?.url ? <a className="ghost-action export-link" href={lastExport.url} target="_blank" rel="noreferrer">Ouvrir</a> : null}
-          {lastExport ? <button type="button" className="ghost-action" onClick={handleShareLastExport}>Partager</button> : null}
+          {lastExport?.url ? <a className="ghost-action export-link" href={lastExport.url} target="_blank" rel="noreferrer">Ouvrir le téléchargement</a> : null}
         </div>
-        <input ref={importInputRef} className="visually-hidden" type="file" accept=".manifestation.json,application/json" onChange={handleImportProject} />
-        <input ref={htmlImportInputRef} className="visually-hidden" type="file" accept=".html,text/html" onChange={handleImportHtml} />
-        <small>Application seule : pratique à ouvrir ou partager. Projet complet : application, contexte et historique pour reprendre la création.</small>
-        {exportStatus ? <span className="project-export-status" role="status">{exportStatus}</span> : null}
+        <small>Application seule : pratique à ouvrir ailleurs. Projet complet : reprend la création avec le contexte.</small>
       </details>
 
-      {controller.pipeline ? (
-        <div className="ai-pipeline-card">
-          <strong>{controller.pipeline.strategy.label}</strong>
-          <span>{controller.pipeline.strategy.description}</span>
-          <small>Capacités détectées : {Object.entries(controller.pipeline.capabilities).filter(([, enabled]) => enabled).map(([key]) => key).join(', ') || 'standard'}</small>
-        </div>
-      ) : null}
+
+
 
       <AiInputComposer
         value={controller.input}
@@ -339,18 +231,33 @@ export function HtmlAppGenerator({ onClose, onDebug, speechEnabled = true }) {
         </div>
       ) : null}
 
-      {project?.humanModel ? (
-        <details className="project-menu">
-          <summary>Niveau humain</summary>
-          <dl className="human-model-list">
-            <div><dt>Objectif</dt><dd>{project.humanModel.purpose || 'À préciser'}</dd></div>
-            <div><dt>Audience</dt><dd>{project.humanModel.audience || 'À préciser'}</dd></div>
-            <div><dt>Ton</dt><dd>{project.humanModel.tone || 'À préciser'}</dd></div>
-            <div><dt>Émotion</dt><dd>{project.humanModel.emotion || 'À préciser'}</dd></div>
-            <div><dt>Parcours</dt><dd>{project.humanModel.journey || 'À préciser'}</dd></div>
-          </dl>
-        </details>
-      ) : null}
+      <details className="project-menu advanced-options">
+        <summary>Options avancées</summary>
+        <label className="ai-time-option">
+          <input type="checkbox" checked={mode === 'co-create'} onChange={(event) => setMode(event.target.checked ? 'co-create' : 'create')} disabled={isBusy} />
+          <span>Co-création</span>
+          <small>L’IA peut proposer des suites et préparer des améliorations. Désactivé par défaut.</small>
+        </label>
+        <label className="ai-time-option">
+          <input type="checkbox" checked={controller.hasTime} onChange={(event) => controller.setHasTime(event.target.checked)} disabled={isBusy} />
+          <span>Analyse approfondie</span>
+          <small>Autorise des contrôles plus longs quand c’est utile.</small>
+        </label>
+        {project?.humanModel ? (
+          <div className="human-model-help">
+            <strong>Contexte utilisé par l’IA</strong>
+            <p>Ces éléments aident Creatia à garder la même intention quand tu demandes une évolution.</p>
+            <dl className="human-model-list">
+              <div><dt>But</dt><dd>{project.humanModel.purpose || 'À préciser dans ta prochaine demande'}</dd></div>
+              <div><dt>Pour qui</dt><dd>{project.humanModel.audience || 'À préciser dans ta prochaine demande'}</dd></div>
+              <div><dt>Style</dt><dd>{project.humanModel.tone || 'À préciser dans ta prochaine demande'}</dd></div>
+              <div><dt>Ressenti</dt><dd>{project.humanModel.emotion || 'À préciser dans ta prochaine demande'}</dd></div>
+              <div><dt>Parcours</dt><dd>{project.humanModel.journey || 'À préciser dans ta prochaine demande'}</dd></div>
+            </dl>
+          </div>
+        ) : null}
+      </details>
+
 
 
       {mode === 'co-create' && latestSuggestions.length ? (
