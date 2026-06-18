@@ -1213,10 +1213,6 @@ function ReconciliationStep({
 }
 
 function AppChooser({ rules, activeRuleId, onRuleChange, onCreateYourApp }) {
-  const [showCreatiaHealthDetails, setShowCreatiaHealthDetails] = useState(false)
-  const creatiaHealthcheck = creatiaMenu?.healthcheck
-  const creatiaHealthLabel = creatiaHealthcheck?.status === 'verified' ? 'Application vérifiée' : creatiaHealthcheck?.failedCount ? 'Contrôles incomplets' : creatiaHealthcheck?.checks?.length ? 'Contrôles à vérifier' : 'Aucun contrôle'
-
   return (
     <section className="app-chooser" aria-labelledby="app-chooser-title">
       <div className="app-chooser-header">
@@ -1260,10 +1256,6 @@ function AppSetupStep({
   refreshingSettingId,
   onStart
 }) {
-  const [showCreatiaHealthDetails, setShowCreatiaHealthDetails] = useState(false)
-  const creatiaHealthcheck = creatiaMenu?.healthcheck
-  const creatiaHealthLabel = creatiaHealthcheck?.status === 'verified' ? 'Application vérifiée' : creatiaHealthcheck?.failedCount ? 'Contrôles incomplets' : creatiaHealthcheck?.checks?.length ? 'Contrôles à vérifier' : 'Aucun contrôle'
-
   return (
     <section className="wizard-card app-setup" aria-labelledby="app-setup-title">
       <p className="eyebrow">Préparation</p>
