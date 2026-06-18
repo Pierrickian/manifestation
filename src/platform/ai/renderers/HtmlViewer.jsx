@@ -132,7 +132,7 @@ export function HtmlViewer({ html, title = 'Page créée', onBack, aiOverlay = n
       {aiOverlay}
       <iframe
         title={title}
-        sandbox="allow-scripts allow-forms allow-pointer-lock allow-popups allow-modals"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-popups allow-modals allow-downloads"
         srcDoc={withCreatiaUiGuards(html)}
       />
     </section>
