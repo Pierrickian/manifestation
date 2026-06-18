@@ -447,7 +447,8 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       entry.durationMs = entry.startedAt ? Math.round(performance.now() - entry.startedAt) : entry.durationMs;
       end('Runtime AI generation result · ' + entry.trigger, Boolean(event.data.ok));
     }
-    debugState.lastResponse = { type: event.data.responseType || 'runtime_generation', payload: event.data.payload || event.data };
+    const runtimePayload = event.data.runtimePayload || null;
+    debugState.lastResponse = { type: event.data.responseType || 'runtime_generation', payload: runtimePayload || event.data.payload || event.data };
     debugState.aiResponses.unshift({ timestamp: now(), type: debugState.lastResponse.type, payload: debugState.lastResponse.payload });
     debugState.aiResponses = debugState.aiResponses.slice(0, 30);
     addEvent(event.data.ok ? 'generation_completed' : 'generation_failed', { requestId, responseType: debugState.lastResponse.type });
@@ -456,9 +457,17 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       pendingRuntimeRequests.delete(requestId);
       resolver(event.data);
     }
+    const hasRuntimePayload = Boolean(runtimePayload && Object.keys(runtimePayload).length);
+    const hasConsumer = typeof window.onAiResponse === 'function'
+      || typeof window.applyRuntimePayload === 'function'
+      || typeof window.applyGeneratedContent === 'function'
+      || typeof window.applyGeneratedRoom === 'function';
+    if (event.data.ok && !hasRuntimePayload) addDecision('AI response received but runtimePayload is missing or empty.', { requestId });
+    if (event.data.ok && !hasConsumer) addDecision('AI response received but no runtime consumer function was found.', { requestId });
     if (typeof window.onAiResponse === 'function') window.onAiResponse(event.data);
+    if (event.data.ok && typeof window.applyRuntimePayload === 'function') window.applyRuntimePayload(runtimePayload);
     if (event.data.ok && typeof window.applyGeneratedContent === 'function') window.applyGeneratedContent(event.data.payload);
-    if (event.data.ok && typeof window.applyGeneratedRoom === 'function') window.applyGeneratedRoom(event.data.payload);
+    if (event.data.ok && typeof window.applyGeneratedRoom === 'function') window.applyGeneratedRoom(runtimePayload?.room || runtimePayload);
     renderDiagnostics();
   });
   window.requestAiGeneration = window.requestAiGeneration || async (request = {}) => {

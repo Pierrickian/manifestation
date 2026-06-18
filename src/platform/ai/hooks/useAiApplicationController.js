@@ -243,6 +243,12 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
         healthcheck: repairResult.verification,
         repairAttempts: repairResult.attempts
       })
+      return {
+        finalStructured: repairResult.finalStructured,
+        project: nextProject,
+        healthcheck: repairResult.verification,
+        repairAttempts: repairResult.attempts
+      }
     } catch (submitError) {
       if (submitError?.name === 'AbortError') {
         setStatus('idle')
@@ -285,7 +291,7 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
       `Runtime request: ${JSON.stringify(runtimeRequest)}`
     ].join('\n')
     setInput(wrappedPrompt)
-    await submitWithText(wrappedPrompt)
+    return submitWithText(wrappedPrompt)
   }
 
   async function retry() {

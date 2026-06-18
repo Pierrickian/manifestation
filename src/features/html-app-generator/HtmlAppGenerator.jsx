@@ -6,6 +6,34 @@ import { AiLoadingState } from '../../platform/ai/components/AiLoadingState'
 import { HtmlViewer } from '../../platform/ai/renderers/HtmlViewer'
 import { createProjectFromImportedHtml, exportHtmlProject, exportProjectJson, importHtmlIntoProject, normalizeImportedProject } from '../../platform/ai/projectExport'
 
+function deriveRuntimePayload(finalStructured = {}) {
+  const state = finalStructured?.state && typeof finalStructured.state === 'object' ? finalStructured.state : {}
+  const capabilities = finalStructured?.capabilities && typeof finalStructured.capabilities === 'object' ? finalStructured.capabilities : {}
+  const continuationPlan = finalStructured?.continuationPlan && typeof finalStructured.continuationPlan === 'object' ? finalStructured.continuationPlan : null
+  const runtimePayload = {
+    kind: 'generic',
+    domain: state.domain || capabilities.domain || 'generic',
+    narrative: state.narrative || state.story || '',
+    choices: Array.isArray(state.choices) ? state.choices : Array.isArray(finalStructured?.suggestedActions) ? finalStructured.suggestedActions : [],
+    statePatch: state.statePatch && typeof state.statePatch === 'object' ? state.statePatch : state,
+    events: [],
+    callbacks: continuationPlan?.callbacks || continuationPlan?.expectedCallbacks || [],
+    preload: Array.isArray(finalStructured?.preload) ? finalStructured.preload : [],
+    continuationPlanPatch: continuationPlan
+  }
+
+  ;['room', 'lesson', 'exercise', 'simulationStep', 'statePatch'].forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(state, key)) runtimePayload[key] = state[key]
+  })
+
+  if (runtimePayload.room) runtimePayload.kind = 'room'
+  else if (runtimePayload.lesson || runtimePayload.exercise) runtimePayload.kind = 'teaching_step'
+  else if (runtimePayload.simulationStep) runtimePayload.kind = 'simulation_step'
+  else if (runtimePayload.narrative || runtimePayload.choices.length) runtimePayload.kind = 'narrative'
+
+  return runtimePayload
+}
+
 export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled = true }) {
   const [isViewingHtml, setIsViewingHtml] = useState(false)
   const [exportStatus, setExportStatus] = useState(null)
@@ -72,9 +100,36 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
       console.log('[AI RUNTIME HOST]', 'AI request dispatch to controller')
       const requestId = event.data.request?.requestId
       controller.submitRuntimeGeneration(event.data.request || {})
-        .then(() => {
+        .then((runtimeResult) => {
           console.log('[AI RUNTIME HOST]', 'AI response reception')
-          event.source?.postMessage({ source: 'creatia-host', type: 'ai-runtime-generation-result', requestId, ok: true, responseType: 'runtime_generation', payload: { status: 'completed' } }, '*')
+          const finalStructured = runtimeResult?.finalStructured || null
+          const runtimePayload = deriveRuntimePayload(finalStructured)
+          event.source?.postMessage({
+            source: 'creatia-host',
+            type: 'ai-runtime-generation-result',
+            requestId,
+            ok: true,
+            status: 'completed',
+            responseType: 'runtime_generation',
+            payload: { status: 'completed' },
+            legacyPayload: { status: 'completed' },
+            runtimePayload,
+            finalStructured,
+            projectPatch: {
+              projectId: runtimeResult?.project?.id || project?.id || null,
+              currentApplicationUpdated: Boolean(runtimeResult?.project?.currentApplication),
+              lastValidApplicationUpdated: Boolean(runtimeResult?.project?.lastValidApplication),
+              continuationPlanUpdated: Boolean(runtimeResult?.project?.continuationPlan),
+              preloadUpdated: Boolean(runtimeResult?.project?.preloadQueue?.length),
+              generationHistoryIndex: Math.max(0, (runtimeResult?.project?.generationHistory?.length || 1) - 1)
+            },
+            diagnostics: {
+              healthcheck: runtimeResult?.healthcheck || null,
+              repairAttempts: runtimeResult?.repairAttempts || 0,
+              hasRuntimePayload: Boolean(runtimePayload && Object.keys(runtimePayload).length),
+              hasFinalStructured: Boolean(finalStructured)
+            }
+          }, '*')
         })
         .catch((error) => {
           console.log('[AI RUNTIME HOST]', 'AI failures', error?.message || error)
