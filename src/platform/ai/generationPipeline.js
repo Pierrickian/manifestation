@@ -112,6 +112,13 @@ function consumesPreload(html = '') {
   return /\bpreload\b|preloadQueue|preload_requested|preload_consumed|preparedPrompt/i.test(String(html))
 }
 
+function consumesRuntimePayload(html = '') {
+  const text = String(html)
+  const hasStandardConsumer = /applyRuntimePayload|onAiResponse/i.test(text)
+  const consumesCoreFields = /runtimePayload\s*\.\s*(room|narrative|choices|statePatch)|runtimePayload\s*\[\s*['"](?:room|narrative|choices|statePatch)['"]\s*\]/i.test(text)
+  return hasStandardConsumer && consumesCoreFields
+}
+
 function displaysOfflineByDefault(html = '') {
   return />\s*Offline\s*</i.test(String(html)) || /status[^<>"']*Offline/i.test(String(html))
 }
@@ -262,6 +269,17 @@ export function runGeneratedAppHealthcheck(response = {}, strategy = {}) {
       message: 'Runtime preload consumption detected.',
       expected: 'The generated application must be capable of consuming preload entries during execution.',
       actual: 'No preload consumption was detected in the application runtime.',
+      repairConfidence: 'high',
+      repairable: true,
+      severity: 'warning'
+    }))
+
+    checks.push(createCheck({
+      id: 'cocreate_runtime_payload_consumer_exists',
+      ok: consumesRuntimePayload(html),
+      message: 'Runtime payload consumer detected.',
+      expected: 'The generated application must implement applyRuntimePayload/onAiResponse and consume runtimePayload.room, runtimePayload.narrative, runtimePayload.choices, or runtimePayload.statePatch without reloading.',
+      actual: 'No standard runtimePayload consumer was detected for direct in-app continuation.',
       repairConfidence: 'high',
       repairable: true,
       severity: 'warning'

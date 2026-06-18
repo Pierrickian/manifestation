@@ -117,9 +117,33 @@ function buildAiActivityMonitor(runtimeContext = {}) {
   .creatia-runtime-debug-warning { color: #ffd166; }
   .creatia-runtime-debug-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
   .creatia-runtime-debug-actions button { border: 0; border-radius: 999px; padding: 8px 10px; font-weight: 700; }
+  .creatia-runtime-content {
+    position: fixed;
+    left: max(12px, env(safe-area-inset-left));
+    right: max(12px, env(safe-area-inset-right));
+    bottom: max(12px, env(safe-area-inset-bottom));
+    z-index: 999998;
+    max-height: min(38vh, 340px);
+    overflow: auto;
+    padding: 14px;
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,.18);
+    background: rgba(14, 12, 28, .92);
+    color: white;
+    font: 14px/1.45 system-ui, sans-serif;
+    box-shadow: 0 18px 48px rgba(0,0,0,.34);
+    backdrop-filter: blur(14px);
+    pointer-events: auto;
+  }
+  .creatia-runtime-content h2 { margin: 0 0 8px; font-size: 17px; }
+  .creatia-runtime-content p { margin: 0 0 10px; }
+  .creatia-runtime-content button { width: 100%; margin: 6px 0 0; border: 0; border-radius: 12px; padding: 10px 12px; font-weight: 700; color: #161326; background: #ffeeb3; }
+  .creatia-runtime-content details { margin-top: 10px; }
+  .creatia-runtime-content pre { white-space: pre-wrap; overflow-wrap: anywhere; background: rgba(255,255,255,.08); padding: 8px; border-radius: 10px; max-height: 120px; overflow: auto; }
   @media (min-width: 720px) {
     .creatia-runtime-debug-panel { inset: 12px auto 12px 12px; width: 380px; max-height: none; border-radius: 18px; transform: translateX(-110%); }
     .creatia-runtime-debug-panel.is-open { transform: translateX(0); }
+    .creatia-runtime-content { left: auto; width: min(420px, calc(100vw - 24px)); }
   }
   @keyframes creatiaAiSpin { to { transform: rotate(360deg); } }
 </style>
@@ -437,6 +461,111 @@ function buildAiActivityMonitor(runtimeContext = {}) {
   };
   const begin = (title) => { pending += 1; diagnostics.pendingRequests = pending; dot.classList.add('is-active'); logStatus('Generating', title); notify('request', title); };
   const end = (title, ok) => { pending = Math.max(0, pending - 1); diagnostics.pendingRequests = pending; if (!pending) dot.classList.remove('is-active'); if (!ok) diagnostics.lastAiError = title; logStatus(ok ? (pending ? 'Generating' : 'Idle') : 'Error', title); notify(ok ? 'response' : 'error', title); };
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
+  }
+  function getRuntimeContentHost() {
+    let host = document.getElementById('creatia-runtime-content');
+    if (!host) {
+      host = document.createElement('section');
+      host.id = 'creatia-runtime-content';
+      host.className = 'creatia-runtime-content';
+      host.setAttribute('aria-live', 'polite');
+      host.setAttribute('aria-label', 'AI generated runtime content');
+      document.body.appendChild(host);
+    }
+    return host;
+  }
+  function mergeRuntimeStatePatch(statePatch = {}) {
+    if (!statePatch || typeof statePatch !== 'object' || Array.isArray(statePatch)) return;
+    const target = window.state || window.gameState || window.appState;
+    if (target && typeof target === 'object') {
+      Object.assign(target, statePatch);
+      return;
+    }
+    window.appState = { ...(window.appState || {}), ...statePatch };
+  }
+  function normalizeRuntimeChoices(choices) {
+    if (!Array.isArray(choices)) return [];
+    return choices.map((choice, index) => {
+      if (typeof choice === 'string') return { id: 'choice-' + index, label: choice, prompt: choice };
+      if (choice && typeof choice === 'object') return choice;
+      return { id: 'choice-' + index, label: 'Choice ' + (index + 1) };
+    });
+  }
+  function applyRuntimePayloadFallback(runtimePayload = {}) {
+    if (!runtimePayload || typeof runtimePayload !== 'object') {
+      addDecision('AI response received but runtimePayload is missing or empty.', { runtimePayload });
+      return false;
+    }
+    const room = runtimePayload.room && typeof runtimePayload.room === 'object' ? runtimePayload.room : null;
+    const statePatch = runtimePayload.statePatch && typeof runtimePayload.statePatch === 'object' ? runtimePayload.statePatch : {};
+    const narrative = runtimePayload.narrative || room?.narrative || room?.description || statePatch.narrative || statePatch.story || '';
+    const choices = normalizeRuntimeChoices(runtimePayload.choices || room?.choices || statePatch.choices || []);
+    mergeRuntimeStatePatch(statePatch);
+    if (room) {
+      const rooms = discoverRooms();
+      if (rooms && typeof rooms === 'object') {
+        const roomId = room.id || room.key || room.slug || 'runtime-room-' + Date.now();
+        rooms[roomId] = { ...(rooms[roomId] || {}), ...room };
+        const state = window.state || window.gameState || window.appState;
+        if (state && typeof state === 'object') {
+          const previousBranch = state.branch || state.currentBranch || state.room || state.currentRoom || '';
+          console.log('TRANSITION', previousBranch, '->', roomId);
+          addEvent('branch_changed', { previousBranch, nextBranch: roomId, reason: 'runtime_payload_room' });
+          if ('branch' in state || !('currentBranch' in state)) state.branch = roomId;
+          if ('currentBranch' in state) state.currentBranch = roomId;
+          if ('room' in state) state.room = roomId;
+          if ('currentRoom' in state) state.currentRoom = roomId;
+        }
+      }
+    }
+    const host = getRuntimeContentHost();
+    const title = room?.title || room?.name || runtimePayload.title || statePatch.title || 'AI generated continuation';
+    const domainBlocks = ['lesson', 'exercise', 'simulationStep']
+      .filter((key) => runtimePayload[key])
+      .map((key) => '<details><summary>' + escapeHtml(key) + '</summary><pre>' + escapeHtml(payloadPreview(runtimePayload[key])) + '</pre></details>')
+      .join('');
+    host.innerHTML = '<h2>' + escapeHtml(title) + '</h2>'
+      + (narrative ? '<p>' + escapeHtml(narrative) + '</p>' : '')
+      + '<div data-creatia-runtime-choices></div>'
+      + domainBlocks
+      + '<details><summary>Runtime payload</summary><pre>' + escapeHtml(payloadPreview(runtimePayload)) + '</pre></details>';
+    const choiceHost = host.querySelector('[data-creatia-runtime-choices]');
+    choices.forEach((choice, index) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = choice.label || choice.title || choice.text || choice.prompt || ('Choice ' + (index + 1));
+      button.addEventListener('click', () => {
+        addEvent('user_choice', { choice });
+        const state = window.state || window.gameState || window.appState || {};
+        const nextBranch = choice.branch || choice.target || choice.room || choice.id || choice.trigger || '';
+        if (nextBranch && state && typeof state === 'object') {
+          const previousBranch = state.branch || state.currentBranch || state.room || state.currentRoom || '';
+          console.log('TRANSITION', previousBranch, '->', nextBranch);
+          addEvent('branch_changed', { previousBranch, nextBranch, reason: 'runtime_choice' });
+          if ('branch' in state || !('currentBranch' in state)) state.branch = nextBranch;
+          if ('currentBranch' in state) state.currentBranch = nextBranch;
+        }
+        if (choice.trigger && typeof window.requestAiGeneration === 'function') {
+          window.requestAiGeneration({ trigger: choice.trigger, state: getRuntimeState(), context: { choice, runtimePayload } });
+        }
+      });
+      choiceHost.appendChild(button);
+    });
+    if (Array.isArray(runtimePayload.preload) && runtimePayload.preload.length) {
+      debugState.budget.preloadsGenerated += runtimePayload.preload.length;
+    }
+    addEvent('runtime_payload_applied', { hasRoom: Boolean(room), hasNarrative: Boolean(narrative), choices: choices.length, statePatchKeys: Object.keys(statePatch) });
+    try {
+      wrapRenderFunction();
+      if (typeof window.render === 'function') window.render();
+    } catch (error) {
+      addError('applyRuntimePayloadFallback', error?.message || 'Runtime payload render failed', error);
+    }
+    renderDiagnostics();
+    return true;
+  }
   const pendingRuntimeRequests = new Map();
   window.addEventListener('message', (event) => {
     if (event.data?.source !== 'creatia-host' || event.data?.type !== 'ai-runtime-generation-result') return;
@@ -458,14 +587,16 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       resolver(event.data);
     }
     const hasRuntimePayload = Boolean(runtimePayload && Object.keys(runtimePayload).length);
+    const hasRuntimePayloadConsumer = typeof window.applyRuntimePayload === 'function';
     const hasConsumer = typeof window.onAiResponse === 'function'
-      || typeof window.applyRuntimePayload === 'function'
+      || hasRuntimePayloadConsumer
       || typeof window.applyGeneratedContent === 'function'
       || typeof window.applyGeneratedRoom === 'function';
     if (event.data.ok && !hasRuntimePayload) addDecision('AI response received but runtimePayload is missing or empty.', { requestId });
-    if (event.data.ok && !hasConsumer) addDecision('AI response received but no runtime consumer function was found.', { requestId });
+    if (event.data.ok && !hasConsumer) addDecision('AI response received but no runtime consumer function was found. Applying host fallback renderer.', { requestId });
     if (typeof window.onAiResponse === 'function') window.onAiResponse(event.data);
-    if (event.data.ok && typeof window.applyRuntimePayload === 'function') window.applyRuntimePayload(runtimePayload);
+    if (event.data.ok && hasRuntimePayloadConsumer) window.applyRuntimePayload(runtimePayload);
+    if (event.data.ok && hasRuntimePayload && !hasRuntimePayloadConsumer) applyRuntimePayloadFallback(runtimePayload);
     if (event.data.ok && typeof window.applyGeneratedContent === 'function') window.applyGeneratedContent(event.data.payload);
     if (event.data.ok && typeof window.applyGeneratedRoom === 'function') window.applyGeneratedRoom(runtimePayload?.room || runtimePayload);
     renderDiagnostics();
