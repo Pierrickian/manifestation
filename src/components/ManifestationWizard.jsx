@@ -1107,6 +1107,10 @@ function FlowStep({ words, selectedWords, conclusion, onChooseWord, onContinue, 
 }
 
 function PhaseBridge({ phase, nextPhase, steps, choices, onChoose, onBack }) {
+  const [showCreatiaHealthDetails, setShowCreatiaHealthDetails] = useState(false)
+  const creatiaHealthcheck = creatiaMenu?.healthcheck
+  const creatiaHealthLabel = creatiaHealthcheck?.status === 'verified' ? 'Application vérifiée' : creatiaHealthcheck?.failedCount ? 'Contrôles incomplets' : creatiaHealthcheck?.checks?.length ? 'Contrôles à vérifier' : 'Aucun contrôle'
+
   return (
     <section className="wizard-card phase-bridge" aria-labelledby="phase-bridge-title">
       <p className="eyebrow">Synthese</p>
@@ -1209,6 +1213,10 @@ function ReconciliationStep({
 }
 
 function AppChooser({ rules, activeRuleId, onRuleChange, onCreateYourApp }) {
+  const [showCreatiaHealthDetails, setShowCreatiaHealthDetails] = useState(false)
+  const creatiaHealthcheck = creatiaMenu?.healthcheck
+  const creatiaHealthLabel = creatiaHealthcheck?.status === 'verified' ? 'Application vérifiée' : creatiaHealthcheck?.failedCount ? 'Contrôles incomplets' : creatiaHealthcheck?.checks?.length ? 'Contrôles à vérifier' : 'Aucun contrôle'
+
   return (
     <section className="app-chooser" aria-labelledby="app-chooser-title">
       <div className="app-chooser-header">
@@ -1252,6 +1260,10 @@ function AppSetupStep({
   refreshingSettingId,
   onStart
 }) {
+  const [showCreatiaHealthDetails, setShowCreatiaHealthDetails] = useState(false)
+  const creatiaHealthcheck = creatiaMenu?.healthcheck
+  const creatiaHealthLabel = creatiaHealthcheck?.status === 'verified' ? 'Application vérifiée' : creatiaHealthcheck?.failedCount ? 'Contrôles incomplets' : creatiaHealthcheck?.checks?.length ? 'Contrôles à vérifier' : 'Aucun contrôle'
+
   return (
     <section className="wizard-card app-setup" aria-labelledby="app-setup-title">
       <p className="eyebrow">Préparation</p>
@@ -1304,6 +1316,10 @@ function WizardMenu({
   onShowAiDebugChange,
   creatiaMenu
 }) {
+  const [showCreatiaHealthDetails, setShowCreatiaHealthDetails] = useState(false)
+  const creatiaHealthcheck = creatiaMenu?.healthcheck
+  const creatiaHealthLabel = creatiaHealthcheck?.status === 'verified' ? 'Application vérifiée' : creatiaHealthcheck?.failedCount ? 'Contrôles incomplets' : creatiaHealthcheck?.checks?.length ? 'Contrôles à vérifier' : 'Aucun contrôle'
+
   return (
     <details className="wizard-menu compact-menu">
       <summary aria-label="Menu" title="Menu">
@@ -1349,11 +1365,23 @@ function WizardMenu({
             </details>
           ) : null}
 
-          {creatiaMenu.healthcheck ? (
+          {creatiaHealthcheck ? (
             <details className="ai-submenu">
               <summary>Contrôles de test</summary>
-              <strong>{creatiaMenu.healthcheck.label}</strong>
-              <small>{creatiaMenu.healthcheck.passedCount ?? creatiaMenu.healthcheck.checks.filter((check) => check.ok).length}/{creatiaMenu.healthcheck.checks.length} validés</small>
+              <strong>{creatiaHealthLabel}</strong>
+              <small>{creatiaHealthcheck.passedCount ?? creatiaHealthcheck.checks.filter((check) => check.ok).length}/{creatiaHealthcheck.checks.length} validés</small>
+              <div className="menu-health-actions">
+                <button type="button" className="ghost-action" onClick={() => setShowCreatiaHealthDetails((visible) => !visible)}>{showCreatiaHealthDetails ? 'Masquer' : 'View details'}</button>
+                <button type="button" className="ghost-action" onClick={creatiaMenu.healthcheckActions?.retry} disabled={creatiaMenu.healthcheckActions?.isBusy}>Retry</button>
+                <button type="button" className="primary-action" onClick={creatiaMenu.healthcheckActions?.repair} disabled={creatiaMenu.healthcheckActions?.isBusy || !creatiaMenu.healthcheckActions?.canRepair}>Repair</button>
+              </div>
+              {showCreatiaHealthDetails ? (
+                <ul className="menu-health-details">
+                  {creatiaHealthcheck.checks.map((check) => (
+                    <li key={check.id} className={check.ok ? 'passed' : 'failed'}><strong>{check.ok ? '✓' : '×'} {check.id}</strong><span>{check.message}</span>{!check.ok ? <small>{check.expected} · {check.actual}</small> : null}</li>
+                  ))}
+                </ul>
+              ) : null}
             </details>
           ) : null}
         </div>
@@ -1372,6 +1400,10 @@ function WizardMenu({
 }
 
 function AiDebugFooter({ debugRows }) {
+  const [showCreatiaHealthDetails, setShowCreatiaHealthDetails] = useState(false)
+  const creatiaHealthcheck = creatiaMenu?.healthcheck
+  const creatiaHealthLabel = creatiaHealthcheck?.status === 'verified' ? 'Application vérifiée' : creatiaHealthcheck?.failedCount ? 'Contrôles incomplets' : creatiaHealthcheck?.checks?.length ? 'Contrôles à vérifier' : 'Aucun contrôle'
+
   return (
     <footer className="ai-debug-footer ai-debug-panel" aria-live="polite">
       <strong>Connexion IA</strong>
@@ -1392,6 +1424,10 @@ function AiDebugFooter({ debugRows }) {
 }
 
 function SliderSetting({ group, slider, value, onChange, onRefresh, isRefreshing, isDisabled }) {
+  const [showCreatiaHealthDetails, setShowCreatiaHealthDetails] = useState(false)
+  const creatiaHealthcheck = creatiaMenu?.healthcheck
+  const creatiaHealthLabel = creatiaHealthcheck?.status === 'verified' ? 'Application vérifiée' : creatiaHealthcheck?.failedCount ? 'Contrôles incomplets' : creatiaHealthcheck?.checks?.length ? 'Contrôles à vérifier' : 'Aucun contrôle'
+
   return (
     <div className="ai-setting-row">
       <label className="ai-setting">

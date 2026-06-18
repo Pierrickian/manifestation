@@ -10,7 +10,7 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
   const [isViewingHtml, setIsViewingHtml] = useState(false)
   const [exportStatus, setExportStatus] = useState(null)
   const [lastExport, setLastExport] = useState(null)
-  const [showTransferInfo, setShowTransferInfo] = useState(false)
+  const [activeTransferInfo, setActiveTransferInfo] = useState(null)
   const importInputRef = useRef(null)
   const [mode, setMode] = useState('create')
   const [aiActivity, setAiActivity] = useState({ active: false, log: [] })
@@ -101,7 +101,7 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
         const importedProject = normalizeImportedProject(JSON.parse(text))
         controller.importProject(importedProject)
         setMode(importedProject.mode || 'create')
-        setExportStatus('Projet complet importé. L’application, le contexte et l’historique sont restaurés.')
+        setExportStatus('Projet importé. L’application, le contexte et l’historique sont restaurés.')
         return
       }
 
@@ -120,6 +120,11 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
     lastAutoOpenedHtmlRef.current = html
     setIsViewingHtml(true)
   }, [html])
+
+  useEffect(() => {
+    if (!controller.result?.html) return
+    setIsViewingHtml(true)
+  }, [controller.result?.html])
 
   async function handleCopyExternalPrompt() {
     if (!project && !controller.lastPrompt) return
@@ -153,9 +158,10 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
       steps: aiActivity.log,
       pipeline: controller.pipeline,
       healthcheck: controller.healthcheck,
+      healthcheckActions: { retry: controller.retry, repair: controller.repair, canRepair: Boolean(controller.healthcheck?.isRepairable), isBusy },
       history: project?.evolutionHistory || []
     })
-  }, [onMenuData, aiActivity.log, controller.pipeline, controller.healthcheck, project?.generationHistory, project?.evolutionHistory])
+  }, [onMenuData, aiActivity.log, controller.pipeline, controller.healthcheck, project?.generationHistory, project?.evolutionHistory, isBusy])
 
   if (html && isViewingHtml) {
     return <HtmlViewer html={html} title={project?.creationRequest || 'Application créée'} onBack={() => setIsViewingHtml(false)} aiOverlay={<CreatiaAiOverlay activity={aiActivity} />} />
@@ -182,13 +188,14 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
 
       <div className="project-menu transfer-actions">
         <div className="transfer-actions-row">
-          <button type="button" className="primary-action slim-action" onClick={() => importInputRef.current?.click()} disabled={isBusy}>Importer</button>
-          <button type="button" className="ghost-action slim-action" onClick={handleExportHtml} disabled={!project?.currentApplication}>Application seule</button>
-          <button type="button" className="ghost-action slim-action" onClick={handleExportProject} disabled={!project}>Projet complet</button>
-          <button type="button" className="info-action" onClick={() => setShowTransferInfo((visible) => !visible)} aria-expanded={showTransferInfo} aria-label="Informations import export">i</button>
+          <div className="transfer-action-pair"><button type="button" className="primary-action slim-action" onClick={() => importInputRef.current?.click()} disabled={isBusy}>Importer</button><button type="button" className="info-action" onClick={() => setActiveTransferInfo((current) => current === 'import' ? null : 'import')} aria-expanded={activeTransferInfo === 'import'} aria-label="Information importer">i</button></div>
+          <div className="transfer-action-pair"><button type="button" className="ghost-action slim-action" onClick={handleExportHtml} disabled={!project?.currentApplication}>Exporter app</button><button type="button" className="info-action" onClick={() => setActiveTransferInfo((current) => current === 'app' ? null : 'app')} aria-expanded={activeTransferInfo === 'app'} aria-label="Information exporter app">i</button></div>
+          <div className="transfer-action-pair"><button type="button" className="ghost-action slim-action" onClick={handleExportProject} disabled={!project}>Exporter projet</button><button type="button" className="info-action" onClick={() => setActiveTransferInfo((current) => current === 'project' ? null : 'project')} aria-expanded={activeTransferInfo === 'project'} aria-label="Information exporter projet">i</button></div>
         </div>
         <input ref={importInputRef} className="visually-hidden" type="file" accept=".manifestation.json,application/json,.html,text/html" onChange={handleImport} />
-        {showTransferInfo ? <small>Importer charge un projet complet ou une application seule. Application seule sert à ouvrir ailleurs. Projet complet garde le contexte et l’historique pour continuer.</small> : null}
+        {activeTransferInfo === 'import' ? <small>Importer charge un projet Creatia ou une app seule déjà exportée.</small> : null}
+        {activeTransferInfo === 'app' ? <small>Exporter app télécharge seulement l’application à ouvrir ailleurs, sans historique de création.</small> : null}
+        {activeTransferInfo === 'project' ? <small>Exporter projet télécharge l’application avec le contexte et l’historique pour continuer dans Creatia.</small> : null}
         {lastExport?.url ? <a className="ghost-action export-link" href={lastExport.url} target="_blank" rel="noreferrer">Ouvrir le téléchargement</a> : null}
         {exportStatus ? <span className="project-export-status" role="status">{exportStatus}</span> : null}
       </div>
