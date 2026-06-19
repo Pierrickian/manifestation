@@ -169,6 +169,8 @@ export function buildRepairPrompt({ originalRequest, failedResponse, healthcheck
       'The following application failed validation.',
       'Repair the failed checks while preserving the intended functionality and visual style.',
       'Do not merely repeat the original request; use the previousHtml and healthcheckReport as debugging context.',
+      'This is a final repair pass, not a planning or negotiation step: do not return capability_request, clarification_request, or generation_error unless repair is impossible.',
+      'When mode is co-create and only continuationPlan or preload is missing, keep the existing HTML runnable and repair the JSON collaboration metadata with a non-empty continuationPlan and trigger-driven preload entries.',
       'Return a corrected standalone HTML application using the required JSON shape.'
     ].join(' ')
   }

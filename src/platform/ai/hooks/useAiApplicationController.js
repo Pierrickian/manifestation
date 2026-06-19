@@ -97,6 +97,7 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
     let finalStructured = initialStructured
     let verification = initialHealthcheck
     let attempts = 0
+    let intermediateResponse = null
 
     while (verification.status !== 'verified' && attempts < maxAttempts && isAutoRepairableHealthcheck(verification)) {
       const attempt = attempts + 1
@@ -116,13 +117,27 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
       onDebug?.({ status: 'ai_request', kind: repairRequest.kind, shortTitle: `Réparation IA ${attempt}/${maxAttempts}`, timestamp: new Date().toISOString() })
       const repairedPayload = await aiProvider({ ...repairRequest, signal: controller.signal })
       onDebug?.({ status: 'ai_response', kind: repairRequest.kind, shortTitle: `Réponse réparation ${attempt}/${maxAttempts}`, timestamp: new Date().toISOString() })
-      finalStructured = normalizeForProject(repairedPayload, detectedCapabilities, mode)
+      const repairedStructured = normalizeForProject(repairedPayload, detectedCapabilities, mode)
+      if (!isHtmlAppResponse(repairedStructured)) {
+        intermediateResponse = repairedStructured
+        attempts = attempt
+        onDebug?.({
+          status: 'repair_intermediate_response',
+          reason,
+          attempt,
+          maxAttempts,
+          responseKind: repairedStructured.kind,
+          timestamp: new Date().toISOString()
+        })
+        break
+      }
+      finalStructured = repairedStructured
       verification = runGeneratedAppHealthcheck(finalStructured, { ...selectedStrategy, id: 'recovery', mode })
       attempts = attempt
       onDebug?.({ status: 'repair_checked', reason, attempt, maxAttempts, healthcheck: verification, timestamp: new Date().toISOString() })
     }
 
-    return { finalStructured, verification, attempts }
+    return { finalStructured, verification, attempts, intermediateResponse }
   }
 
   async function requestBuilderResponse({ requestText, capabilities, strategy, controller, requestKindTitle, negotiationAttempt = 0 }) {
@@ -223,6 +238,9 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
       if (!isHtmlAppResponse(repairResult.finalStructured)) {
         throw new Error('La réparation a retourné une réponse intermédiaire au lieu d’une application.')
       }
+      if (repairResult.intermediateResponse) {
+        setRepairError('La réparation a demandé une étape intermédiaire. Creatia conserve la dernière application HTML valide et affiche les warnings Co-Create pour une nouvelle réparation.')
+      }
       setHealthcheck({ ...repairResult.verification, repairAttempts: repairResult.attempts })
       const nextProject = storeProject(project ? evolveProject(project, trimmed, repairResult.finalStructured) : createProject({ mode, request: trimmed, response: repairResult.finalStructured, designSystem }))
       setProject(nextProject)
@@ -241,13 +259,15 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
         capabilities: repairResult.finalStructured.capabilities,
         strategy: selectedStrategy,
         healthcheck: repairResult.verification,
-        repairAttempts: repairResult.attempts
+        repairAttempts: repairResult.attempts,
+        repairIntermediateResponse: repairResult.intermediateResponse || null
       })
       return {
         finalStructured: repairResult.finalStructured,
         project: nextProject,
         healthcheck: repairResult.verification,
-        repairAttempts: repairResult.attempts
+        repairAttempts: repairResult.attempts,
+        intermediateResponse: repairResult.intermediateResponse || null
       }
     } catch (submitError) {
       if (submitError?.name === 'AbortError') {
@@ -333,12 +353,15 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
       if (!isHtmlAppResponse(repairResult.finalStructured)) {
         throw new Error('La réparation a retourné une réponse intermédiaire au lieu d’une application.')
       }
+      if (repairResult.intermediateResponse) {
+        setRepairError('La réparation a demandé une étape intermédiaire. La dernière application HTML valide a été conservée.')
+      }
       const nextProject = storeProject(evolveProject(project, originalRequest, repairResult.finalStructured))
       setProject(nextProject)
       setResult(repairResult.finalStructured)
       setHealthcheck({ ...repairResult.verification, repairAttempts: (healthcheck.repairAttempts || 0) + repairResult.attempts })
       setStatus('success')
-      setMessage(repairResult.verification.status === 'verified' ? 'Application réparée.' : 'Réparation tentée, validation encore incomplète.')
+      setMessage(repairResult.intermediateResponse ? 'Réparation interrompue par une réponse intermédiaire.' : repairResult.verification.status === 'verified' ? 'Application réparée.' : 'Réparation tentée, validation encore incomplète.')
     } catch (repairFailure) {
       setStatus('success')
       setRepairError(repairFailure instanceof Error ? repairFailure.message : 'Impossible de réparer automatiquement pour le moment.')
