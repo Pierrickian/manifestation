@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { requestAiCompletion } from '../aiProvider'
-import { buildAiPrompt, buildHumanModelRefreshPrompt, buildRepairPrompt, normalizeStructuredAiResponse } from '../promptBuilder'
+import { buildAiPrompt, buildHumanModelRefreshPrompt, buildRepairPrompt, buildRuntimeGenerationPrompt, normalizeStructuredAiResponse } from '../promptBuilder'
 import { createProject, evolveProject, normalizePreloadQueue, refreshProjectHumanModel, storeProject } from '../projectModel'
 import { detectCapabilities, isAutoRepairableHealthcheck, runGeneratedAppHealthcheck, selectGenerationStrategy } from '../generationPipeline'
 
@@ -54,6 +54,10 @@ function isHtmlAppResponse(response = {}) {
   return response.kind === 'html_app' && typeof response.html === 'string'
 }
 
+function hasUsableRuntimePayload(response = {}) {
+  return Boolean(response.runtimePayload && typeof response.runtimePayload === 'object' && Object.keys(response.runtimePayload).length)
+}
+
 function mergeCapabilityRequest(current = {}, requested = {}) {
   const runtimeCapabilities = {
     ...(current.runtimeCapabilities || {}),
@@ -82,6 +86,7 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
   const [lastRuntimePrompt, setLastRuntimePrompt] = useState('')
   const abortRef = useRef(null)
   const timeoutRef = useRef(null)
+  const runtimeGenerationPendingRef = useRef(false)
 
   const progressText = useMemo(() => PATIENCE_IDEAS[ideaIndex % PATIENCE_IDEAS.length], [ideaIndex])
 
@@ -320,13 +325,42 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
   }
 
   async function submitRuntimeGeneration(runtimeRequest = {}) {
-    const wrappedPrompt = [
-      'Traite cette demande runtime émise par l’application Co-Create comme une continuation IA normale via le pipeline existant.',
-      'Préserve la continuité de session, consomme continuationPlan et preload si fournis, puis retourne une application complète mise à jour.',
-      `Runtime request: ${JSON.stringify(runtimeRequest)}`
-    ].join('\n')
-    setInput(wrappedPrompt)
-    return submitWithText(wrappedPrompt)
+    if (mode !== 'co-create') {
+      return { error: 'Runtime generation is only available in Co-Create mode.' }
+    }
+    if (runtimeGenerationPendingRef.current) {
+      return { error: 'A runtime generation request is already pending.' }
+    }
+
+    const controller = new AbortController()
+    runtimeGenerationPendingRef.current = true
+    abortRef.current = controller
+    try {
+      const request = buildRuntimeGenerationPrompt({ runtimeRequest, project, designSystem })
+      setLastRuntimePrompt(JSON.stringify(request, null, 2))
+      onDebug?.({ status: 'ai_request', kind: request.kind, shortTitle: `Runtime IA · ${runtimeRequest.trigger || 'runtime_generation'}`, timestamp: new Date().toISOString() })
+      scheduleRequestTimeout(controller)
+      const payload = await aiProvider({ ...request, signal: controller.signal })
+      onDebug?.({ status: 'ai_response', kind: request.kind, shortTitle: 'Runtime IA response', timestamp: new Date().toISOString() })
+      const finalStructured = normalizeForProject(payload, project?.capabilities || {}, mode)
+      if (!hasUsableRuntimePayload(finalStructured)) {
+        return { error: 'Runtime generation did not return a usable runtimePayload.', finalStructured }
+      }
+      return {
+        finalStructured,
+        runtimePayload: finalStructured.runtimePayload,
+        project,
+        healthcheck: null,
+        repairAttempts: 0
+      }
+    } catch (runtimeError) {
+      return { error: runtimeError?.message || String(runtimeError) }
+    } finally {
+      runtimeGenerationPendingRef.current = false
+      if (timeoutRef.current) window.clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+      abortRef.current = null
+    }
   }
 
   async function retry() {

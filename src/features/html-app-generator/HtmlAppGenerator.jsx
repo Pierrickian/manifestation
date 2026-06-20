@@ -7,85 +7,23 @@ import { HtmlViewer } from '../../platform/ai/renderers/HtmlViewer'
 import { createProjectFromImportedHtml, exportHtmlProject, exportProjectJson, importHtmlIntoProject, normalizeImportedProject } from '../../platform/ai/projectExport'
 
 function deriveRuntimePayload(finalStructured = {}) {
+  if (finalStructured?.runtimePayload && typeof finalStructured.runtimePayload === 'object' && Object.keys(finalStructured.runtimePayload).length) {
+    return finalStructured.runtimePayload
+  }
   const state = finalStructured?.state && typeof finalStructured.state === 'object' ? finalStructured.state : {}
-  const capabilities = finalStructured?.capabilities && typeof finalStructured.capabilities === 'object' ? finalStructured.capabilities : {}
-  const continuationPlan = finalStructured?.continuationPlan && typeof finalStructured.continuationPlan === 'object' ? finalStructured.continuationPlan : null
   const firstArray = (...values) => values.find((value) => Array.isArray(value) && value.length) || []
-  const quotesByKey = state.quotesByKey && typeof state.quotesByKey === 'object' ? state.quotesByKey : {}
-  const labelsByKey = state.labelsByKey && typeof state.labelsByKey === 'object' ? state.labelsByKey : {}
-  const descriptionsByKey = state.descriptionsByKey && typeof state.descriptionsByKey === 'object' ? state.descriptionsByKey : {}
   const normalizeChoice = (item, index) => {
-    if (typeof item === 'string') {
-      return {
-        key: item,
-        label: labelsByKey[item] || item,
-        desc: descriptionsByKey[item] || '',
-        quotes: Array.isArray(quotesByKey[item]) ? quotesByKey[item] : []
-      }
-    }
-    if (item && typeof item === 'object') {
-      const key = item.key || item.id || item.slug || item.label || `choice-${index}`
-      return {
-        key,
-        label: item.label || item.title || labelsByKey[key] || key,
-        desc: item.desc || item.description || item.summary || descriptionsByKey[key] || '',
-        quotes: Array.isArray(item.quotes) ? item.quotes : Array.isArray(quotesByKey[key]) ? quotesByKey[key] : [],
-        ...item
-      }
-    }
+    if (typeof item === 'string') return { key: item, label: item }
+    if (item && typeof item === 'object') return item
     return { key: `choice-${index}`, label: `Choix ${index + 1}`, desc: '', quotes: [] }
   }
-  const choices = firstArray(
-    state.choices,
-    state.activeChoices,
-    state.activeSeries,
-    state.items,
-    state.options,
-    state.emotions,
-    state.needs,
-    state.activeSeriesKeys
-  ).map(normalizeChoice)
-  const nextChoices = firstArray(
-    state.nextChoices,
-    state.nextSeries,
-    state.nextSeriesKeys
-  ).map(normalizeChoice)
-  const narrative = state.narrative || state.story || (choices.length ? 'Nouvelle série générée par l’IA.' : '')
-  const statePatch = {
-    ...(state.statePatch && typeof state.statePatch === 'object' ? state.statePatch : state),
+  const choices = firstArray(state.choices, state.items).map(normalizeChoice)
+  const statePatch = state.statePatch && typeof state.statePatch === 'object' ? state.statePatch : {}
+  return {
     choices,
-    nextChoices,
-    quotesByKey,
-    loading: false,
-    isLoading: false,
-    pending: false
+    items: firstArray(state.items),
+    statePatch: { ...statePatch, loading: false, isLoading: false, pending: false }
   }
-  const runtimePayload = {
-    kind: 'generic',
-    domain: state.appType || state.domain || capabilities.domain || 'generic',
-    narrative,
-    choices: choices.length ? choices : Array.isArray(finalStructured?.suggestedActions) ? finalStructured.suggestedActions : [],
-    nextChoices,
-    statePatch,
-    events: [],
-    callbacks: continuationPlan?.callbacks || continuationPlan?.expectedCallbacks || [],
-    preload: Array.isArray(finalStructured?.preload) ? finalStructured.preload : [],
-    continuationPlanPatch: continuationPlan
-  }
-
-  ;['room', 'lesson', 'exercise', 'simulationStep', 'quotesByKey', 'activeSeriesKeys', 'nextSeriesKeys'].forEach((key) => {
-    if (Object.prototype.hasOwnProperty.call(state, key)) runtimePayload[key] = state[key]
-  })
-  if (!runtimePayload.room && (runtimePayload.choices.length || runtimePayload.nextChoices.length)) {
-    runtimePayload.room = { choices: runtimePayload.choices, nextChoices: runtimePayload.nextChoices, narrative }
-  }
-
-  if (runtimePayload.room) runtimePayload.kind = 'room'
-  else if (runtimePayload.lesson || runtimePayload.exercise) runtimePayload.kind = 'teaching_step'
-  else if (runtimePayload.simulationStep) runtimePayload.kind = 'simulation_step'
-  else if (runtimePayload.narrative || runtimePayload.choices.length) runtimePayload.kind = 'narrative'
-
-  return runtimePayload
 }
 
 export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled = true }) {
@@ -156,8 +94,17 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
       controller.submitRuntimeGeneration(event.data.request || {})
         .then((runtimeResult) => {
           console.log('[AI RUNTIME HOST]', 'AI response reception')
+          if (runtimeResult?.error) {
+            event.source?.postMessage({ source: 'creatia-host', type: 'ai-runtime-generation-result', requestId, ok: false, responseType: 'generation_error', payload: { error: runtimeResult.error } }, '*')
+            return
+          }
           const finalStructured = runtimeResult?.finalStructured || null
-          const runtimePayload = deriveRuntimePayload(finalStructured)
+          const runtimePayload = runtimeResult?.runtimePayload || deriveRuntimePayload(finalStructured)
+          const hasRuntimePayload = Boolean(runtimePayload && typeof runtimePayload === 'object' && Object.keys(runtimePayload).length)
+          if (!finalStructured || !hasRuntimePayload) {
+            event.source?.postMessage({ source: 'creatia-host', type: 'ai-runtime-generation-result', requestId, ok: false, responseType: 'generation_error', payload: { error: 'Runtime generation did not return a usable runtimePayload.' } }, '*')
+            return
+          }
           event.source?.postMessage({
             source: 'creatia-host',
             type: 'ai-runtime-generation-result',
@@ -180,7 +127,7 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
             diagnostics: {
               healthcheck: runtimeResult?.healthcheck || null,
               repairAttempts: runtimeResult?.repairAttempts || 0,
-              hasRuntimePayload: Boolean(runtimePayload && Object.keys(runtimePayload).length),
+              hasRuntimePayload,
               hasFinalStructured: Boolean(finalStructured)
             }
           }, '*')

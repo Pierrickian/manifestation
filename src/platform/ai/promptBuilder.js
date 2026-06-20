@@ -1,40 +1,41 @@
 import { MANIFESTATION_DESIGN_SYSTEM } from './designSystem'
 
-const STRUCTURED_APP_INSTRUCTIONS = [
-  'You are the hidden application architect for Creatia / Evolutia. The goal is not to generate HTML; the goal is to translate natural-language intentions into design decisions, then render the technical consequence.',
-  'The user never needs to know about HTML, CSS, JavaScript, React, components, frameworks, databases, APIs, persistence, rendering, or implementation details.',
+const BASE_APP_INSTRUCTIONS = [
+  'You are the hidden application architect for Creatia / Evolutia.',
   'Return ONLY valid JSON, without Markdown or code fences.',
-  'Return one explicit response kind. Final applications use { "kind": "html_app", "humanModel": object, "analysis": string, "decisions": array, "generatedChanges": array, "html": string, "files": object, "systemPrompt": string, "state": object, "suggestedActions": array, "capabilities": object, "runtimeCapabilities": object, "continuationPlan": object|null, "preload": array }.',
+  'Final applications must use { "kind": "html_app", "humanModel": object, "analysis": string, "decisions": array, "generatedChanges": array, "html": string, "files": object, "systemPrompt": string, "state": object, "suggestedActions": array, "capabilities": object, "runtimeCapabilities": object, "continuationPlan": object|null, "preload": array }.',
   'Intermediate capability negotiation uses { "kind": "capability_request", "requestedCapabilities": object, "reason": string, "retryPrompt": string }. Clarification uses { "kind": "clarification_request", "question": string }. Genuine failures use { "kind": "generation_error", "error": string }.',
-  'humanModel must describe the human level: { "purpose": string, "audience": string, "tone": string, "emotion": string, "journey": string, "sections": array }.',
-  'analysis must explain the design reasoning before implementation: goal, audience, desired emotion, UX journey, readability, information density, interactions, and business constraints when relevant.',
-  'decisions must list the design decisions derived from the user intention before code generation.',
-  'generatedChanges must list the concrete technical consequences of those decisions.',
-  'In create mode, html must be a complete standalone executable HTML5 document with embedded CSS and JavaScript. Create mode is a single self-contained generation, may run offline, requires no runtime AI dependency, and must not expect future AI interaction.',
-  'In co-create mode, html must still be executable as an application shell, but it is an AI-driven living experience that expects runtime AI collaboration rather than a finished static offline artifact.',
-  'Generated applications must be self-contained for create mode, and must contain their runtime AI collaboration loop for co-create mode.',
-  'Prefer browser-native technologies.',
-  'Avoid external libraries whenever possible.',
-  'A downloaded HTML file should continue to work offline after export in create mode. In co-create mode, local procedural content is allowed only as a clearly labeled fallback and must never replace AI collaboration when AI is available.',
+  'html must be a complete standalone executable HTML5 document with embedded CSS and JavaScript.',
+  'Prefer browser-native technologies and avoid external libraries unless explicitly requested.',
   'Support mobile devices, touch events, scrolling, dark mode, Canvas/SVG/WebGL when useful, and offline execution.',
-  'Every generated screen or panel that contains informational text, instructions, logs, descriptions, story content, results, settings, or help must be vertically scrollable on mobile, even when the first version appears short.',
-  'Use safe scroll containers such as main, section, .screen, .panel, or .content with overflow-y: auto and -webkit-overflow-scrolling: touch; avoid locking text-heavy interfaces behind fixed 100vh layouts without scroll.',
-  'systemPrompt is a hidden evolution prompt that explains how to continue evolving this specific project.',
-  'state stores persistent application state and decisions that future evolutions must preserve.',
-  'currentApplication/html is the single authoritative active HTML source. files stores optional supporting technical artifacts only, for example { "styles.css": string, "app.js": string }; do not duplicate the complete HTML document in files["index.html"].',
-  'capabilities must declare expected app capabilities, for example { "webgl": true, "audio": false, "simulation": true }.',
-  'runtimeCapabilities must always declare { "aiGeneration": boolean, "aiStreaming": boolean, "online": boolean, "offline": boolean }. In co-create mode aiGeneration and online must be true; offline may be true only as a fallback capability. In create mode aiGeneration should be false unless the user explicitly asks for runtime AI.',
-  'suggestedActions is only for visible, user-facing evolution buttons in Co-Create mode. Keep each item short, actionable, optional, and user-centric, for example "Add a shop", "Add a harder level", or "Add a minimap". In create mode return an empty array.',
-  'continuationPlan is mandatory in Co-Create mode. It is the durable AI-to-engine collaboration memory, not a UI feature and not a list of buttons. Use it to preserve the AI role such as game master, narrator, coach, teacher, or simulation director; long-term objectives; world/teaching/simulation rules; narrative continuity; collaboration rules; orchestration logic; expected callbacks; and session strategy. In create mode return null.',
-  'preload is mandatory and non-empty in Co-Create mode. It is the future-preparation channel for anticipation and latency hiding, not a user suggestion and not a continuationPlan duplicate. Return future generation candidates, prepared prompts, prepared branches, probable future content, or optional prepared fragments. Put trigger definitions on preload entries, for example { "trigger": "monster_defeated", "preparedPrompt": "...", "confidence": 0.9 }. In create mode return an empty array.',
-  'Co-Create HTML must include a runtime AI protocol surface that can call or stub requestAiGeneration({ trigger, state, continuationPlan, preload, context }), emit runtime events such as ai_request, needs_generation, state_transition, user_choice, milestone_reached, content_exhausted, branch_requested, preload_requested, or preload_consumed, consume continuationPlan and preload during execution, expose runtime AI status such as AI Connected, AI Generating, AI Unavailable, Reconnecting, or Local Fallback Active, preserve session continuity, and resume after reconnection.',
-  'Co-Create generated apps must implement window.applyRuntimePayload = function(runtimePayload) { ... } for new applications. It must directly consume runtimePayload.room, runtimePayload.narrative, runtimePayload.choices, and runtimePayload.statePatch, merge state patches into the running state, render new rooms/narrative/teacher steps/simulation steps immediately, and continue the experience without reloading the full HTML application. window.onAiResponse = function(event) { ... } may be exposed as an additional hook. Legacy consumers window.applyGeneratedContent(payload) and window.applyGeneratedRoom(roomOrPayload) may also be used for backward compatibility, but new code should prefer event.data.runtimePayload.',
-  'Any in-game button that depends on an AI callback must either call window.requestAiGeneration(...) directly, dispatch a CustomEvent such as needs_generation/ai_request/preload_requested/branch_requested/content_exhausted with trigger and state detail, or include data-ai-trigger/data-runtime-trigger/data-generation-trigger so the runtime bridge can request AI generation. Never leave AI callback buttons as inert local buttons.',
-  'For Co-Create runtime renewals, return state in a runtime-consumable shape in addition to the complete html_app. Use explicit arrays such as state.choices, state.nextChoices, state.activeChoices, state.activeSeries, state.nextSeries, state.items, state.options, state.emotions, state.needs, and state.quotesByKey. For emotional guidance apps, prefer state: { appType: "emotion-guidance", choices: [{ key, label, desc, quotes }], nextChoices: [{ key, label, desc, quotes }], quotesByKey, statePatch: { loading: false } } so applyRuntimePayload can update the running app in place.',
-  'In Co-Create mode, generating a static application that never requests AI content, only uses local procedural generation, behaves identically with or without AI, or exposes suggestions without a runtime collaboration mechanism is invalid.',
-  'Co-Create applications must never display "Offline" by default; status text must reflect the actual AI runtime state such as Connecting, AI Connected, AI Unavailable, Reconnecting, or Local Mode.',
-  'If the app has an intro or description panel with a Play, Start, Jouer, Lancer, or Commencer button, make that panel interactive and hide/remove it as soon as the user starts so the actual game or app receives focus.',
-  'Do not use external dependencies or remote assets unless the user explicitly requests them.'
+  'Every generated screen or panel that contains informational text must be vertically scrollable on mobile.',
+  'files stores optional supporting artifacts only; do not duplicate the complete HTML document in files["index.html"].'
+]
+
+const CREATE_APP_INSTRUCTIONS = [
+  ...BASE_APP_INSTRUCTIONS,
+  'Create mode is simple: generate one standalone application. Do not include live collaboration behavior or future-update machinery.',
+  'Create mode requirements: kind must be "html_app", suggestedActions must be [], continuationPlan must be null, preload must be [], runtimeCapabilities.aiGeneration must be false unless the user explicitly requested runtime AI.',
+  'The primary responsibility is valid JSON with executable html. A simple request such as "Un jeu de pendu" must return a playable standalone app.'
+]
+
+const CO_CREATE_APP_INSTRUCTIONS = [
+  ...BASE_APP_INSTRUCTIONS,
+  'Co-Create mode requirements: kind must be "html_app", html must be executable, continuationPlan must exist, preload must contain at least one trigger descriptor, and runtimeCapabilities.aiGeneration must be true.',
+  'Generated Co-Create apps must expose window.requestAiGeneration({ trigger, state, continuationPlan, preload, context }) and window.applyRuntimePayload(runtimePayload).',
+  'The app should request new content when needed, receive runtimePayload, and update itself without reloading.',
+  'continuationPlan must be short: one or two sentences only, for example { "runtimeRole": "Generate new inspiration cards when AI+ is pressed." }.',
+  'preload must contain only trigger descriptors and context requirements, for example { "trigger": "ai_plus", "event": "renew_requested", "sendContext": ["originalRequest", "applicationState", "userHistory"] }.',
+  'Do not generate future prompts, future content, precomputed cards, rooms, screens, stories, or citations in preload. Runtime AI will be recalled later with fresh context.',
+  'For Co-Create runtime renewals, state may include explicit arrays such as choices, items, and statePatch so runtimePayload can update the running app in place.'
+]
+
+const RUNTIME_GENERATION_INSTRUCTIONS = [
+  'You are the runtime AI for a Creatia / Evolutia Co-Create app.',
+  'Return ONLY valid JSON, without Markdown or code fences.',
+  'Return { "kind": "runtime_generation", "runtimePayload": object, "state": object, "continuationPlan": object|null, "preload": array }.',
+  'Generate only the runtimePayload needed for the current trigger. Do not rebuild the full HTML app.',
+  'runtimePayload must be directly consumable by window.applyRuntimePayload(runtimePayload). Include choices/items/statePatch when relevant.'
 ]
 
 function looksLikeHtmlDocument(value = '') {
@@ -70,6 +71,15 @@ export function normalizeStructuredAiResponse(payload = {}) {
   if (explicitKind === 'generation_error') {
     return { kind: 'generation_error', error: payload.error || payload.message || 'Generation failed.' }
   }
+  if (explicitKind === 'runtime_generation') {
+    return {
+      kind: 'runtime_generation',
+      runtimePayload: payload.runtimePayload && typeof payload.runtimePayload === 'object' ? payload.runtimePayload : {},
+      state: payload.state && typeof payload.state === 'object' ? payload.state : {},
+      continuationPlan: payload.continuationPlan && typeof payload.continuationPlan === 'object' ? payload.continuationPlan : null,
+      preload: Array.isArray(payload.preload) ? payload.preload : []
+    }
+  }
   if (!explicitKind && payload.requestedCapabilities && typeof payload.requestedCapabilities === 'object') {
     return {
       kind: 'capability_request',
@@ -104,7 +114,8 @@ export function normalizeStructuredAiResponse(payload = {}) {
       capabilities: payload.capabilities && typeof payload.capabilities === 'object' ? payload.capabilities : {},
       runtimeCapabilities: payload.runtimeCapabilities && typeof payload.runtimeCapabilities === 'object' ? payload.runtimeCapabilities : payload.capabilities?.runtimeCapabilities || {},
       continuationPlan: payload.continuationPlan && typeof payload.continuationPlan === 'object' ? payload.continuationPlan : null,
-      preload: Array.isArray(payload.preload) ? payload.preload : []
+      preload: Array.isArray(payload.preload) ? payload.preload : [],
+      runtimePayload: payload.runtimePayload && typeof payload.runtimePayload === 'object' ? payload.runtimePayload : null
     }
   }
 
@@ -167,8 +178,27 @@ export function buildAiPrompt({ input, mode = 'create', designSystem = MANIFESTA
 
   return {
     kind: 'html_app',
-    prompt: [STRUCTURED_APP_INSTRUCTIONS.join('\n'), JSON.stringify(userPayload, null, 2)].join('\n\n'),
+    prompt: [(isCoCreate ? CO_CREATE_APP_INSTRUCTIONS : CREATE_APP_INSTRUCTIONS).join('\n'), JSON.stringify(userPayload, null, 2)].join('\n\n'),
     metadata: { rendererType: 'html', mode, designSystem, projectId: project?.id || null, strategyId: strategy?.id || 'fast', capabilities, hasTime }
+  }
+}
+
+export function buildRuntimeGenerationPrompt({ runtimeRequest = {}, project = null, designSystem = MANIFESTATION_DESIGN_SYSTEM }) {
+  const payload = {
+    task: 'runtime_generation',
+    originalRequest: project?.creationRequest || '',
+    trigger: runtimeRequest.trigger || 'runtime_generation',
+    currentState: runtimeRequest.state || {},
+    continuationPlan: runtimeRequest.continuationPlan || project?.continuationPlan || null,
+    preload: runtimeRequest.preload || project?.preloadQueue || [],
+    context: runtimeRequest.context || {},
+    instruction: 'Generate only runtimePayload for this trigger. Do not return or rewrite HTML.'
+  }
+
+  return {
+    kind: 'runtime_generation',
+    prompt: [RUNTIME_GENERATION_INSTRUCTIONS.join('\n'), JSON.stringify(payload, null, 2)].join('\n\n'),
+    metadata: { rendererType: 'runtime', mode: 'co-create', designSystem, projectId: project?.id || null }
   }
 }
 
@@ -209,7 +239,7 @@ export function buildRepairPrompt({ originalRequest, failedResponse, healthcheck
 
   return {
     kind: 'html_app_repair',
-    prompt: [STRUCTURED_APP_INSTRUCTIONS.join('\n'), JSON.stringify(repairPayload, null, 2)].join('\n\n'),
+    prompt: [(mode === 'co-create' ? CO_CREATE_APP_INSTRUCTIONS : CREATE_APP_INSTRUCTIONS).join('\n'), JSON.stringify(repairPayload, null, 2)].join('\n\n'),
     metadata: { rendererType: 'html', mode, designSystem, strategyId: 'recovery', capabilities, attempt, maxAttempts }
   }
 }
@@ -231,7 +261,7 @@ export function buildHumanModelRefreshPrompt({ project, designSystem = MANIFESTA
 
   return {
     kind: 'human_model_refresh',
-    prompt: [STRUCTURED_APP_INSTRUCTIONS.join('\n'), JSON.stringify(payload, null, 2)].join('\n\n'),
+    prompt: [CREATE_APP_INSTRUCTIONS.join('\n'), JSON.stringify(payload, null, 2)].join('\n\n'),
     metadata: { rendererType: 'html', projectId: project?.id || null, refreshOnly: true, designSystem }
   }
 }

@@ -741,6 +741,13 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       || hasRuntimePayloadConsumer
       || typeof window.applyGeneratedContent === 'function'
       || typeof window.applyGeneratedRoom === 'function';
+    if (!event.data.ok) {
+      clearRuntimeLoadingState(triggerElement);
+      const errorPayload = { kind: 'runtime_error', error: event.data.payload?.error || 'Runtime generation failed.', statePatch: { loading: false, isLoading: false, pending: false, error: event.data.payload?.error || 'Runtime generation failed.' } };
+      if (hasRuntimePayloadConsumer) window.applyRuntimePayload(errorPayload);
+      renderDiagnostics();
+      return;
+    }
     if (event.data.ok && !hasRuntimePayload) addDecision('AI response received but runtimePayload is missing or empty.', { requestId });
     if (event.data.ok && !hasConsumablePayload) {
       addDecision('AI response received but no consumable runtimePayload was produced.', { requestId, runtimePayload });
@@ -766,6 +773,7 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     }
     if (diagnostics.pendingRequests > 0) {
       addDecision('Blocked because: Request already in progress.', { pendingRequests: diagnostics.pendingRequests });
+      return { status: 'blocked', error: 'A runtime generation request is already pending.' };
     }
     const runtimeRequest = {
       requestId: request.requestId || 'runtime-' + Date.now() + '-' + Math.random().toString(16).slice(2),
