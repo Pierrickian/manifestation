@@ -263,13 +263,13 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
       {mode === 'co-create' && continuationPlan ? (
         <div className="ai-suggestions-card">
           <strong>Plan de continuation</strong>
-          <span>{continuationPlan.summary || continuationPlan.nextContact || 'L’IA propose une suite de collaboration.'}</span>
+          <span>{continuationPlan.runtimeRole || continuationPlan.summary || continuationPlan.nextContact || 'L’IA sera rappelée au prochain déclencheur.'}</span>
         </div>
       ) : null}
       {mode === 'co-create' && preloadQueue.length ? (
         <div className="ai-suggestions-card">
-          <strong>Preload proposé</strong>
-          <div>{preloadQueue.map((item, index) => <button type="button" key={`${item.task || 'preload'}-${index}`} onClick={() => controller.submitPartnerSuggestion(item.task || item.reason || 'Préparer le contenu suivant')} disabled={isBusy}>{item.priority || 'Soon'} · {item.task || item.reason}</button>)}</div>
+          <strong>Déclencheurs runtime</strong>
+          <div>{preloadQueue.map((item, index) => <span key={`${item.trigger || 'trigger'}-${index}`}>{item.trigger || 'runtime'} · {item.event || 'context requested'} · {(item.sendContext || []).join(', ')}</span>)}</div>
         </div>
       ) : null}
 

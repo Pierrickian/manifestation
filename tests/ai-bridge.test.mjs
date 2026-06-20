@@ -14,13 +14,15 @@ assert.doesNotMatch(createPrompt.prompt, /window\.requestAiGeneration\(\{ trigge
 assert.doesNotMatch(createPrompt.prompt, /window\.applyRuntimePayload/)
 
 const coCreatePrompt = buildAiPrompt({ input: 'Application avec bouton AI+', mode: 'co-create' })
-assert.match(coCreatePrompt.prompt, /continuationPlan must describe/)
-assert.match(coCreatePrompt.prompt, /preload must be an array/)
+assert.match(coCreatePrompt.prompt, /continuationPlan must only describe the runtime AI role/)
+assert.match(coCreatePrompt.prompt, /preload must contain only trigger descriptors/)
+assert.match(coCreatePrompt.prompt, /Do not generate future content/)
+assert.match(coCreatePrompt.prompt, /Runtime AI will be recalled later/)
 assert.match(coCreatePrompt.prompt, /window\.requestAiGeneration/)
 assert.match(coCreatePrompt.prompt, /window\.applyRuntimePayload/)
 assert.match(coCreatePrompt.prompt, /aiGeneration must be true/)
 
-const runtimePrompt = buildRuntimeGenerationPrompt({ request: { trigger: 'ai-plus', state: { choices: [1, 2, 3, 4, 5] }, continuationPlan: { summary: 'continue' }, preload: [{ id: 'seed' }] } })
+const runtimePrompt = buildRuntimeGenerationPrompt({ request: { trigger: 'ai_plus', state: { choices: [1, 2, 3, 4, 5] }, continuationPlan: { runtimeRole: 'Generate cards when AI+ is pressed.' }, preload: [{ trigger: 'ai_plus', event: 'renew_requested', sendContext: ['originalRequest', 'applicationState', 'userHistory'] }] } })
 assert.equal(runtimePrompt.kind, 'runtime_generation')
 assert.match(runtimePrompt.prompt, /runtimePayload/)
 

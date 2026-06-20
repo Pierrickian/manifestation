@@ -26,6 +26,25 @@ export function extractRuntimePayload(finalStructured) {
   return Object.keys(fallback).length ? fallback : null
 }
 
+function trimSentence(value = '', maxLength = 180) {
+  return String(value || '').replace(/\s+/g, ' ').trim().slice(0, maxLength)
+}
+
+function normalizeContinuationPlan(plan) {
+  if (!plan || typeof plan !== 'object') return null
+  const runtimeRole = trimSentence(plan.runtimeRole || plan.summary || plan.nextContact || '')
+  return runtimeRole ? { runtimeRole } : null
+}
+
+function normalizePreloadDescriptors(preload) {
+  if (!Array.isArray(preload)) return []
+  return preload.map((item = {}) => ({
+    trigger: trimSentence(item.trigger || item.id || 'runtime_trigger', 60),
+    event: trimSentence(item.event || item.reason || item.task || 'runtime_requested', 80),
+    sendContext: Array.isArray(item.sendContext) ? item.sendContext.filter((value) => typeof value === 'string').slice(0, 6) : ['originalRequest', 'applicationState', 'userHistory']
+  })).filter((item) => item.trigger && item.event).slice(0, 6)
+}
+
 function enforceModeBoundaries(structured, mode) {
   if (mode !== 'co-create') {
     return {
@@ -36,7 +55,11 @@ function enforceModeBoundaries(structured, mode) {
     }
   }
 
-  return structured
+  return {
+    ...structured,
+    continuationPlan: normalizeContinuationPlan(structured.continuationPlan),
+    preload: normalizePreloadDescriptors(structured.preload)
+  }
 }
 
 function normalizeForProject(payload, detectedCapabilities, mode) {
