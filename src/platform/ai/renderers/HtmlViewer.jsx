@@ -196,6 +196,7 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     pendingRequests: 0,
     lastAiError: ''
   };
+  window.creatiaRuntimeDiagnostics = diagnostics;
   const builderCapabilities = runtimeContext.capabilities || {};
   const debugState = {
     mode: runtimeContext.mode || 'create',
@@ -410,8 +411,27 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     panel.querySelector('[data-creatia-debug-close]')?.addEventListener('click', () => panel.classList.remove('is-open'));
     panel.querySelector('[data-creatia-debug-export]')?.addEventListener('click', exportDebugSnapshot);
   };
+  const connectedRuntimeStatusText = 'Runtime: connecté';
+  const disconnectedRuntimeLabels = [
+    /runtime\\s*:\\s*(indisponible|attendu|en attente|non disponible)/i,
+    /runtime\\s+ai\\s+indisponible\\s+localement/i,
+    /runtime\\s+indisponible/i,
+    /runtime\\s+attendu/i,
+    /ai\\s+runtime\\s+unavailable/i,
+    /runtime\\s*:\\s*(unavailable|waiting|pending)/i
+  ];
+  const hasDisconnectedRuntimeLabel = (text = '') => disconnectedRuntimeLabels.some((pattern) => pattern.test(text));
   const syncGeneratedStatusText = () => {
     if (!diagnostics.providerRegistered || diagnostics.status === 'Unavailable') return;
+    const candidates = Array.from(document.querySelectorAll('[data-runtime-status], [data-ai-status], [role="status"], .runtime-status, .ai-status, .status, p, span, small, div, button'));
+    candidates.forEach((node) => {
+      if (!node || node.children.length > 3) return;
+      const text = (node.textContent || '').replace(/\\s+/g, ' ').trim();
+      if (!text || text.length > 96 || !hasDisconnectedRuntimeLabel(text)) return;
+      log('status text override', text + ' -> ' + connectedRuntimeStatusText, 'reason=provider_registered');
+      node.textContent = connectedRuntimeStatusText;
+      node.dataset.creatiaRuntimeSynced = 'true';
+    });
     const walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT);
     const replacements = [];
     while (walker.nextNode()) {
@@ -437,7 +457,10 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       wrapRenderFunction();
       debugState.currentState = getRuntimeState();
       renderDiagnostics();
+      syncGeneratedStatusText();
     }, 1500);
+    const observer = new MutationObserver(() => syncGeneratedStatusText());
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
     renderDiagnostics();
     syncGeneratedStatusText();
   };
@@ -835,6 +858,9 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       }, 45000);
     });
   };
+  syncGeneratedStatusText();
+  window.dispatchEvent(new CustomEvent('creatia-runtime-ready', { detail: { diagnostics: { ...diagnostics } } }));
+  document.dispatchEvent(new CustomEvent('creatia-runtime-ready', { detail: { diagnostics: { ...diagnostics } } }));
   installRuntimeCallbackBridge();
   const originalFetch = window.fetch?.bind(window);
   if (originalFetch) {
@@ -879,9 +905,12 @@ function buildAiActivityMonitor(runtimeContext = {}) {
 
 export function withCreatiaUiGuards(html = '', runtimeContext = {}) {
   const source = html || '<!doctype html><html><body></body></html>'
-  const guards = `${buildStartPanelGuardStyle()}${buildStartPanelGuardScript()}${buildAiActivityMonitor(runtimeContext)}`
+  const guards = [
+    source.includes('data-creatia-ui-guard="start-panel"') ? '' : `${buildStartPanelGuardStyle()}${buildStartPanelGuardScript()}`,
+    source.includes('data-creatia-ui-guard="ai-activity"') ? '' : buildAiActivityMonitor(runtimeContext)
+  ].join('')
 
-  if (source.includes('data-creatia-ui-guard="ai-activity"')) return source
+  if (!guards) return source
   if (/<\/body>/i.test(source)) return source.replace(/<\/body>/i, `${guards}</body>`)
   return `${source}${guards}`
 }

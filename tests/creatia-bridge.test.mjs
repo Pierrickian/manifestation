@@ -40,5 +40,10 @@ assert.match(generator, /Runtime generation did not return a usable runtimePaylo
 assert.match(viewer, /Blocked because: Request already in progress/)
 assert.match(viewer, /return \{ status: 'blocked'/)
 assert.match(viewer, /window\.applyRuntimePayload\(effectiveRuntimePayload\)/)
+assert.match(viewer, /creatia-runtime-ready/)
+assert.match(viewer, /runtime\\\\s\*:\\\\s\*\(indisponible\|attendu\|en attente\|non disponible\)/)
+assert.match(viewer, /Runtime: connecté/)
+assert.match(viewer, /source\.includes\('data-creatia-ui-guard="start-panel"'\)/)
+assert.match(viewer, /if \(!guards\) return source/)
 
 console.log('Creatia bridge contract tests passed')
