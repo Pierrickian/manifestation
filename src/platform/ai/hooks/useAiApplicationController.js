@@ -253,6 +253,9 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
       if (repairResult.intermediateResponse) {
         setRepairError('La réparation a demandé une étape intermédiaire. Creatia conserve la dernière application HTML valide et affiche les warnings Co-Create pour une nouvelle réparation.')
       }
+      if (repairResult.verification.failedCount > 0) {
+        throw new Error('La génération a échoué aux vérifications HTML critiques. Creatia refuse d’afficher une UI dégradée ou du JSON brut.')
+      }
       setHealthcheck({ ...repairResult.verification, repairAttempts: repairResult.attempts })
       const nextProject = storeProject(project ? evolveProject(project, trimmed, repairResult.finalStructured) : createProject({ mode, request: trimmed, response: repairResult.finalStructured, designSystem }))
       setProject(nextProject)
@@ -367,6 +370,9 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
       }
       if (repairResult.intermediateResponse) {
         setRepairError('La réparation a demandé une étape intermédiaire. La dernière application HTML valide a été conservée.')
+      }
+      if (repairResult.verification.failedCount > 0) {
+        throw new Error('La réparation laisse encore des erreurs HTML critiques. Creatia conserve la dernière application valide.')
       }
       const nextProject = storeProject(evolveProject(project, originalRequest, repairResult.finalStructured))
       setProject(nextProject)

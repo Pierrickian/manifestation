@@ -100,6 +100,11 @@ function hasHtmlDocumentShape(html = '') {
   return /<!doctype\s+html|<html[\s>]|<body[\s>]|<main[\s>]|<section[\s>]|<script[\s>]|<style[\s>]|<div[\s>]/i.test(String(html))
 }
 
+function exposesInternalPromptOrJson(html = '') {
+  const text = String(html)
+  return /Return ONLY valid JSON|hidden application architect|requiredRuntimeCapabilities|detectedCapabilities|healthcheckReport|failedChecks|STRUCTURED_APP_INSTRUCTIONS|<pre[^>]*>\s*[{[]|<code[^>]*>\s*[{[]|&quot;kind&quot;\s*:\s*&quot;html_app|\"kind\"\s*:\s*\"html_app\"/i.test(text)
+}
+
 function hasScrollableTextSurface(html = '') {
   return /overflow-y\s*:\s*(auto|scroll)|overflow\s*:\s*(auto|scroll)|-webkit-overflow-scrolling\s*:\s*touch|scrollable|data-scrollable/i.test(String(html))
 }
@@ -180,6 +185,16 @@ export function runGeneratedAppHealthcheck(response = {}, strategy = {}) {
     message: 'Executable HTML document detected.',
     expected: 'The html field must contain executable HTML markup, not the prompt, raw JSON, or plain text.',
     actual: 'The generated html field looks like plain text or JSON rather than HTML.',
+    repairConfidence: 'high',
+    repairable: true
+  }))
+
+  checks.push(createCheck({
+    id: 'html-no-internal-prompt-leak',
+    ok: !exposesInternalPromptOrJson(html),
+    message: 'No internal prompt or raw JSON leak detected.',
+    expected: 'The generated app must render the user-facing application, not the builder prompt, schema, or raw JSON response.',
+    actual: 'The HTML appears to expose internal prompt/schema/debug JSON as visible content.',
     repairConfidence: 'high',
     repairable: true
   }))

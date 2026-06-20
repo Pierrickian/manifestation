@@ -49,6 +49,11 @@ function extractHtmlFromText(value = '') {
   return looksLikeHtmlDocument(text) ? text : ''
 }
 
+function exposesInternalPromptOrJson(value = '') {
+  const text = String(value || '')
+  return /Return ONLY valid JSON|hidden application architect|requiredRuntimeCapabilities|detectedCapabilities|healthcheckReport|failedChecks|STRUCTURED_APP_INSTRUCTIONS|<pre[^>]*>\s*[{[]|<code[^>]*>\s*[{[]|&quot;kind&quot;\s*:\s*&quot;html_app|\"kind\"\s*:\s*\"html_app\"/i.test(text)
+}
+
 export function normalizeStructuredAiResponse(payload = {}) {
   const explicitKind = typeof payload.kind === 'string' ? payload.kind : ''
   if (explicitKind === 'capability_request') {
@@ -82,6 +87,9 @@ export function normalizeStructuredAiResponse(payload = {}) {
     if (html && !looksLikeHtmlDocument(html)) {
       return { kind: 'generation_error', error: 'AI response html field did not contain an executable HTML document.' }
     }
+    if (html && exposesInternalPromptOrJson(html)) {
+      return { kind: 'generation_error', error: 'AI response html field exposed internal prompt/schema JSON instead of the application UI.' }
+    }
     return {
       kind: 'html_app',
       html,
@@ -111,6 +119,9 @@ export function normalizeStructuredAiResponse(payload = {}) {
   } catch {
     const html = extractHtmlFromText(text)
     if (html) {
+      if (exposesInternalPromptOrJson(html)) {
+        return { kind: 'generation_error', error: 'AI response exposed internal prompt/schema JSON instead of the application UI.' }
+      }
       return { kind: 'html_app', html, humanModel: {}, files: {}, analysis: '', decisions: [], generatedChanges: [], systemPrompt: '', state: {}, suggestedActions: [], capabilities: {}, runtimeCapabilities: {}, continuationPlan: null, preload: [] }
     }
     return { kind: 'generation_error', error: 'AI response did not contain valid structured JSON or an executable HTML document.' }
