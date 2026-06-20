@@ -10,21 +10,75 @@ function deriveRuntimePayload(finalStructured = {}) {
   const state = finalStructured?.state && typeof finalStructured.state === 'object' ? finalStructured.state : {}
   const capabilities = finalStructured?.capabilities && typeof finalStructured.capabilities === 'object' ? finalStructured.capabilities : {}
   const continuationPlan = finalStructured?.continuationPlan && typeof finalStructured.continuationPlan === 'object' ? finalStructured.continuationPlan : null
+  const firstArray = (...values) => values.find((value) => Array.isArray(value) && value.length) || []
+  const quotesByKey = state.quotesByKey && typeof state.quotesByKey === 'object' ? state.quotesByKey : {}
+  const labelsByKey = state.labelsByKey && typeof state.labelsByKey === 'object' ? state.labelsByKey : {}
+  const descriptionsByKey = state.descriptionsByKey && typeof state.descriptionsByKey === 'object' ? state.descriptionsByKey : {}
+  const normalizeChoice = (item, index) => {
+    if (typeof item === 'string') {
+      return {
+        key: item,
+        label: labelsByKey[item] || item,
+        desc: descriptionsByKey[item] || '',
+        quotes: Array.isArray(quotesByKey[item]) ? quotesByKey[item] : []
+      }
+    }
+    if (item && typeof item === 'object') {
+      const key = item.key || item.id || item.slug || item.label || `choice-${index}`
+      return {
+        key,
+        label: item.label || item.title || labelsByKey[key] || key,
+        desc: item.desc || item.description || item.summary || descriptionsByKey[key] || '',
+        quotes: Array.isArray(item.quotes) ? item.quotes : Array.isArray(quotesByKey[key]) ? quotesByKey[key] : [],
+        ...item
+      }
+    }
+    return { key: `choice-${index}`, label: `Choix ${index + 1}`, desc: '', quotes: [] }
+  }
+  const choices = firstArray(
+    state.choices,
+    state.activeChoices,
+    state.activeSeries,
+    state.items,
+    state.options,
+    state.emotions,
+    state.needs,
+    state.activeSeriesKeys
+  ).map(normalizeChoice)
+  const nextChoices = firstArray(
+    state.nextChoices,
+    state.nextSeries,
+    state.nextSeriesKeys
+  ).map(normalizeChoice)
+  const narrative = state.narrative || state.story || (choices.length ? 'Nouvelle série générée par l’IA.' : '')
+  const statePatch = {
+    ...(state.statePatch && typeof state.statePatch === 'object' ? state.statePatch : state),
+    choices,
+    nextChoices,
+    quotesByKey,
+    loading: false,
+    isLoading: false,
+    pending: false
+  }
   const runtimePayload = {
     kind: 'generic',
-    domain: state.domain || capabilities.domain || 'generic',
-    narrative: state.narrative || state.story || '',
-    choices: Array.isArray(state.choices) ? state.choices : Array.isArray(finalStructured?.suggestedActions) ? finalStructured.suggestedActions : [],
-    statePatch: state.statePatch && typeof state.statePatch === 'object' ? state.statePatch : state,
+    domain: state.appType || state.domain || capabilities.domain || 'generic',
+    narrative,
+    choices: choices.length ? choices : Array.isArray(finalStructured?.suggestedActions) ? finalStructured.suggestedActions : [],
+    nextChoices,
+    statePatch,
     events: [],
     callbacks: continuationPlan?.callbacks || continuationPlan?.expectedCallbacks || [],
     preload: Array.isArray(finalStructured?.preload) ? finalStructured.preload : [],
     continuationPlanPatch: continuationPlan
   }
 
-  ;['room', 'lesson', 'exercise', 'simulationStep', 'statePatch'].forEach((key) => {
+  ;['room', 'lesson', 'exercise', 'simulationStep', 'quotesByKey', 'activeSeriesKeys', 'nextSeriesKeys'].forEach((key) => {
     if (Object.prototype.hasOwnProperty.call(state, key)) runtimePayload[key] = state[key]
   })
+  if (!runtimePayload.room && (runtimePayload.choices.length || runtimePayload.nextChoices.length)) {
+    runtimePayload.room = { choices: runtimePayload.choices, nextChoices: runtimePayload.nextChoices, narrative }
+  }
 
   if (runtimePayload.room) runtimePayload.kind = 'room'
   else if (runtimePayload.lesson || runtimePayload.exercise) runtimePayload.kind = 'teaching_step'
