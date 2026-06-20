@@ -22,8 +22,8 @@ const CREATE_APP_INSTRUCTIONS = [
 const CO_CREATE_APP_INSTRUCTIONS = [
   ...BASE_APP_INSTRUCTIONS,
   'Co-Create mode requirements: kind must be "html_app", html must be executable, continuationPlan must exist, preload must contain at least one trigger descriptor, and runtimeCapabilities.aiGeneration must be true.',
-  'Generated Co-Create apps must expose window.requestAiGeneration({ trigger, state, continuationPlan, preload, context }) and window.applyRuntimePayload(runtimePayload).',
-  'The app should request new content when needed, receive runtimePayload, and update itself without reloading.',
+  'Generated Co-Create apps must call window.requestAiGeneration({ trigger, state, continuationPlan, preload, context }) when they need live AI content, but must never define, stub, override, or shadow window.requestAiGeneration; the Creatia host injects that bridge.',
+  'Generated Co-Create apps must implement window.applyRuntimePayload(runtimePayload) to receive runtimePayload, clear loading states, and update themselves without reloading.',
   'continuationPlan must be short: one or two sentences only, for example { "runtimeRole": "Generate new inspiration cards when AI+ is pressed." }.',
   'preload must contain only trigger descriptors and context requirements, for example { "trigger": "ai_plus", "event": "renew_requested", "sendContext": ["originalRequest", "applicationState", "userHistory"] }.',
   'Do not generate future prompts, future content, precomputed cards, rooms, screens, stories, or citations in preload. Runtime AI will be recalled later with fresh context.',

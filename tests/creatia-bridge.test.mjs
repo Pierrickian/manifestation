@@ -19,6 +19,8 @@ assert.match(coCreateInstructions, /continuationPlan must exist/)
 assert.match(coCreateInstructions, /preload must contain at least one trigger descriptor/)
 assert.match(coCreateInstructions, /window\.requestAiGeneration/)
 assert.match(coCreateInstructions, /window\.applyRuntimePayload/)
+assert.match(coCreateInstructions, /must never define, stub, override, or shadow window\.requestAiGeneration/)
+assert.match(coCreateInstructions, /Creatia host injects that bridge/)
 assert.match(coCreateInstructions, /Do not generate future prompts/)
 assert.match(coCreateInstructions, /Do not generate future prompts, future content/)
 
