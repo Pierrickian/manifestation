@@ -1,8 +1,8 @@
 import { useMemo, useRef, useState } from 'react'
-import { requestAiCompletion } from '../aiProvider'
-import { buildAiPrompt, buildHumanModelRefreshPrompt, buildRepairPrompt, normalizeStructuredAiResponse } from '../promptBuilder'
-import { createProject, evolveProject, refreshProjectHumanModel, storeProject } from '../projectModel'
-import { detectCapabilities, isAutoRepairableHealthcheck, runGeneratedAppHealthcheck, selectGenerationStrategy } from '../generationPipeline'
+import { requestAiCompletion } from '../aiProvider.js'
+import { buildAiPrompt, buildHumanModelRefreshPrompt, buildRepairPrompt, buildRuntimeGenerationPrompt, normalizeStructuredAiResponse } from '../promptBuilder.js'
+import { createProject, evolveProject, refreshProjectHumanModel, storeProject } from '../projectModel.js'
+import { detectCapabilities, isAutoRepairableHealthcheck, runGeneratedAppHealthcheck, selectGenerationStrategy } from '../generationPipeline.js'
 
 const REQUEST_TIMEOUT_MS = 60000
 const DEFAULT_REPAIR_LIMIT = 1
@@ -14,6 +14,17 @@ const PATIENCE_IDEAS = [
   'Exemple : quiz éducatif avec score et animations douces.',
   'Exemple : tableau de bord personnel simple et tactile.'
 ]
+
+export function extractRuntimePayload(finalStructured) {
+  if (finalStructured?.runtimePayload && typeof finalStructured.runtimePayload === 'object') return finalStructured.runtimePayload
+  const state = finalStructured?.state
+  if (!state || typeof state !== 'object') return null
+  const fallback = {}
+  if (Array.isArray(state.choices)) fallback.choices = state.choices
+  if (Array.isArray(state.items)) fallback.items = state.items
+  if (state.statePatch && typeof state.statePatch === 'object') fallback.statePatch = state.statePatch
+  return Object.keys(fallback).length ? fallback : null
+}
 
 function enforceModeBoundaries(structured, mode) {
   if (mode !== 'co-create') {
@@ -52,6 +63,7 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
   const [lastRuntimePrompt, setLastRuntimePrompt] = useState('')
   const abortRef = useRef(null)
   const timeoutRef = useRef(null)
+  const runtimePendingRef = useRef(null)
 
   const progressText = useMemo(() => PATIENCE_IDEAS[ideaIndex % PATIENCE_IDEAS.length], [ideaIndex])
 
@@ -166,6 +178,7 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
         healthcheck: repairResult.verification,
         repairAttempts: repairResult.attempts
       })
+      return repairResult.finalStructured
     } catch (submitError) {
       if (submitError?.name === 'AbortError') {
         setStatus('idle')
@@ -313,6 +326,40 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
     setMessage('Projet importé. Tu peux continuer Create ou Co-Create immédiatement.')
   }
 
+  async function requestRuntimeGeneration(runtimeRequest = {}) {
+    const requestId = runtimeRequest.requestId || `runtime-${Date.now()}-${Math.random().toString(16).slice(2)}`
+    if (mode !== 'co-create') {
+      return { source: 'creatia-host', type: 'ai-runtime-generation-result', requestId, ok: false, responseType: 'generation_error', payload: { error: 'Runtime AI is only available in Co-Create mode.' } }
+    }
+
+    if (runtimePendingRef.current) {
+      return { source: 'creatia-host', type: 'ai-runtime-generation-result', requestId, ok: false, responseType: 'generation_error', payload: { error: 'A runtime generation request is already pending.' } }
+    }
+
+    runtimePendingRef.current = requestId
+
+    try {
+      const request = buildRuntimeGenerationPrompt({ request: runtimeRequest, project, designSystem })
+      setLastRuntimePrompt(JSON.stringify(request, null, 2))
+      onDebug?.({ status: 'ai_request', kind: 'runtime_generation', shortTitle: 'Runtime Co-Create', requestId, timestamp: new Date().toISOString() })
+      const payload = await aiProvider(request)
+      const finalStructured = normalizeStructuredAiResponse(payload)
+      const runtimePayload = extractRuntimePayload(finalStructured)
+      if (!runtimePayload) {
+        onDebug?.({ status: 'error', kind: 'runtime_generation', shortTitle: 'Runtime Co-Create', requestId, timestamp: new Date().toISOString() })
+        return { source: 'creatia-host', type: 'ai-runtime-generation-result', requestId, ok: false, responseType: 'generation_error', payload: { error: 'Runtime generation did not return a usable runtimePayload.' } }
+      }
+
+      onDebug?.({ status: 'ai_response', kind: 'runtime_generation', shortTitle: 'Runtime Co-Create', requestId, timestamp: new Date().toISOString() })
+      return { source: 'creatia-host', type: 'ai-runtime-generation-result', requestId, ok: true, status: 'completed', responseType: 'runtime_generation', runtimePayload, finalStructured }
+    } catch (runtimeError) {
+      onDebug?.({ status: 'error', kind: 'runtime_generation', shortTitle: 'Runtime Co-Create', requestId, errorMessage: runtimeError?.message || 'unknown', timestamp: new Date().toISOString() })
+      return { source: 'creatia-host', type: 'ai-runtime-generation-result', requestId, ok: false, responseType: 'generation_error', payload: { error: runtimeError instanceof Error ? runtimeError.message : 'Runtime generation failed.' } }
+    } finally {
+      if (runtimePendingRef.current === requestId) runtimePendingRef.current = null
+    }
+  }
+
 
   function updateHumanModelField(field, value) {
     if (!project) return
@@ -332,5 +379,5 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
 
   function cancel() { abortRef.current?.abort() }
 
-  return { input, setInput, status, message, error, repairError, result, project, submit, submitPartnerSuggestion, retry, repair, rebuildHumanModel, updateHumanModelField, importProject, cancel, appendTranscript, speechEnabled, progressText, hasTime, setHasTime, pipeline, healthcheck, lastPrompt, lastRuntimePrompt }
+  return { input, setInput, status, message, error, repairError, result, project, submit, submitPartnerSuggestion, retry, repair, rebuildHumanModel, updateHumanModelField, importProject, cancel, appendTranscript, speechEnabled, progressText, hasTime, setHasTime, pipeline, healthcheck, lastPrompt, lastRuntimePrompt, requestRuntimeGeneration }
 }

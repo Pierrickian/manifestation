@@ -22,6 +22,7 @@ const questionVariationRules = [
 
 export function buildPrompt(kind, context) {
   if (kind === 'html_app') return buildHtmlAppPrompt(context)
+  if (kind === 'runtime_generation') return buildRuntimeGenerationPrompt(context)
   if (kind?.startsWith('narratia_')) return buildNarratiaPrompt(context)
   if (kind === 'mes_questions_quiz') return buildMesQuestionsPrompt(context)
   if (kind === 'enigmia_riddle') return buildEnigmiaPrompt(context)
@@ -390,5 +391,22 @@ function buildHtmlAppPrompt(context = {}) {
       role: 'user',
       content: String(context.prompt || '')
     }
+  ]
+}
+
+
+function buildRuntimeGenerationPrompt(context = {}) {
+  return [
+    {
+      role: 'system',
+      content: [
+        'You generate one lightweight runtime update for a running Creatia Co-Create HTML app.',
+        'Return ONLY valid JSON, without Markdown.',
+        'Required shape: { "runtimePayload": object, "state": object, "analysis": string, "decisions": array, "generatedChanges": array }.',
+        'runtimePayload must be usable directly by window.applyRuntimePayload(runtimePayload).',
+        'Do not return a full standalone application.'
+      ].join('\n')
+    },
+    { role: 'user', content: String(context.prompt || '') }
   ]
 }

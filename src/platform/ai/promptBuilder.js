@@ -1,34 +1,75 @@
-import { MANIFESTATION_DESIGN_SYSTEM } from './designSystem'
+import { MANIFESTATION_DESIGN_SYSTEM } from './designSystem.js'
 
-const STRUCTURED_APP_INSTRUCTIONS = [
-  'You are the hidden application architect for Creatia / Evolutia. The goal is not to generate HTML; the goal is to translate natural-language intentions into design decisions, then render the technical consequence.',
-  'The user never needs to know about HTML, CSS, JavaScript, React, components, frameworks, databases, APIs, persistence, rendering, or implementation details.',
+const CREATE_APP_INSTRUCTIONS = [
+  'You generate standalone HTML applications for Creatia.',
   'Return ONLY valid JSON, without Markdown or code fences.',
-  'Required shape: { "humanModel": object, "analysis": string, "decisions": array, "generatedChanges": array, "html": string, "files": object, "systemPrompt": string, "state": object, "suggestedActions": array, "capabilities": object, "continuationPlan": object|null, "preload": array }.',
-  'humanModel must describe the human level: { "purpose": string, "audience": string, "tone": string, "emotion": string, "journey": string, "sections": array }.',
-  'analysis must explain the design reasoning before implementation: goal, audience, desired emotion, UX journey, readability, information density, interactions, and business constraints when relevant.',
-  'decisions must list the design decisions derived from the user intention before code generation.',
-  'generatedChanges must list the concrete technical consequences of those decisions.',
+  'Required shape: { "humanModel": object, "analysis": string, "decisions": array, "generatedChanges": array, "html": string, "files": object, "systemPrompt": string, "state": object, "suggestedActions": array, "capabilities": object, "continuationPlan": null, "preload": array }.',
   'html must be a complete standalone executable HTML5 document with embedded CSS and JavaScript.',
-  'Generated applications must be self-contained.',
-  'Prefer browser-native technologies.',
-  'Avoid external libraries whenever possible.',
-  'A downloaded HTML file should continue to work offline after export.',
-  'Support mobile devices, touch events, scrolling, dark mode, Canvas/SVG/WebGL when useful, and offline execution.',
-  'Every generated screen or panel that contains informational text, instructions, logs, descriptions, story content, results, settings, or help must be vertically scrollable on mobile, even when the first version appears short.',
-  'Use safe scroll containers such as main, section, .screen, .panel, or .content with overflow-y: auto and -webkit-overflow-scrolling: touch; avoid locking text-heavy interfaces behind fixed 100vh layouts without scroll.',
-  'systemPrompt is a hidden evolution prompt that explains how to continue evolving this specific project.',
-  'state stores persistent application state and decisions that future evolutions must preserve.',
-  'currentApplication/html is the single authoritative active HTML source. files stores optional supporting technical artifacts only, for example { "styles.css": string, "app.js": string }; do not duplicate the complete HTML document in files["index.html"].',
-  'capabilities must declare expected runtime capabilities, for example { "webgl": true, "audio": false, "simulation": true }.',
-  'suggestedActions contains concise creative next steps only when collaboration mode is enabled; otherwise return an empty array.',
-  'continuationPlan and preload are exclusive to co-create mode. In create mode return null and an empty array.',
-  'If the app has an intro or description panel with a Play, Start, Jouer, Lancer, or Commencer button, make that panel interactive and hide/remove it as soon as the user starts so the actual game or app receives focus.',
-  'Do not use external dependencies or remote assets unless the user explicitly requests them.'
+  'Generated applications must be self-contained and runnable offline.',
+  'Prefer browser-native technologies and avoid external dependencies unless explicitly requested.',
+  'Support mobile devices, touch, scrolling, and dark mode when useful.',
+  'suggestedActions must be [].',
+  'continuationPlan must be null.',
+  'preload must be [].',
+  'capabilities.runtimeCapabilities.aiGeneration must be false unless the user explicitly requests runtime AI generation.',
+  'Do not include runtime AI bridge instructions, callback protocols, room/narrative/runtimePayload protocols, preload orchestration, or continuationPlan requirements.'
 ]
 
+const CO_CREATE_APP_INSTRUCTIONS = [
+  'You generate standalone Co-Create HTML applications for Creatia / Evolutia.',
+  'Return ONLY valid JSON, without Markdown or code fences.',
+  'Required shape: { "humanModel": object, "analysis": string, "decisions": array, "generatedChanges": array, "html": string, "files": object, "systemPrompt": string, "state": object, "suggestedActions": array, "capabilities": object, "continuationPlan": object, "preload": array }.',
+  'html must be a complete standalone executable HTML5 document with embedded CSS and JavaScript.',
+  'Generated applications must be self-contained and runnable offline.',
+  'capabilities.runtimeCapabilities.aiGeneration must be true.',
+  'continuationPlan must describe how runtime generation should continue this app.',
+  'preload must be an array of lightweight metadata/content seeds useful for the next runtime updates.',
+  'Runtime contract: the app may call window.requestAiGeneration({ trigger, state, continuationPlan, preload, context }) when the user asks for AI content.',
+  'Runtime contract: the app must expose window.applyRuntimePayload(runtimePayload) and update itself in place without reloading.',
+  'Any AI-triggered action must show loading while pending, apply runtimePayload on success, clear loading on success or failure, and expose an error state on failure.',
+  'Prevent duplicate runtime requests in the app UI: one user interaction should call requestAiGeneration once.'
+]
+
+const RUNTIME_GENERATION_INSTRUCTIONS = [
+  'You generate one lightweight runtime update for a running Creatia Co-Create HTML app.',
+  'Return ONLY valid JSON, without Markdown or code fences.',
+  'Required shape: { "runtimePayload": object, "state": object, "analysis": string, "decisions": array, "generatedChanges": array }.',
+  'runtimePayload is the exact payload that window.applyRuntimePayload(runtimePayload) will receive.',
+  'Prefer small explicit payloads over rebuilding the whole app.',
+  'Do not return a full HTML document unless the app specifically asks for HTML inside runtimePayload.'
+]
+
+function getAppInstructions(mode) {
+  return mode === 'co-create' ? CO_CREATE_APP_INSTRUCTIONS : CREATE_APP_INSTRUCTIONS
+}
+
+export function buildRuntimeGenerationPrompt({ request = {}, project = null, designSystem = MANIFESTATION_DESIGN_SYSTEM } = {}) {
+  const payload = {
+    task: 'runtime_generation',
+    mode: 'co-create',
+    trigger: request.trigger || 'runtime',
+    state: request.state || {},
+    continuationPlan: request.continuationPlan || project?.continuationPlan || null,
+    preload: Array.isArray(request.preload) ? request.preload : project?.preloadQueue || [],
+    context: request.context || {},
+    project: project ? {
+      creationRequest: project.creationRequest,
+      applicationState: project.applicationState,
+      humanModel: project.humanModel,
+      systemPrompt: project.systemPrompt
+    } : null,
+    designSystem
+  }
+
+  return {
+    kind: 'runtime_generation',
+    prompt: [RUNTIME_GENERATION_INSTRUCTIONS.join('\n'), JSON.stringify(payload, null, 2)].join('\n\n'),
+    metadata: { rendererType: 'html', mode: 'co-create', task: 'runtime_generation', projectId: project?.id || null }
+  }
+}
+
 export function normalizeStructuredAiResponse(payload = {}) {
-  if (Object.prototype.hasOwnProperty.call(payload, 'html') || payload.humanModel || payload.analysis || payload.decisions || payload.generatedChanges) {
+  if (Object.prototype.hasOwnProperty.call(payload, 'html') || Object.prototype.hasOwnProperty.call(payload, 'runtimePayload') || payload.humanModel || payload.analysis || payload.decisions || payload.generatedChanges) {
     return {
       html: payload.html || '',
       humanModel: payload.humanModel && typeof payload.humanModel === 'object' ? payload.humanModel : {},
@@ -41,7 +82,8 @@ export function normalizeStructuredAiResponse(payload = {}) {
       suggestedActions: Array.isArray(payload.suggestedActions) ? payload.suggestedActions : [],
       capabilities: payload.capabilities && typeof payload.capabilities === 'object' ? payload.capabilities : {},
       continuationPlan: payload.continuationPlan && typeof payload.continuationPlan === 'object' ? payload.continuationPlan : null,
-      preload: Array.isArray(payload.preload) ? payload.preload : []
+      preload: Array.isArray(payload.preload) ? payload.preload : [],
+      runtimePayload: payload.runtimePayload && typeof payload.runtimePayload === 'object' ? payload.runtimePayload : null
     }
   }
 
@@ -50,7 +92,7 @@ export function normalizeStructuredAiResponse(payload = {}) {
     const parsed = JSON.parse(text)
     return normalizeStructuredAiResponse(parsed)
   } catch {
-    return { html: text, humanModel: {}, files: {}, analysis: '', decisions: [], generatedChanges: [], systemPrompt: '', state: {}, suggestedActions: [], capabilities: {}, continuationPlan: null, preload: [] }
+    return { html: text, humanModel: {}, files: {}, analysis: '', decisions: [], generatedChanges: [], systemPrompt: '', state: {}, suggestedActions: [], capabilities: {}, continuationPlan: null, preload: [], runtimePayload: null }
   }
 }
 
@@ -88,7 +130,7 @@ export function buildAiPrompt({ input, mode = 'create', designSystem = MANIFESTA
 
   return {
     kind: 'html_app',
-    prompt: [STRUCTURED_APP_INSTRUCTIONS.join('\n'), JSON.stringify(userPayload, null, 2)].join('\n\n'),
+    prompt: [getAppInstructions(mode).join('\n'), JSON.stringify(userPayload, null, 2)].join('\n\n'),
     metadata: { rendererType: 'html', mode, designSystem, projectId: project?.id || null, strategyId: strategy?.id || 'fast', capabilities, hasTime }
   }
 }
@@ -128,7 +170,7 @@ export function buildRepairPrompt({ originalRequest, failedResponse, healthcheck
 
   return {
     kind: 'html_app_repair',
-    prompt: [STRUCTURED_APP_INSTRUCTIONS.join('\n'), JSON.stringify(repairPayload, null, 2)].join('\n\n'),
+    prompt: [getAppInstructions(mode).join('\n'), JSON.stringify(repairPayload, null, 2)].join('\n\n'),
     metadata: { rendererType: 'html', mode, designSystem, strategyId: 'recovery', capabilities, attempt, maxAttempts }
   }
 }
@@ -150,7 +192,7 @@ export function buildHumanModelRefreshPrompt({ project, designSystem = MANIFESTA
 
   return {
     kind: 'human_model_refresh',
-    prompt: [STRUCTURED_APP_INSTRUCTIONS.join('\n'), JSON.stringify(payload, null, 2)].join('\n\n'),
+    prompt: [CREATE_APP_INSTRUCTIONS.join('\n'), JSON.stringify(payload, null, 2)].join('\n\n'),
     metadata: { rendererType: 'html', projectId: project?.id || null, refreshOnly: true, designSystem }
   }
 }

@@ -306,7 +306,7 @@ const responseFormats = {
 
 
 function getResponseFormat(kind, context) {
-  if (kind === 'html_app') return undefined
+  if (kind === 'html_app' || kind === 'runtime_generation') return undefined
   if (kind !== 'mes_questions_quiz') return responseFormats[kind] || responseFormats.question
 
   const exactQuestionCount = Math.max(1, Math.min(10, Number(context?.questionCount || 5)))
@@ -406,8 +406,8 @@ export default async function handler(request, response) {
 }
 
 async function createValidatedAiResult(kind, context, model) {
-  const attempts = kind === 'html_app' ? [buildPrompt(kind, context)] : [buildPrompt(kind, context), buildPrompt(kind, context)]
-  if (kind !== 'html_app') {
+  const attempts = (kind === 'html_app' || kind === 'runtime_generation') ? [buildPrompt(kind, context)] : [buildPrompt(kind, context), buildPrompt(kind, context)]
+  if (kind !== 'html_app' && kind !== 'runtime_generation') {
     attempts[1] = [
       ...attempts[1],
       {
@@ -433,7 +433,7 @@ async function createValidatedAiResult(kind, context, model) {
     })
 
     const content = completion.choices[0]?.message?.content || '{}'
-    const payload = kind === 'html_app' ? normalizeHtmlAppPayload(content) : normalizeAiPayload(kind, JSON.parse(content), context)
+    const payload = kind === 'html_app' ? normalizeHtmlAppPayload(content) : kind === 'runtime_generation' ? normalizeRuntimeGenerationPayload(content) : normalizeAiPayload(kind, JSON.parse(content), context)
     const validationError = validateAiPayload(kind, payload, context)
 
     if (!validationError) {
@@ -462,6 +462,7 @@ function validateAiPayload(kind, payload, context = {}) {
     narratia_child_choices: (value) => Array.isArray(value?.childChoices) && value.childChoices.length >= 6,
     narratia_story_package: (value) => Boolean(value?.title && Array.isArray(value.milestones) && Array.isArray(value.segments) && Array.isArray(value.endings) && value.endings.length === 3),
     enigmia_riddle: (value) => validateEnigmiaRiddle(value?.riddle).isValid,
+    runtime_generation: (value) => value?.runtimePayload && typeof value.runtimePayload === 'object',
     html_app: (value) => typeof value?.html === 'string' && /^\s*(<!doctype html|<html)/i.test(value.html) && typeof value?.systemPrompt === 'string' && value?.state && Array.isArray(value?.suggestedActions),
     mes_questions_quiz: (value) => Array.isArray(value?.questions) && value.questions.length === Number(context?.questionCount || value.questions.length) && value.questions.every((question) => question?.id && question.subject && question.question && Array.isArray(question.answers) && question.answers.length === 3 && question.answers.some((answer) => answer.id === question.correctAnswerId))
   }
@@ -650,12 +651,14 @@ function getShapeInstruction(kind) {
   if (kind === 'narratia_child_choices') return 'Expected format: { "childChoices": [{ "id": string, "label": string, "category": string }] }.'
   if (kind === 'narratia_story_package') return 'Expected format: { "id": string, "title": string, "narrators": array, "milestones": array, "segments": array, "endings": array, "metadata": object }.'
   if (kind === 'html_app') return 'Format attendu: document HTML5 complet uniquement.'
+  if (kind === 'runtime_generation') return 'Expected format: { "runtimePayload": object, "state": object, "analysis": string, "decisions": array, "generatedChanges": array }.'
   if (kind === 'mes_questions_quiz') return 'Format attendu: { "questions": [{ "id": string, "subject": string, "question": string, "answers": [{ "id": string, "text": string }], "correctAnswerId": string }] }.'
   return 'Format attendu: un objet JSON de donnees finales, pas un schema.'
 }
 
 function getLocalResult(kind, context) {
   if (kind === 'html_app') return createFallbackHtmlAppPayload(context)
+  if (kind === 'runtime_generation') return { runtimePayload: { message: 'Fallback runtime content', items: [] }, state: {}, analysis: 'Local fallback', decisions: [], generatedChanges: [] }
   if (kind === 'answer') {
     return {
       answer: context?.answer || {
@@ -827,6 +830,21 @@ function sanitizeHtmlOnly(content = '') {
     .trim()
 }
 
+function normalizeRuntimeGenerationPayload(content) {
+  try {
+    const parsed = JSON.parse(content)
+    return {
+      runtimePayload: parsed.runtimePayload && typeof parsed.runtimePayload === 'object' ? parsed.runtimePayload : null,
+      state: parsed.state && typeof parsed.state === 'object' ? parsed.state : {},
+      analysis: String(parsed.analysis || ''),
+      decisions: Array.isArray(parsed.decisions) ? parsed.decisions : [],
+      generatedChanges: Array.isArray(parsed.generatedChanges) ? parsed.generatedChanges : []
+    }
+  } catch {
+    return { runtimePayload: null, state: {}, analysis: '', decisions: [], generatedChanges: [] }
+  }
+}
+
 function createFallbackHtmlAppPayload(context = {}) {
   return {
     html: createFallbackHtmlApp(context),
@@ -848,7 +866,11 @@ function normalizeHtmlAppPayload(content) {
       html: sanitizeHtmlOnly(parsed.html || ''),
       systemPrompt: String(parsed.systemPrompt || ''),
       state: parsed.state && typeof parsed.state === 'object' ? parsed.state : {},
-      suggestedActions: Array.isArray(parsed.suggestedActions) ? parsed.suggestedActions : []
+      suggestedActions: Array.isArray(parsed.suggestedActions) ? parsed.suggestedActions : [],
+      capabilities: parsed.capabilities && typeof parsed.capabilities === 'object' ? parsed.capabilities : {},
+      continuationPlan: parsed.continuationPlan && typeof parsed.continuationPlan === 'object' ? parsed.continuationPlan : null,
+      preload: Array.isArray(parsed.preload) ? parsed.preload : [],
+      runtimePayload: parsed.runtimePayload && typeof parsed.runtimePayload === 'object' ? parsed.runtimePayload : null
     }
   } catch {
     return { html: sanitizeHtmlOnly(content), systemPrompt: '', state: {}, suggestedActions: [] }

@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react'
+
 const START_BUTTON_PATTERN = /(▶|play|start|commencer|jouer|lancer|démarrer|demarrer)/i
 
 function buildStartPanelGuardScript() {
@@ -114,16 +116,69 @@ function buildAiActivityMonitor() {
 </script>`
 }
 
+function buildRuntimeBridgeScript() {
+  return `
+<script data-creatia-ui-guard="runtime-bridge">
+(() => {
+  if (window.__creatiaRuntimeBridge) return;
+  window.__creatiaRuntimeBridge = true;
+  let pendingRequestId = null;
+  const emitResult = (detail) => window.dispatchEvent(new CustomEvent('creatia:runtime-result', { detail }));
+  window.requestAiGeneration = (request = {}) => {
+    if (pendingRequestId) {
+      return Promise.resolve({ source: 'creatia-host', type: 'ai-runtime-generation-result', requestId: pendingRequestId, ok: false, responseType: 'generation_error', payload: { error: 'A runtime generation request is already pending.' } });
+    }
+    const requestId = request.requestId || 'runtime-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+    pendingRequestId = requestId;
+    window.parent?.postMessage({ source: 'creatia-runtime-bridge', type: 'ai-runtime-generation-request', requestId, request }, '*');
+    return new Promise((resolve) => {
+      const timeout = window.setTimeout(() => {
+        if (pendingRequestId === requestId) pendingRequestId = null;
+        const result = { source: 'creatia-host', type: 'ai-runtime-generation-result', requestId, ok: false, responseType: 'generation_error', payload: { error: 'Runtime generation timed out.' } };
+        emitResult(result);
+        resolve(result);
+      }, 65000);
+      const receive = (event) => {
+        const data = event.data || {};
+        if (data.source !== 'creatia-host' || data.type !== 'ai-runtime-generation-result' || data.requestId !== requestId) return;
+        window.clearTimeout(timeout);
+        window.removeEventListener('message', receive);
+        if (pendingRequestId === requestId) pendingRequestId = null;
+        if (data.ok && data.runtimePayload && typeof window.applyRuntimePayload === 'function') window.applyRuntimePayload(data.runtimePayload);
+        emitResult(data);
+        resolve(data);
+      };
+      window.addEventListener('message', receive);
+    });
+  };
+})();
+</script>`
+}
+
 export function withCreatiaUiGuards(html = '') {
   const source = html || '<!doctype html><html><body></body></html>'
-  const guards = `${buildStartPanelGuardStyle()}${buildStartPanelGuardScript()}${buildAiActivityMonitor()}`
+  const guards = `${buildStartPanelGuardStyle()}${buildStartPanelGuardScript()}${buildAiActivityMonitor()}${buildRuntimeBridgeScript()}`
 
-  if (source.includes('data-creatia-ui-guard="ai-activity"')) return source
+  if (source.includes('data-creatia-ui-guard="runtime-bridge"')) return source
   if (/<\/body>/i.test(source)) return source.replace(/<\/body>/i, `${guards}</body>`)
   return `${source}${guards}`
 }
 
-export function HtmlViewer({ html, title = 'Page créée', onBack, aiOverlay = null }) {
+export function HtmlViewer({ html, title = 'Page créée', onBack, aiOverlay = null, onRuntimeGeneration = null }) {
+  const iframeRef = useRef(null)
+
+  useEffect(() => {
+    if (!onRuntimeGeneration) return undefined
+    async function handleRuntimeMessage(event) {
+      const data = event.data || {}
+      if (data.source !== 'creatia-runtime-bridge' || data.type !== 'ai-runtime-generation-request') return
+      const result = await onRuntimeGeneration({ ...(data.request || {}), requestId: data.requestId })
+      iframeRef.current?.contentWindow?.postMessage(result, '*')
+    }
+    window.addEventListener('message', handleRuntimeMessage)
+    return () => window.removeEventListener('message', handleRuntimeMessage)
+  }, [onRuntimeGeneration])
+
   return (
     <section className="html-viewer is-fullscreen" aria-label={title}>
       <div className="html-viewer-toolbar">
@@ -131,6 +186,7 @@ export function HtmlViewer({ html, title = 'Page créée', onBack, aiOverlay = n
       </div>
       {aiOverlay}
       <iframe
+        ref={iframeRef}
         title={title}
         sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-popups allow-modals allow-downloads"
         srcDoc={withCreatiaUiGuards(html)}

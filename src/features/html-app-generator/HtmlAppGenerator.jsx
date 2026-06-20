@@ -157,7 +157,7 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
   }, [onMenuData, aiActivity.log, controller.pipeline, controller.healthcheck, project?.generationHistory, project?.evolutionHistory, isBusy])
 
   if (html && isViewingHtml) {
-    return <HtmlViewer html={html} title={project?.creationRequest || 'Application créée'} onBack={() => setIsViewingHtml(false)} aiOverlay={<CreatiaAiOverlay activity={aiActivity} />} />
+    return <HtmlViewer html={html} title={project?.creationRequest || 'Application créée'} onBack={() => setIsViewingHtml(false)} aiOverlay={<CreatiaAiOverlay activity={aiActivity} />} onRuntimeGeneration={mode === 'co-create' ? controller.requestRuntimeGeneration : null} />
   }
 
   return (
