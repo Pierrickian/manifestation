@@ -19,7 +19,16 @@ function deriveRuntimePayload(finalStructured = {}) {
   }
   const choices = firstArray(state.choices, state.items).map(normalizeChoice)
   const statePatch = state.statePatch && typeof state.statePatch === 'object' ? state.statePatch : {}
+  const page = state.page && typeof state.page === 'object' ? state.page : finalStructured?.page && typeof finalStructured.page === 'object' ? finalStructured.page : null
+  const screen = state.screen && typeof state.screen === 'object' ? state.screen : finalStructured?.screen && typeof finalStructured.screen === 'object' ? finalStructured.screen : null
+  const route = state.route || finalStructured?.route || state.currentRoute || finalStructured?.currentRoute || ''
   return {
+    ...(page ? { page } : {}),
+    ...(screen ? { screen } : {}),
+    ...(route ? { route } : {}),
+    ...(state.title || finalStructured?.title ? { title: state.title || finalStructured.title } : {}),
+    ...(state.text || state.summary || state.description || finalStructured?.text || finalStructured?.summary || finalStructured?.description ? { text: state.text || state.summary || state.description || finalStructured.text || finalStructured.summary || finalStructured.description } : {}),
+    ...(state.htmlFragment || finalStructured?.htmlFragment ? { htmlFragment: state.htmlFragment || finalStructured.htmlFragment } : {}),
     choices,
     items: firstArray(state.items),
     statePatch: { ...statePatch, loading: false, isLoading: false, pending: false }

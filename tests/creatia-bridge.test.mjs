@@ -21,10 +21,14 @@ assert.match(coCreateInstructions, /window\.requestAiGeneration/)
 assert.match(coCreateInstructions, /window\.applyRuntimePayload/)
 assert.match(coCreateInstructions, /must never define, stub, override, or shadow window\.requestAiGeneration/)
 assert.match(coCreateInstructions, /Creatia host injects that bridge/)
+assert.match(coCreateInstructions, /await or handle the Promise returned by window\.requestAiGeneration/)
+assert.match(coCreateInstructions, /status "unavailable", "blocked", or "timeout"/)
+assert.match(coCreateInstructions, /creatia-runtime-ready/)
 assert.match(coCreateInstructions, /Do not generate future prompts/)
 assert.match(coCreateInstructions, /Do not generate future prompts, future content/)
 
 assert.match(runtimeInstructions, /Return \{ "kind": "runtime_generation", "runtimePayload": object/)
+assert.match(runtimeInstructions, /page\/screen\/route\/title\/text\/htmlFragment/)
 assert.match(promptBuilder, /explicitKind === 'runtime_generation'/)
 assert.match(promptBuilder, /runtimePayload: payload\.runtimePayload/)
 
@@ -34,6 +38,8 @@ assert.match(controller, /runtimeGenerationPendingRef\.current/)
 assert.match(controller, /A runtime generation request is already pending/)
 
 assert.match(generator, /runtimeResult\?\.runtimePayload \|\| deriveRuntimePayload/)
+assert.match(generator, /state\.page/)
+assert.match(generator, /htmlFragment/)
 assert.match(generator, /ok: false, responseType: 'generation_error'/)
 assert.match(generator, /Runtime generation did not return a usable runtimePayload/)
 
@@ -45,5 +51,8 @@ assert.match(viewer, /runtime\\\\s\*:\\\\s\*\(indisponible\|attendu\|en attente\
 assert.match(viewer, /Runtime: connecté/)
 assert.match(viewer, /source\.includes\('data-creatia-ui-guard="start-panel"'\)/)
 assert.match(viewer, /if \(!guards\) return source/)
+assert.match(viewer, /runtimePayload\.page/)
+assert.match(viewer, /deliverRuntimeError/)
+assert.match(viewer, /Runtime generation response timed out\./)
 
 console.log('Creatia bridge contract tests passed')

@@ -23,6 +23,8 @@ const CO_CREATE_APP_INSTRUCTIONS = [
   ...BASE_APP_INSTRUCTIONS,
   'Co-Create mode requirements: kind must be "html_app", html must be executable, continuationPlan must exist, preload must contain at least one trigger descriptor, and runtimeCapabilities.aiGeneration must be true.',
   'Generated Co-Create apps must call window.requestAiGeneration({ trigger, state, continuationPlan, preload, context }) when they need live AI content, but must never define, stub, override, or shadow window.requestAiGeneration; the Creatia host injects that bridge.',
+  'Generated Co-Create apps must await or handle the Promise returned by window.requestAiGeneration and clear loading states when it returns status "unavailable", "blocked", or "timeout".',
+  'Generated Co-Create apps should listen for the "creatia-runtime-ready" event and re-render their AI/runtime availability indicator when it fires.',
   'Generated Co-Create apps must implement window.applyRuntimePayload(runtimePayload) to receive runtimePayload, clear loading states, and update themselves without reloading.',
   'continuationPlan must be short: one or two sentences only, for example { "runtimeRole": "Generate new inspiration cards when AI+ is pressed." }.',
   'preload must contain only trigger descriptors and context requirements, for example { "trigger": "ai_plus", "event": "renew_requested", "sendContext": ["originalRequest", "applicationState", "userHistory"] }.',
@@ -34,8 +36,8 @@ const RUNTIME_GENERATION_INSTRUCTIONS = [
   'You are the runtime AI for a Creatia / Evolutia Co-Create app.',
   'Return ONLY valid JSON, without Markdown or code fences.',
   'Return { "kind": "runtime_generation", "runtimePayload": object, "state": object, "continuationPlan": object|null, "preload": array }.',
-  'Generate only the runtimePayload needed for the current trigger. Do not rebuild the full HTML app.',
-  'runtimePayload must be directly consumable by window.applyRuntimePayload(runtimePayload). Include choices/items/statePatch when relevant.'
+  'Generate only the runtimePayload needed for the current trigger. Do not rebuild the full HTML app; for a page change, return page/screen/route/title/text/htmlFragment fields inside runtimePayload.',
+  'runtimePayload must be directly consumable by window.applyRuntimePayload(runtimePayload). Include page, choices, items, statePatch, route, screen, title, text, or htmlFragment when relevant.'
 ]
 
 function looksLikeHtmlDocument(value = '') {
@@ -192,7 +194,7 @@ export function buildRuntimeGenerationPrompt({ runtimeRequest = {}, project = nu
     continuationPlan: runtimeRequest.continuationPlan || project?.continuationPlan || null,
     preload: runtimeRequest.preload || project?.preloadQueue || [],
     context: runtimeRequest.context || {},
-    instruction: 'Generate only runtimePayload for this trigger. Do not return or rewrite HTML.'
+    instruction: 'Generate only runtimePayload for this trigger. Do not return or rewrite the full HTML app. To move to another page, return runtimePayload.page, screen, route, title/text, or htmlFragment.'
   }
 
   return {

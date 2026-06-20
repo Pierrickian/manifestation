@@ -545,9 +545,11 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       return false;
     }
     const room = runtimePayload.room && typeof runtimePayload.room === 'object' ? runtimePayload.room : null;
+    const page = runtimePayload.page && typeof runtimePayload.page === 'object' ? runtimePayload.page : null;
+    const screen = runtimePayload.screen && typeof runtimePayload.screen === 'object' ? runtimePayload.screen : null;
     const statePatch = runtimePayload.statePatch && typeof runtimePayload.statePatch === 'object' ? runtimePayload.statePatch : {};
-    const narrative = runtimePayload.narrative || room?.narrative || room?.description || statePatch.narrative || statePatch.story || '';
-    const choices = normalizeRuntimeChoices(runtimePayload.choices || room?.choices || statePatch.choices || []);
+    const narrative = runtimePayload.narrative || room?.narrative || room?.description || page?.text || page?.summary || page?.description || screen?.text || screen?.summary || screen?.description || runtimePayload.text || runtimePayload.summary || runtimePayload.description || statePatch.narrative || statePatch.story || '';
+    const choices = normalizeRuntimeChoices(runtimePayload.choices || room?.choices || page?.choices || screen?.choices || statePatch.choices || []);
     mergeRuntimeStatePatch(statePatch);
     if (room) {
       const rooms = discoverRooms();
@@ -567,13 +569,19 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       }
     }
     const host = getRuntimeContentHost();
-    const title = room?.title || room?.name || runtimePayload.title || statePatch.title || 'AI generated continuation';
-    const domainBlocks = ['lesson', 'exercise', 'simulationStep']
+    const title = room?.title || room?.name || page?.title || page?.name || screen?.title || screen?.name || runtimePayload.title || statePatch.title || 'AI generated continuation';
+    const chips = Array.isArray(runtimePayload.chips) ? runtimePayload.chips : Array.isArray(page?.chips) ? page.chips : Array.isArray(screen?.chips) ? screen.chips : [];
+    const bullets = Array.isArray(runtimePayload.bullets) ? runtimePayload.bullets : Array.isArray(page?.bullets) ? page.bullets : Array.isArray(screen?.bullets) ? screen.bullets : [];
+    const htmlFragment = runtimePayload.htmlFragment || page?.htmlFragment || screen?.htmlFragment || '';
+    const domainBlocks = ['lesson', 'exercise', 'simulationStep', 'page', 'screen', 'route']
       .filter((key) => runtimePayload[key])
       .map((key) => '<details><summary>' + escapeHtml(key) + '</summary><pre>' + escapeHtml(payloadPreview(runtimePayload[key])) + '</pre></details>')
       .join('');
     host.innerHTML = '<h2>' + escapeHtml(title) + '</h2>'
       + (narrative ? '<p>' + escapeHtml(narrative) + '</p>' : '')
+      + (htmlFragment ? '<div>' + htmlFragment + '</div>' : '')
+      + (chips.length ? '<div>' + chips.map((chip) => '<span style="display:inline-block;margin:3px;padding:4px 8px;border-radius:999px;background:rgba(255,255,255,.12)">' + escapeHtml(chip) + '</span>').join('') + '</div>' : '')
+      + (bullets.length ? '<ul>' + bullets.map((bullet) => '<li>' + escapeHtml(bullet) + '</li>').join('') + '</ul>' : '')
       + '<div data-creatia-runtime-choices></div>'
       + domainBlocks
       + '<details><summary>Runtime payload</summary><pre>' + escapeHtml(payloadPreview(runtimePayload)) + '</pre></details>';
@@ -602,7 +610,7 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     if (Array.isArray(runtimePayload.preload) && runtimePayload.preload.length) {
       debugState.budget.preloadsGenerated += runtimePayload.preload.length;
     }
-    addEvent('runtime_payload_applied', { hasRoom: Boolean(room), hasNarrative: Boolean(narrative), choices: choices.length, statePatchKeys: Object.keys(statePatch) });
+    addEvent('runtime_payload_applied', { hasRoom: Boolean(room), hasPage: Boolean(page), hasScreen: Boolean(screen), hasNarrative: Boolean(narrative), choices: choices.length, statePatchKeys: Object.keys(statePatch) });
     try {
       wrapRenderFunction();
       if (typeof window.render === 'function') window.render();
@@ -703,14 +711,46 @@ function buildAiActivityMonitor(runtimeContext = {}) {
   function hasConsumableRuntimePayload(runtimePayload) {
     if (!runtimePayload || typeof runtimePayload !== 'object') return false;
     const room = runtimePayload.room && typeof runtimePayload.room === 'object' ? runtimePayload.room : null;
+    const page = runtimePayload.page && typeof runtimePayload.page === 'object' ? runtimePayload.page : null;
+    const screen = runtimePayload.screen && typeof runtimePayload.screen === 'object' ? runtimePayload.screen : null;
     const statePatch = runtimePayload.statePatch && typeof runtimePayload.statePatch === 'object' ? runtimePayload.statePatch : null;
     return Boolean(
       runtimePayload.narrative
+      || runtimePayload.title
+      || runtimePayload.text
+      || runtimePayload.summary
+      || runtimePayload.description
+      || runtimePayload.htmlFragment
+      || runtimePayload.route
       || (Array.isArray(runtimePayload.choices) && runtimePayload.choices.length)
       || (Array.isArray(runtimePayload.nextChoices) && runtimePayload.nextChoices.length)
       || (room && (room.narrative || room.description || room.choices?.length || room.nextChoices?.length))
+      || (page && (page.title || page.text || page.summary || page.description || page.htmlFragment || page.choices?.length || page.bullets?.length || page.chips?.length))
+      || (screen && (screen.title || screen.text || screen.summary || screen.description || screen.htmlFragment || screen.choices?.length || screen.bullets?.length || screen.chips?.length))
       || (statePatch && Object.keys(statePatch).length)
     );
+  }
+  function buildRuntimeErrorPayload(error, status = 'error') {
+    return {
+      kind: 'runtime_error',
+      status: 'error',
+      error,
+      statePatch: {
+        loading: false,
+        isLoading: false,
+        pending: false,
+        busy: false,
+        aiStatus: 'error',
+        runtimeStatus: status,
+        error
+      }
+    };
+  }
+  function deliverRuntimeError(error, status = 'error') {
+    const payload = buildRuntimeErrorPayload(error, status);
+    if (typeof window.applyRuntimePayload === 'function') window.applyRuntimePayload(payload);
+    if (typeof window.onAiResponse === 'function') window.onAiResponse({ ok: false, responseType: 'generation_error', payload });
+    return payload;
   }
   function clearRuntimeLoadingState(triggerElement) {
     const candidates = [
@@ -766,7 +806,7 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       || typeof window.applyGeneratedRoom === 'function';
     if (!event.data.ok) {
       clearRuntimeLoadingState(triggerElement);
-      const errorPayload = { kind: 'runtime_error', error: event.data.payload?.error || 'Runtime generation failed.', statePatch: { loading: false, isLoading: false, pending: false, error: event.data.payload?.error || 'Runtime generation failed.' } };
+      const errorPayload = buildRuntimeErrorPayload(event.data.payload?.error || 'Runtime generation failed.', 'failed');
       if (hasRuntimePayloadConsumer) window.applyRuntimePayload(errorPayload);
       renderDiagnostics();
       return;
@@ -792,10 +832,12 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       addDecision('Blocked because: Provider not connected.', { request });
       addError('requestAiGeneration', diagnostics.lastAiError);
       logStatus('Unavailable', 'provider_missing_before_request');
+      deliverRuntimeError(diagnostics.lastAiError, 'unavailable');
       return { status: 'unavailable', error: diagnostics.lastAiError };
     }
     if (diagnostics.pendingRequests > 0) {
       addDecision('Blocked because: Request already in progress.', { pendingRequests: diagnostics.pendingRequests });
+      deliverRuntimeError('A runtime generation request is already pending.', 'blocked');
       return { status: 'blocked', error: 'A runtime generation request is already pending.' };
     }
     const runtimeRequest = {
@@ -853,6 +895,7 @@ function buildAiActivityMonitor(runtimeContext = {}) {
         requestEntry.status = 'Failed';
         addDecision('Blocked because: runtime generation response timed out.', { requestId: runtimeRequest.requestId });
         clearRuntimeLoadingState(triggerElement);
+        deliverRuntimeError('Runtime generation response timed out.', 'timeout');
         end('Runtime AI generation timed out · ' + runtimeRequest.trigger, false);
         resolve({ status: 'timeout', request: runtimeRequest });
       }, 45000);
