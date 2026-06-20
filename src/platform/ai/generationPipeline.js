@@ -132,7 +132,7 @@ function consumesPreload(html = '') {
 function consumesRuntimePayload(html = '') {
   const text = String(html)
   const hasStandardConsumer = /applyRuntimePayload|onAiResponse/i.test(text)
-  const consumesCoreFields = /runtimePayload\s*\.\s*(room|narrative|choices|statePatch)|runtimePayload\s*\[\s*['"](?:room|narrative|choices|statePatch)['"]\s*\]/i.test(text)
+  const consumesCoreFields = /runtimePayload\s*\.\s*(room|narrative|choices|statePatch|page|screen|route|title|text|summary|items|htmlFragment)|runtimePayload\s*\[\s*['"](?:room|narrative|choices|statePatch|page|screen|route|title|text|summary|items|htmlFragment)['"]\s*\]/i.test(text)
   return hasStandardConsumer && consumesCoreFields
 }
 
@@ -315,7 +315,7 @@ export function runGeneratedAppHealthcheck(response = {}, strategy = {}) {
       id: 'cocreate_runtime_payload_consumer_exists',
       ok: consumesRuntimePayload(html),
       message: 'Runtime payload consumer detected.',
-      expected: 'The generated application must implement applyRuntimePayload/onAiResponse and consume runtimePayload.room, runtimePayload.narrative, runtimePayload.choices, or runtimePayload.statePatch without reloading.',
+      expected: 'The generated application must implement applyRuntimePayload/onAiResponse and consume runtimePayload fields such as page, title, summary, items, choices, htmlFragment, or statePatch without reloading.',
       actual: 'No standard runtimePayload consumer was detected for direct in-app continuation.',
       repairConfidence: 'high',
       repairable: true,

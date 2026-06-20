@@ -59,6 +59,82 @@ function exposesInternalPromptOrJson(value = '') {
   return /Return ONLY valid JSON|hidden application architect|requiredRuntimeCapabilities|detectedCapabilities|healthcheckReport|failedChecks|STRUCTURED_APP_INSTRUCTIONS|<pre[^>]*>\s*[{[]|<code[^>]*>\s*[{[]|&quot;kind&quot;\s*:\s*&quot;html_app|\"kind\"\s*:\s*\"html_app\"/i.test(text)
 }
 
+function extractBalancedLiteral(source = '', startIndex = 0) {
+  const text = String(source || '')
+  const opening = text[startIndex]
+  const closing = opening === '{' ? '}' : opening === '[' ? ']' : ''
+  if (!closing) return ''
+
+  let depth = 0
+  let quote = ''
+  let escaped = false
+
+  for (let index = startIndex; index < text.length; index += 1) {
+    const char = text[index]
+    if (quote) {
+      if (escaped) {
+        escaped = false
+      } else if (char === '\\') {
+        escaped = true
+      } else if (char === quote) {
+        quote = ''
+      }
+      continue
+    }
+
+    if (char === '"' || char === "'") {
+      quote = char
+      continue
+    }
+
+    if (char === opening) depth += 1
+    if (char === closing) depth -= 1
+    if (depth === 0) return text.slice(startIndex, index + 1)
+  }
+
+  return ''
+}
+
+function parseLooseJsonLiteral(literal = '') {
+  if (!literal) return null
+
+  try {
+    return JSON.parse(literal)
+  } catch {
+    // Continue with a conservative JSON-ish normalization for common AI-generated
+    // inline JS object literals such as const continuationPlan = { runtimeRole: '...' }.
+  }
+
+  try {
+    const normalized = literal
+      .replace(/([{,]\s*)([A-Za-z_$][\w$]*)\s*:/g, '$1"$2":')
+      .replace(/'([^'\\]*(?:\\.[^'\\]*)*)'/g, (_, value) => JSON.stringify(value.replace(/\\'/g, "'")))
+      .replace(/,\s*([}\]])/g, '$1')
+    return JSON.parse(normalized)
+  } catch {
+    return null
+  }
+}
+
+function extractDeclaredLiteral(html = '', name = '') {
+  const declaration = new RegExp(`(?:const|let|var)\\s+${name}\\s*=\\s*`, 'i').exec(String(html || ''))
+  if (!declaration) return null
+
+  const startIndex = declaration.index + declaration[0].length
+  const literal = extractBalancedLiteral(html, startIndex)
+  return parseLooseJsonLiteral(literal)
+}
+
+function deriveCoCreateMetadataFromHtml(html = '') {
+  const continuationPlan = extractDeclaredLiteral(html, 'continuationPlan')
+  const preload = extractDeclaredLiteral(html, 'preload')
+
+  return {
+    continuationPlan: continuationPlan && typeof continuationPlan === 'object' && !Array.isArray(continuationPlan) ? continuationPlan : null,
+    preload: Array.isArray(preload) ? preload : []
+  }
+}
+
 export function normalizeStructuredAiResponse(payload = {}) {
   const explicitKind = typeof payload.kind === 'string' ? payload.kind : ''
   if (explicitKind === 'capability_request') {
@@ -104,6 +180,7 @@ export function normalizeStructuredAiResponse(payload = {}) {
     if (html && exposesInternalPromptOrJson(html)) {
       return { kind: 'generation_error', error: 'AI response html field exposed internal prompt/schema JSON instead of the application UI.' }
     }
+    const derivedMetadata = deriveCoCreateMetadataFromHtml(html)
     return {
       kind: 'html_app',
       html,
@@ -117,8 +194,8 @@ export function normalizeStructuredAiResponse(payload = {}) {
       suggestedActions: Array.isArray(payload.suggestedActions) ? payload.suggestedActions : [],
       capabilities: payload.capabilities && typeof payload.capabilities === 'object' ? payload.capabilities : {},
       runtimeCapabilities: payload.runtimeCapabilities && typeof payload.runtimeCapabilities === 'object' ? payload.runtimeCapabilities : payload.capabilities?.runtimeCapabilities || {},
-      continuationPlan: payload.continuationPlan && typeof payload.continuationPlan === 'object' ? payload.continuationPlan : null,
-      preload: Array.isArray(payload.preload) ? payload.preload : [],
+      continuationPlan: payload.continuationPlan && typeof payload.continuationPlan === 'object' ? payload.continuationPlan : derivedMetadata.continuationPlan,
+      preload: Array.isArray(payload.preload) && payload.preload.length ? payload.preload : derivedMetadata.preload,
       runtimePayload: payload.runtimePayload && typeof payload.runtimePayload === 'object' ? payload.runtimePayload : null
     }
   }

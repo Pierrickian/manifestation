@@ -3,6 +3,75 @@ import { withCreatiaUiGuards } from './renderers/HtmlViewer'
 
 const PROJECT_EXPORT_VERSION = 1
 
+function extractBalancedLiteral(source = '', startIndex = 0) {
+  const text = String(source || '')
+  const opening = text[startIndex]
+  const closing = opening === '{' ? '}' : opening === '[' ? ']' : ''
+  if (!closing) return ''
+
+  let depth = 0
+  let quote = ''
+  let escaped = false
+
+  for (let index = startIndex; index < text.length; index += 1) {
+    const char = text[index]
+    if (quote) {
+      if (escaped) escaped = false
+      else if (char === '\\') escaped = true
+      else if (char === quote) quote = ''
+      continue
+    }
+
+    if (char === '"' || char === "'") {
+      quote = char
+      continue
+    }
+
+    if (char === opening) depth += 1
+    if (char === closing) depth -= 1
+    if (depth === 0) return text.slice(startIndex, index + 1)
+  }
+
+  return ''
+}
+
+function parseLooseJsonLiteral(literal = '') {
+  if (!literal) return null
+
+  try {
+    return JSON.parse(literal)
+  } catch {
+    // Continue with a conservative JSON-ish parser for inline generated JS metadata.
+  }
+
+  try {
+    const normalized = literal
+      .replace(/([{,]\s*)([A-Za-z_$][\w$]*)\s*:/g, '$1"$2":')
+      .replace(/'([^'\\]*(?:\\.[^'\\]*)*)'/g, (_, value) => JSON.stringify(value.replace(/\\'/g, "'")))
+      .replace(/,\s*([}\]])/g, '$1')
+    return JSON.parse(normalized)
+  } catch {
+    return null
+  }
+}
+
+function extractDeclaredLiteral(html = '', name = '') {
+  const declaration = new RegExp(`(?:const|let|var)\\s+${name}\\s*=\\s*`, 'i').exec(String(html || ''))
+  if (!declaration) return null
+
+  return parseLooseJsonLiteral(extractBalancedLiteral(html, declaration.index + declaration[0].length))
+}
+
+function deriveRuntimeMetadataFromHtml(html = '') {
+  const continuationPlan = extractDeclaredLiteral(html, 'continuationPlan')
+  const preload = extractDeclaredLiteral(html, 'preload')
+
+  return {
+    continuationPlan: continuationPlan && typeof continuationPlan === 'object' && !Array.isArray(continuationPlan) ? continuationPlan : null,
+    preload: Array.isArray(preload) ? preload : []
+  }
+}
+
 function safeSlug(value = 'creatia') {
   return String(value)
     .normalize('NFD')
@@ -185,13 +254,15 @@ export function normalizeImportedProject(payload) {
   const sourceProject = payload?.project || payload
   const history = Array.isArray(payload?.history) ? payload.history : sourceProject?.generationHistory || []
   const latestResponse = history.at(-1)?.response || {}
+  const currentApplication = payload?.currentApplication ?? sourceProject?.currentApplication ?? sourceProject?.lastValidApplication ?? latestResponse.html ?? ''
+  const derivedRuntimeMetadata = deriveRuntimeMetadataFromHtml(currentApplication)
   const project = {
     ...(sourceProject || {}),
     id: sourceProject?.id || `project-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     mode: sourceProject?.mode || 'create',
     creationRequest: payload?.request ?? sourceProject?.creationRequest ?? '',
-    currentApplication: payload?.currentApplication ?? sourceProject?.currentApplication ?? sourceProject?.lastValidApplication ?? latestResponse.html ?? '',
-    lastValidApplication: payload?.lastValidApplication ?? sourceProject?.lastValidApplication ?? payload?.currentApplication ?? sourceProject?.currentApplication ?? latestResponse.html ?? '',
+    currentApplication,
+    lastValidApplication: payload?.lastValidApplication ?? sourceProject?.lastValidApplication ?? currentApplication ?? latestResponse.html ?? '',
     systemPrompt: payload?.systemPrompt ?? sourceProject?.systemPrompt ?? latestResponse.systemPrompt ?? '',
     applicationState: payload?.state ?? sourceProject?.applicationState ?? latestResponse.state ?? {},
     humanModel: payload?.humanModel ?? sourceProject?.humanModel ?? latestResponse.humanModel ?? {},
@@ -199,8 +270,8 @@ export function normalizeImportedProject(payload) {
     evolutionHistory: Array.isArray(payload?.evolutionHistory) ? payload.evolutionHistory : sourceProject?.evolutionHistory || [],
     generationHistory: history,
     aiSuggestionsHistory: Array.isArray(payload?.aiSuggestions) ? payload.aiSuggestions : sourceProject?.aiSuggestionsHistory || [],
-    continuationPlan: payload?.continuationPlan ?? sourceProject?.continuationPlan ?? latestResponse.continuationPlan ?? null,
-    preloadQueue: normalizePreloadQueue(Array.isArray(payload?.preloadMetadata) ? payload.preloadMetadata : sourceProject?.preloadQueue || latestResponse.preload || []),
+    continuationPlan: payload?.continuationPlan ?? sourceProject?.continuationPlan ?? latestResponse.continuationPlan ?? derivedRuntimeMetadata.continuationPlan,
+    preloadQueue: normalizePreloadQueue(Array.isArray(payload?.preloadMetadata) && payload.preloadMetadata.length ? payload.preloadMetadata : sourceProject?.preloadQueue || latestResponse.preload || derivedRuntimeMetadata.preload || []),
     capabilities: sourceProject?.capabilities || latestResponse.capabilities || {},
     metadata: { renderer: 'html', ...(sourceProject?.metadata || {}) }
   }

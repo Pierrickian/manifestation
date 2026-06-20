@@ -418,9 +418,12 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     /runtime\\s+indisponible/i,
     /runtime\\s+attendu/i,
     /ai\\s+runtime\\s+unavailable/i,
-    /runtime\\s*:\\s*(unavailable|waiting|pending)/i
+    /runtime\\s*:\\s*(unavailable|waiting|pending)/i,
+    /bridge\\s+(en\\s+attente|indisponible|non\\s+disponible|waiting|pending|unavailable)/i,
+    /aucun\\s+bridge\\s+creatia\\s+d[ée]tect[ée]/i
   ];
   const hasDisconnectedRuntimeLabel = (text = '') => disconnectedRuntimeLabels.some((pattern) => pattern.test(text));
+  const connectedStatusFor = (text = '') => /bridge/i.test(text) ? 'Bridge prêt' : connectedRuntimeStatusText;
   const syncGeneratedStatusText = () => {
     if (!diagnostics.providerRegistered || diagnostics.status === 'Unavailable') return;
     const candidates = Array.from(document.querySelectorAll('[data-runtime-status], [data-ai-status], [role="status"], .runtime-status, .ai-status, .status, p, span, small, div, button'));
@@ -428,8 +431,9 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       if (!node || node.children.length > 3) return;
       const text = (node.textContent || '').replace(/\\s+/g, ' ').trim();
       if (!text || text.length > 96 || !hasDisconnectedRuntimeLabel(text)) return;
-      log('status text override', text + ' -> ' + connectedRuntimeStatusText, 'reason=provider_registered');
-      node.textContent = connectedRuntimeStatusText;
+      const connectedText = connectedStatusFor(text);
+      log('status text override', text + ' -> ' + connectedText, 'reason=provider_registered');
+      node.textContent = connectedText;
       node.dataset.creatiaRuntimeSynced = 'true';
     });
     const walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT);
@@ -815,7 +819,8 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       pendingRuntimeRequests.delete(requestId);
       resolver({
         ...event.data,
-        status: event.data.status || 'completed',
+        status: event.data.status === 'completed' ? 'ok' : event.data.status || 'ok',
+        hostStatus: event.data.status || 'completed',
         payload: effectiveRuntimePayload,
         runtimePayload: effectiveRuntimePayload,
         statePatch: effectiveRuntimePayload.statePatch || {}

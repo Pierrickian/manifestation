@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const promptBuilder = readFileSync(new URL('../src/platform/ai/promptBuilder.js', import.meta.url), 'utf8')
+const pipeline = readFileSync(new URL('../src/platform/ai/generationPipeline.js', import.meta.url), 'utf8')
+const projectExport = readFileSync(new URL('../src/platform/ai/projectExport.js', import.meta.url), 'utf8')
 const controller = readFileSync(new URL('../src/platform/ai/hooks/useAiApplicationController.js', import.meta.url), 'utf8')
 const generator = readFileSync(new URL('../src/features/html-app-generator/HtmlAppGenerator.jsx', import.meta.url), 'utf8')
 const viewer = readFileSync(new URL('../src/platform/ai/renderers/HtmlViewer.jsx', import.meta.url), 'utf8')
@@ -58,6 +60,15 @@ assert.match(viewer, /runtimePayload\.page/)
 assert.match(viewer, /deliverRuntimeError/)
 assert.match(viewer, /payload: effectiveRuntimePayload/)
 assert.match(viewer, /runtimePayload: effectiveRuntimePayload/)
+assert.match(viewer, /hostStatus: event\.data\.status \|\| 'completed'/)
+assert.match(viewer, /Bridge prêt/)
 assert.match(viewer, /Runtime generation response timed out\./)
+
+assert.match(promptBuilder, /deriveCoCreateMetadataFromHtml/)
+assert.match(pipeline, /runtimePayload\\s\*\\\.\\s\*\(room\|narrative\|choices\|statePatch\|page\|screen\|route\|title\|text\|summary\|items\|htmlFragment\)/)
+
+assert.match(promptBuilder, /extractDeclaredLiteral\(html, 'continuationPlan'\)/)
+assert.match(promptBuilder, /extractDeclaredLiteral\(html, 'preload'\)/)
+assert.match(projectExport, /deriveRuntimeMetadataFromHtml\(currentApplication\)/)
 
 console.log('Creatia bridge contract tests passed')
