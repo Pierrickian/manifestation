@@ -5,6 +5,7 @@ import { createProject, evolveProject, normalizePreloadQueue, refreshProjectHuma
 import { detectCapabilities, isAutoRepairableHealthcheck, runGeneratedAppHealthcheck, selectGenerationStrategy } from '../generationPipeline'
 
 const REQUEST_TIMEOUT_MS = 60000
+const COCREATE_REQUEST_TIMEOUT_MS = 120000
 const DEFAULT_REPAIR_LIMIT = 1
 const DEEP_REPAIR_LIMIT = 3
 const MAX_CAPABILITY_NEGOTIATION_ATTEMPTS = 2
@@ -93,6 +94,17 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
     return hasTime ? DEEP_REPAIR_LIMIT : DEFAULT_REPAIR_LIMIT
   }
 
+  function getRequestTimeoutMs() {
+    return mode === 'co-create' ? COCREATE_REQUEST_TIMEOUT_MS : REQUEST_TIMEOUT_MS
+  }
+
+  function scheduleRequestTimeout(controller, timeoutMs = getRequestTimeoutMs()) {
+    if (timeoutRef.current) window.clearTimeout(timeoutRef.current)
+    timeoutRef.current = window.setTimeout(() => {
+      controller.abort()
+    }, timeoutMs)
+  }
+
   async function runRepairLoop({ originalRequest, initialStructured, initialHealthcheck, detectedCapabilities, selectedStrategy, controller, maxAttempts, reason = 'auto' }) {
     let finalStructured = initialStructured
     let verification = initialHealthcheck
@@ -115,6 +127,7 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
       setLastRuntimePrompt(JSON.stringify(repairRequest, null, 2))
       onDebug?.({ status: 'repair_ready', reason, attempt, maxAttempts, kind: repairRequest.kind, shortTitle: `Réparation IA ${attempt}/${maxAttempts}`, healthcheck: verification, timestamp: new Date().toISOString() })
       onDebug?.({ status: 'ai_request', kind: repairRequest.kind, shortTitle: `Réparation IA ${attempt}/${maxAttempts}`, timestamp: new Date().toISOString() })
+      scheduleRequestTimeout(controller)
       const repairedPayload = await aiProvider({ ...repairRequest, signal: controller.signal })
       onDebug?.({ status: 'ai_response', kind: repairRequest.kind, shortTitle: `Réponse réparation ${attempt}/${maxAttempts}`, timestamp: new Date().toISOString() })
       const repairedStructured = normalizeForProject(repairedPayload, detectedCapabilities, mode)
@@ -145,6 +158,7 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
     setLastRuntimePrompt(JSON.stringify(request, null, 2))
     onDebug?.({ status: 'request_ready', kind: request.kind, shortTitle: requestKindTitle, rendererType: request.metadata.rendererType, designSystem: request.metadata.designSystem?.themeName, timestamp: new Date().toISOString() })
     onDebug?.({ status: 'ai_request', kind: request.kind, shortTitle: requestKindTitle, timestamp: new Date().toISOString() })
+    scheduleRequestTimeout(controller)
     const payload = await aiProvider({ ...request, signal: controller.signal })
     onDebug?.({ status: 'ai_response', kind: request.kind, shortTitle: project ? 'Projet évolué' : 'Projet généré', timestamp: new Date().toISOString() })
     const structured = normalizeForProject(payload, capabilities, mode)
@@ -189,11 +203,9 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
     setMessage(progressText)
     const detectedCapabilities = detectCapabilities(trimmed)
     const selectedStrategy = selectGenerationStrategy({ input: trimmed, capabilities: detectedCapabilities, mode, hasTime })
+    const requestTimeoutMs = getRequestTimeoutMs()
     setPipeline({ capabilities: detectedCapabilities, strategy: selectedStrategy })
-    onDebug?.({ status: 'loading', rendererType: 'html', mode, speechEnabled, timeoutMs: REQUEST_TIMEOUT_MS, capabilities: detectedCapabilities, strategy: selectedStrategy, hasTime, startedAt: new Date().toISOString() })
-    timeoutRef.current = window.setTimeout(() => {
-      controller.abort()
-    }, REQUEST_TIMEOUT_MS)
+    onDebug?.({ status: 'loading', rendererType: 'html', mode, speechEnabled, timeoutMs: requestTimeoutMs, capabilities: detectedCapabilities, strategy: selectedStrategy, hasTime, startedAt: new Date().toISOString() })
 
     const interval = window.setInterval(() => {
       setIdeaIndex((index) => index + 1)
@@ -367,6 +379,8 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
       setRepairError(repairFailure instanceof Error ? repairFailure.message : 'Impossible de réparer automatiquement pour le moment.')
       setMessage('La réparation a échoué.')
     } finally {
+      if (timeoutRef.current) window.clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
       abortRef.current = null
     }
   }
@@ -387,6 +401,7 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
       setLastRuntimePrompt(JSON.stringify(request, null, 2))
       onDebug?.({ status: 'request_ready', kind: request.kind, shortTitle: 'Rebuild Human Model', rendererType: request.metadata.rendererType, timestamp: new Date().toISOString() })
       onDebug?.({ status: 'ai_request', kind: request.kind, shortTitle: 'Rebuild Human Model', timestamp: new Date().toISOString() })
+      scheduleRequestTimeout(controller)
       const payload = await aiProvider({ ...request, signal: controller.signal })
       onDebug?.({ status: 'ai_response', kind: request.kind, shortTitle: 'Human Model Rebuilt', timestamp: new Date().toISOString() })
       const structured = normalizeForProject(payload, project.capabilities || {}, mode)
@@ -407,6 +422,8 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
         onDebug?.({ status: 'error', kind: 'human_model_refresh', errorMessage: refreshError?.message || 'unknown', timestamp: new Date().toISOString() })
       }
     } finally {
+      if (timeoutRef.current) window.clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
       abortRef.current = null
     }
   }
@@ -454,7 +471,11 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
     setProject(nextProject)
   }
 
-  function cancel() { abortRef.current?.abort() }
+  function cancel() {
+    abortRef.current?.abort()
+    if (timeoutRef.current) window.clearTimeout(timeoutRef.current)
+    timeoutRef.current = null
+  }
 
   return { input, setInput, status, message, error, repairError, result, project, submit, submitPartnerSuggestion, submitRuntimeGeneration, retry, repair, rebuildHumanModel, updateHumanModelField, importProject, cancel, appendTranscript, speechEnabled, progressText, hasTime, setHasTime, pipeline, healthcheck, lastPrompt, lastRuntimePrompt }
 }
