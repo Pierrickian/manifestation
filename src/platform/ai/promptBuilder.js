@@ -37,6 +37,18 @@ const STRUCTURED_APP_INSTRUCTIONS = [
   'Do not use external dependencies or remote assets unless the user explicitly requests them.'
 ]
 
+function looksLikeHtmlDocument(value = '') {
+  const text = String(value).trim()
+  return /<!doctype\s+html|<html[\s>]|<body[\s>]|<main[\s>]|<section[\s>]|<script[\s>]|<style[\s>]|<div[\s>]/i.test(text)
+}
+
+function extractHtmlFromText(value = '') {
+  const text = String(value || '').trim()
+  const fencedHtml = text.match(/```(?:html)?\s*([\s\S]*?)```/i)?.[1]?.trim()
+  if (fencedHtml && looksLikeHtmlDocument(fencedHtml)) return fencedHtml
+  return looksLikeHtmlDocument(text) ? text : ''
+}
+
 export function normalizeStructuredAiResponse(payload = {}) {
   const explicitKind = typeof payload.kind === 'string' ? payload.kind : ''
   if (explicitKind === 'capability_request') {
@@ -66,9 +78,13 @@ export function normalizeStructuredAiResponse(payload = {}) {
   }
 
   if (Object.prototype.hasOwnProperty.call(payload, 'html') || payload.humanModel || payload.analysis || payload.decisions || payload.generatedChanges) {
+    const html = payload.html || ''
+    if (html && !looksLikeHtmlDocument(html)) {
+      return { kind: 'generation_error', error: 'AI response html field did not contain an executable HTML document.' }
+    }
     return {
       kind: 'html_app',
-      html: payload.html || '',
+      html,
       humanModel: payload.humanModel && typeof payload.humanModel === 'object' ? payload.humanModel : {},
       files: payload.files && typeof payload.files === 'object' ? payload.files : {},
       analysis: payload.analysis || '',
@@ -93,7 +109,11 @@ export function normalizeStructuredAiResponse(payload = {}) {
     const parsed = JSON.parse(text)
     return normalizeStructuredAiResponse(parsed)
   } catch {
-    return { kind: 'html_app', html: text, humanModel: {}, files: {}, analysis: '', decisions: [], generatedChanges: [], systemPrompt: '', state: {}, suggestedActions: [], capabilities: {}, runtimeCapabilities: {}, continuationPlan: null, preload: [] }
+    const html = extractHtmlFromText(text)
+    if (html) {
+      return { kind: 'html_app', html, humanModel: {}, files: {}, analysis: '', decisions: [], generatedChanges: [], systemPrompt: '', state: {}, suggestedActions: [], capabilities: {}, runtimeCapabilities: {}, continuationPlan: null, preload: [] }
+    }
+    return { kind: 'generation_error', error: 'AI response did not contain valid structured JSON or an executable HTML document.' }
   }
 }
 
