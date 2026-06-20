@@ -26,6 +26,14 @@ function deriveRuntimePayload(finalStructured = {}) {
   }
 }
 
+function getSuggestionLabel(suggestion) {
+  if (typeof suggestion === 'string') return suggestion
+  if (suggestion && typeof suggestion === 'object') {
+    return suggestion.label || suggestion.title || suggestion.action || suggestion.target || suggestion.prompt || JSON.stringify(suggestion)
+  }
+  return String(suggestion || 'Suggestion')
+}
+
 export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled = true }) {
   const [isViewingHtml, setIsViewingHtml] = useState(false)
   const [exportStatus, setExportStatus] = useState(null)
@@ -345,7 +353,10 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
       {mode === 'co-create' && latestSuggestions.length ? (
         <div className="ai-suggestions-card">
           <strong>Suggestions du partenaire créatif</strong>
-          <div>{latestSuggestions.map((suggestion, index) => <button type="button" key={`${suggestion}-${index}`} onClick={() => controller.submitPartnerSuggestion(suggestion)} disabled={isBusy}>{suggestion}</button>)}</div>
+          <div>{latestSuggestions.map((suggestion, index) => {
+            const label = getSuggestionLabel(suggestion)
+            return <button type="button" key={`${label}-${index}`} onClick={() => controller.submitPartnerSuggestion(suggestion)} disabled={isBusy}>{label}</button>
+          })}</div>
         </div>
       ) : null}
       {mode === 'co-create' && continuationPlan ? (
