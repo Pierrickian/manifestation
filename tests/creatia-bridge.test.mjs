@@ -13,6 +13,7 @@ const runtimeInstructions = block('RUNTIME_GENERATION_INSTRUCTIONS')
 
 assert.match(createInstructions, /Create mode is simple/)
 assert.doesNotMatch(createInstructions, /window\.requestAiGeneration|window\.applyRuntimePayload|runtimePayload instructions|future prompts|precomputed/i)
+assert.match(createInstructions, /offline-capable when possible/)
 assert.match(promptBuilder, /Un jeu de pendu/)
 
 assert.match(coCreateInstructions, /continuationPlan must exist/)
@@ -24,6 +25,8 @@ assert.match(coCreateInstructions, /Creatia host injects that bridge/)
 assert.match(coCreateInstructions, /await or handle the Promise returned by window\.requestAiGeneration/)
 assert.match(coCreateInstructions, /status "unavailable", "blocked", or "timeout"/)
 assert.match(coCreateInstructions, /creatia-runtime-ready/)
+assert.match(coCreateInstructions, /Do not label Co-Create runtime AI as offline-ready/)
+assert.doesNotMatch(coCreateInstructions, /offline execution/)
 assert.match(coCreateInstructions, /Do not generate future prompts/)
 assert.match(coCreateInstructions, /Do not generate future prompts, future content/)
 
@@ -53,6 +56,8 @@ assert.match(viewer, /source\.includes\('data-creatia-ui-guard="start-panel"'\)/
 assert.match(viewer, /if \(!guards\) return source/)
 assert.match(viewer, /runtimePayload\.page/)
 assert.match(viewer, /deliverRuntimeError/)
+assert.match(viewer, /payload: effectiveRuntimePayload/)
+assert.match(viewer, /runtimePayload: effectiveRuntimePayload/)
 assert.match(viewer, /Runtime generation response timed out\./)
 
 console.log('Creatia bridge contract tests passed')

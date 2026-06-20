@@ -7,7 +7,7 @@ const BASE_APP_INSTRUCTIONS = [
   'Intermediate capability negotiation uses { "kind": "capability_request", "requestedCapabilities": object, "reason": string, "retryPrompt": string }. Clarification uses { "kind": "clarification_request", "question": string }. Genuine failures use { "kind": "generation_error", "error": string }.',
   'html must be a complete standalone executable HTML5 document with embedded CSS and JavaScript.',
   'Prefer browser-native technologies and avoid external libraries unless explicitly requested.',
-  'Support mobile devices, touch events, scrolling, dark mode, Canvas/SVG/WebGL when useful, and offline execution.',
+  'Support mobile devices, touch events, scrolling, dark mode, and Canvas/SVG/WebGL when useful.',
   'Every generated screen or panel that contains informational text must be vertically scrollable on mobile.',
   'files stores optional supporting artifacts only; do not duplicate the complete HTML document in files["index.html"].'
 ]
@@ -16,6 +16,7 @@ const CREATE_APP_INSTRUCTIONS = [
   ...BASE_APP_INSTRUCTIONS,
   'Create mode is simple: generate one standalone application. Do not include live collaboration behavior or future-update machinery.',
   'Create mode requirements: kind must be "html_app", suggestedActions must be [], continuationPlan must be null, preload must be [], runtimeCapabilities.aiGeneration must be false unless the user explicitly requested runtime AI.',
+  'Create mode apps should be offline-capable when possible because they are standalone and do not require the Co-Create runtime host.',
   'The primary responsibility is valid JSON with executable html. A simple request such as "Un jeu de pendu" must return a playable standalone app.'
 ]
 
@@ -26,6 +27,7 @@ const CO_CREATE_APP_INSTRUCTIONS = [
   'Generated Co-Create apps must await or handle the Promise returned by window.requestAiGeneration and clear loading states when it returns status "unavailable", "blocked", or "timeout".',
   'Generated Co-Create apps should listen for the "creatia-runtime-ready" event and re-render their AI/runtime availability indicator when it fires.',
   'Generated Co-Create apps must implement window.applyRuntimePayload(runtimePayload) to receive runtimePayload, clear loading states, and update themselves without reloading.',
+  'Do not label Co-Create runtime AI as offline-ready. The static shell may remain usable without the host, but live runtime generation requires an online Creatia parent bridge.',
   'continuationPlan must be short: one or two sentences only, for example { "runtimeRole": "Generate new inspiration cards when AI+ is pressed." }.',
   'preload must contain only trigger descriptors and context requirements, for example { "trigger": "ai_plus", "event": "renew_requested", "sendContext": ["originalRequest", "applicationState", "userHistory"] }.',
   'Do not generate future prompts, future content, precomputed cards, rooms, screens, stories, or citations in preload. Runtime AI will be recalled later with fresh context.',

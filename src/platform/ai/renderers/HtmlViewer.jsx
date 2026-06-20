@@ -785,11 +785,6 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     debugState.aiResponses.unshift({ timestamp: now(), type: debugState.lastResponse.type, payload: debugState.lastResponse.payload });
     debugState.aiResponses = debugState.aiResponses.slice(0, 30);
     addEvent(event.data.ok ? 'generation_completed' : 'generation_failed', { requestId, responseType: debugState.lastResponse.type });
-    const resolver = pendingRuntimeRequests.get(requestId);
-    if (resolver) {
-      pendingRuntimeRequests.delete(requestId);
-      resolver(event.data);
-    }
     const hasRuntimePayload = Boolean(runtimePayload && Object.keys(runtimePayload).length);
     const hasConsumablePayload = hasConsumableRuntimePayload(runtimePayload);
     const effectiveRuntimePayload = hasConsumablePayload ? runtimePayload : {
@@ -804,12 +799,27 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       || hasRuntimePayloadConsumer
       || typeof window.applyGeneratedContent === 'function'
       || typeof window.applyGeneratedRoom === 'function';
+    const resolver = pendingRuntimeRequests.get(requestId);
     if (!event.data.ok) {
       clearRuntimeLoadingState(triggerElement);
       const errorPayload = buildRuntimeErrorPayload(event.data.payload?.error || 'Runtime generation failed.', 'failed');
+      if (resolver) {
+        pendingRuntimeRequests.delete(requestId);
+        resolver({ ...event.data, status: 'error', error: errorPayload.error, payload: errorPayload, runtimePayload: errorPayload, statePatch: errorPayload.statePatch });
+      }
       if (hasRuntimePayloadConsumer) window.applyRuntimePayload(errorPayload);
       renderDiagnostics();
       return;
+    }
+    if (resolver) {
+      pendingRuntimeRequests.delete(requestId);
+      resolver({
+        ...event.data,
+        status: event.data.status || 'completed',
+        payload: effectiveRuntimePayload,
+        runtimePayload: effectiveRuntimePayload,
+        statePatch: effectiveRuntimePayload.statePatch || {}
+      });
     }
     if (event.data.ok && !hasRuntimePayload) addDecision('AI response received but runtimePayload is missing or empty.', { requestId });
     if (event.data.ok && !hasConsumablePayload) {
@@ -832,13 +842,13 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       addDecision('Blocked because: Provider not connected.', { request });
       addError('requestAiGeneration', diagnostics.lastAiError);
       logStatus('Unavailable', 'provider_missing_before_request');
-      deliverRuntimeError(diagnostics.lastAiError, 'unavailable');
-      return { status: 'unavailable', error: diagnostics.lastAiError };
+      const payload = deliverRuntimeError(diagnostics.lastAiError, 'unavailable');
+      return { status: 'unavailable', error: diagnostics.lastAiError, payload, runtimePayload: payload, statePatch: payload.statePatch };
     }
     if (diagnostics.pendingRequests > 0) {
       addDecision('Blocked because: Request already in progress.', { pendingRequests: diagnostics.pendingRequests });
-      deliverRuntimeError('A runtime generation request is already pending.', 'blocked');
-      return { status: 'blocked', error: 'A runtime generation request is already pending.' };
+      const payload = deliverRuntimeError('A runtime generation request is already pending.', 'blocked');
+      return { status: 'blocked', error: 'A runtime generation request is already pending.', payload, runtimePayload: payload, statePatch: payload.statePatch };
     }
     const runtimeRequest = {
       requestId: request.requestId || 'runtime-' + Date.now() + '-' + Math.random().toString(16).slice(2),
@@ -895,9 +905,9 @@ function buildAiActivityMonitor(runtimeContext = {}) {
         requestEntry.status = 'Failed';
         addDecision('Blocked because: runtime generation response timed out.', { requestId: runtimeRequest.requestId });
         clearRuntimeLoadingState(triggerElement);
-        deliverRuntimeError('Runtime generation response timed out.', 'timeout');
+        const payload = deliverRuntimeError('Runtime generation response timed out.', 'timeout');
         end('Runtime AI generation timed out · ' + runtimeRequest.trigger, false);
-        resolve({ status: 'timeout', request: runtimeRequest });
+        resolve({ status: 'timeout', error: payload.error, request: runtimeRequest, payload, runtimePayload: payload, statePatch: payload.statePatch });
       }, 45000);
     });
   };
