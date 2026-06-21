@@ -23,9 +23,10 @@ const CREATE_APP_INSTRUCTIONS = [
 const CO_CREATE_APP_INSTRUCTIONS = [
   ...BASE_APP_INSTRUCTIONS,
   'Co-Create mode requirements: kind must be "html_app", html must be executable, continuationPlan must exist, preload must contain at least one trigger descriptor, and runtimeCapabilities.aiGeneration must be true.',
-  'Generated Co-Create apps must call window.requestAiGeneration({ trigger, state, continuationPlan, preload, context }) when they need live AI content, but must never define, stub, override, or shadow window.requestAiGeneration; the Creatia host injects that bridge.',
-  'Generated Co-Create apps must await or handle the Promise returned by window.requestAiGeneration and clear loading states when it returns status "unavailable", "blocked", or "timeout".',
-  'Generated Co-Create apps should listen for the "creatia-runtime-ready" event and re-render their AI/runtime availability indicator when it fires.',
+  'Generated Co-Create apps must call window.requestAiGeneration({ trigger, state, continuationPlan, preload, context }) when they need live AI content, but must never define, stub, override, assign, wrap, polyfill, or shadow window.requestAiGeneration; the Creatia host injects that bridge after the HTML loads.',
+  'If typeof window.requestAiGeneration is not "function", show a clear "Bridge en attente" status and keep the UI enabled for retry; do not create a fallback requestAiGeneration function and do not mark the runtime permanently unavailable.',
+  'Generated Co-Create apps must await or handle the Promise returned by window.requestAiGeneration, log status/payload diagnostics with the returned traceId when available, and clear loading states when it returns status "unavailable", "blocked", or "timeout".',
+  'Generated Co-Create apps should listen for the "creatia-runtime-ready" event, also check window.CreatiaRuntime/requestAiGeneration at click time, and re-render their AI/runtime availability indicator when the host bridge appears.',
   'Generated Co-Create apps must implement window.applyRuntimePayload(runtimePayload) to receive runtimePayload, clear loading states, and update themselves without reloading.',
   'Generated Co-Create apps should log only app-level steps such as button pressed, requestAiGeneration called, raw response received, status received, payload detected, payload applied, or runtime error. Include the propagated traceId in those app logs when available. The injected Creatia runtime overlay logs host bridge and AI provider steps; do not claim the app contacts OpenAI directly.',
   'Do not label Co-Create runtime AI as offline-ready. The static shell may remain usable without the host, but live runtime generation requires an online Creatia parent bridge.',

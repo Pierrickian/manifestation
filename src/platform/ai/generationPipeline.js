@@ -14,7 +14,8 @@ const CONFIDENCE_SCORE = { low: 1, medium: 2, high: 3 }
 const AUTO_REPAIR_CONFIDENCES = new Set(['high', 'medium'])
 const REQUIRED_COCREATE_REPAIR_CHECKS = new Set([
   'cocreate_continuation_plan_exists',
-  'cocreate_preload_entries_exist'
+  'cocreate_preload_entries_exist',
+  'cocreate_does_not_stub_request_ai_generation'
 ])
 
 function createCheck({ id, ok, message, expected, actual, repairConfidence = 'low', repairable = false, severity = 'critical' }) {
@@ -115,6 +116,11 @@ function isNonEmptyObject(value) {
 
 function hasRuntimeAiGenerationPath(html = '') {
   return /requestAiGeneration|needs_generation|preload_requested|preload_consumed|branch_requested|content_exhausted|ai_request|data-ai-trigger|data-runtime-trigger|data-generation-trigger|postMessage\s*\(/i.test(String(html))
+}
+
+function stubsHostRequestAiGeneration(html = '') {
+  const source = String(html)
+  return /window\.requestAiGeneration\s*=|window\.requestAiGeneration\s*\|\|=|window\[['\"]requestAiGeneration['\"]\]\s*=|(?:function|const|let|var)\s+requestAiGeneration\b/i.test(source)
 }
 
 function exposesRuntimeAiStatus(html = '') {
@@ -284,6 +290,17 @@ export function runGeneratedAppHealthcheck(response = {}, strategy = {}) {
       message: 'Runtime AI generation pathway detected.',
       expected: 'At least one runtime generation pathway such as requestAiGeneration, ai_request, needs_generation, preload_requested, or branch_requested.',
       actual: 'No runtime AI generation pathway was detected.',
+      repairConfidence: 'high',
+      repairable: true,
+      severity: 'warning'
+    }))
+
+    checks.push(createCheck({
+      id: 'cocreate_does_not_stub_request_ai_generation',
+      ok: !stubsHostRequestAiGeneration(html),
+      message: 'Host requestAiGeneration bridge is not stubbed by the generated app.',
+      expected: 'The generated application must call the host-injected window.requestAiGeneration, not define, assign, polyfill, or stub it locally.',
+      actual: 'The generated application appears to define or assign requestAiGeneration, which can intercept Co-Create runtime calls before Creatia receives them.',
       repairConfidence: 'high',
       repairable: true,
       severity: 'warning'
