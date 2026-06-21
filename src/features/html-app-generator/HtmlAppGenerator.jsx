@@ -35,6 +35,31 @@ function deriveRuntimePayload(finalStructured = {}) {
   }
 }
 
+
+function createCoCreateTraceId() {
+  const stamp = new Date().toISOString().replace(/\D/g, '').slice(0, 14)
+  return `co-create-${stamp}-${Math.random().toString(16).slice(2, 8)}`
+}
+
+function validateRuntimeGenerationResult(finalStructured, runtimePayload) {
+  const errors = []
+  const warnings = []
+  const keys = finalStructured && typeof finalStructured === 'object' ? Object.keys(finalStructured) : []
+  const payloadKeys = runtimePayload && typeof runtimePayload === 'object' ? Object.keys(runtimePayload) : []
+  if (!finalStructured || typeof finalStructured !== 'object') errors.push('finalStructured missing')
+  if (finalStructured?.kind === 'runtime_generation' && !finalStructured.runtimePayload && !finalStructured.payload) errors.push('runtimePayload missing')
+  if (!runtimePayload || typeof runtimePayload !== 'object' || !payloadKeys.length) errors.push('runtimePayload missing or empty')
+  if (finalStructured?.runtimePayload && !finalStructured?.payload) warnings.push('runtimePayload present; payload will be synthesized for app')
+  if (finalStructured?.html && !runtimePayload) warnings.push('html present but runtimePayload missing')
+  return {
+    ok: errors.length === 0,
+    errors,
+    warnings,
+    expectedSchema: 'runtime_generation response with runtimePayload or payload object, returned to the app as payload + runtimePayload',
+    receivedSchema: { keys, payloadKeys, kind: finalStructured?.kind || 'unknown' }
+  }
+}
+
 function getSuggestionLabel(suggestion) {
   if (typeof suggestion === 'string') return suggestion
   if (suggestion && typeof suggestion === 'object') {
@@ -52,9 +77,20 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
   const [mode, setMode] = useState('create')
   const [runtimeDebugEnabled, setRuntimeDebugEnabled] = useState(true)
   const [aiActivity, setAiActivity] = useState({ active: false, log: [] })
+  const [runtimeTrace, setRuntimeTrace] = useState({ currentTraceId: '', timeline: [], rawResponses: [] })
+
+  function recordRuntimeTrace(event = {}) {
+    const traceId = event.traceId || event.detail?.traceId || runtimeTrace.currentTraceId || ''
+    setRuntimeTrace((current) => ({
+      currentTraceId: traceId || current.currentTraceId,
+      timeline: [{ id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, traceId: traceId || current.currentTraceId, timestamp: event.timestamp || new Date().toISOString(), step: event.step || event.status || 'runtime_event', status: event.status || 'info', durationMs: event.durationMs ?? null, message: event.message || event.shortTitle || '', detail: event.detail || event }, ...current.timeline].slice(0, 80),
+      rawResponses: event.rawResponse ? [{ traceId: traceId || current.currentTraceId, timestamp: event.timestamp || new Date().toISOString(), ...event.rawResponse }, ...current.rawResponses].slice(0, 10) : current.rawResponses
+    }))
+  }
 
   function recordAiActivity(event = {}) {
     onDebug?.(event)
+    if (event.traceId || event.status?.startsWith?.('runtime_')) recordRuntimeTrace(event)
     const status = event.status || 'info'
     const isRequest = status === 'ai_request' || status === 'request'
     const isResponse = status === 'ai_response' || status === 'response' || status === 'success' || status === 'error' || status === 'aborted'
@@ -108,36 +144,43 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
       if (event.data?.source !== 'creatia-generated-html' || event.data?.type !== 'ai-runtime-generation') return
       if (mode !== 'co-create') return
       console.log('[AI RUNTIME HOST]', 'AI request reception', event.data.request || {})
-      const requestId = event.data.request?.requestId
-      sendRuntimeHostLog(event.source, requestId, 'host_request_received', 'Host Creatia: requête runtime reçue depuis l’iframe.', { trigger: event.data.request?.trigger || 'runtime_generation' })
-      console.log('[AI RUNTIME HOST]', 'AI request dispatch to controller')
-      sendRuntimeHostLog(event.source, requestId, 'host_dispatch_controller', 'Host Creatia: envoi au contrôleur IA runtime.', { mode })
-      controller.submitRuntimeGeneration(event.data.request || {})
+      const traceId = event.data.request?.traceId || event.data.request?.context?.traceId || event.data.traceId || createCoCreateTraceId()
+      const requestId = event.data.request?.requestId || traceId
+      const runtimeRequest = { ...(event.data.request || {}), requestId, traceId, context: { ...(event.data.request?.context || {}), traceId } }
+      sendRuntimeHostLog(event.source, requestId, traceId, 'host_request_received', 'Host Creatia: requête runtime reçue depuis l’iframe.', { traceId, trigger: runtimeRequest.trigger || 'runtime_generation' })
+      sendRuntimeHostLog(event.source, requestId, traceId, 'host_trigger_detected', 'Host Creatia: trigger, preload et continuationPlan détectés.', { traceId, trigger: runtimeRequest.trigger, preloadEntries: runtimeRequest.preload?.length || 0, hasContinuationPlan: Boolean(runtimeRequest.continuationPlan) })
+      console.log('[AI RUNTIME HOST]', '[TRACE ' + traceId + '] AI request dispatch to controller')
+      sendRuntimeHostLog(event.source, requestId, traceId, 'host_dispatch_controller', 'Host Creatia: envoi au contrôleur IA runtime.', { traceId, mode })
+      controller.submitRuntimeGeneration(runtimeRequest)
         .then((runtimeResult) => {
           console.log('[AI RUNTIME HOST]', 'AI response reception')
-          sendRuntimeHostLog(event.source, requestId, 'host_response_received', 'Host Creatia: réponse IA runtime reçue.', { hasError: Boolean(runtimeResult?.error) })
+          sendRuntimeHostLog(event.source, requestId, traceId, 'host_response_received', 'Host Creatia: réponse IA runtime reçue.', { hasError: Boolean(runtimeResult?.error) })
           if (runtimeResult?.error) {
-            sendRuntimeHostLog(event.source, requestId, 'host_response_error', 'Host Creatia: réponse runtime en erreur.', { error: runtimeResult.error })
-            event.source?.postMessage({ source: 'creatia-host', type: 'ai-runtime-generation-result', requestId, ok: false, responseType: 'generation_error', payload: { error: runtimeResult.error } }, '*')
+            sendRuntimeHostLog(event.source, requestId, traceId, 'host_response_error', 'Host Creatia: réponse runtime en erreur.', { error: runtimeResult.error })
+            event.source?.postMessage({ source: 'creatia-host', type: 'ai-runtime-generation-result', requestId, traceId, ok: false, responseType: 'generation_error', payload: { error: runtimeResult.error } }, '*')
             return
           }
           const finalStructured = runtimeResult?.finalStructured || null
           const runtimePayload = runtimeResult?.runtimePayload || deriveRuntimePayload(finalStructured)
           const hasRuntimePayload = Boolean(runtimePayload && typeof runtimePayload === 'object' && Object.keys(runtimePayload).length)
-          if (!finalStructured || !hasRuntimePayload) {
-            sendRuntimeHostLog(event.source, requestId, 'host_payload_missing', 'Host Creatia: runtimePayload manquant ou inutilisable.', {})
-            event.source?.postMessage({ source: 'creatia-host', type: 'ai-runtime-generation-result', requestId, ok: false, responseType: 'generation_error', payload: { error: 'Runtime generation did not return a usable runtimePayload.' } }, '*')
+          const validation = validateRuntimeGenerationResult(finalStructured, runtimePayload)
+          sendRuntimeHostLog(event.source, requestId, traceId, 'host_validation_completed', validation.ok ? 'Host Creatia: réponse runtime validée.' : validation.errors.join('; '), { traceId, validation })
+          if (!validation.ok) {
+            sendRuntimeHostLog(event.source, requestId, traceId, 'host_payload_missing', 'Host Creatia: runtimePayload manquant ou inutilisable.', { traceId, validation })
+            event.source?.postMessage({ source: 'creatia-host', type: 'ai-runtime-generation-result', requestId, traceId, ok: false, responseType: 'generation_error', payload: { error: validation.errors.join('; ') || 'Runtime generation did not return a usable runtimePayload.', traceId }, finalStructured, diagnostics: { traceId, validation } }, '*')
             return
           }
-          sendRuntimeHostLog(event.source, requestId, 'host_payload_posted', 'Host Creatia: payload runtime renvoyé à l’iframe.', { payloadKeys: Object.keys(runtimePayload || {}) })
+          sendRuntimeHostLog(event.source, requestId, traceId, 'host_payload_posted', 'Host Creatia: payload runtime renvoyé à l’iframe.', { traceId, payloadKeys: Object.keys(runtimePayload || {}) })
+          recordRuntimeTrace({ traceId, step: 'host_raw_response_captured', message: 'Host Creatia: réponse brute/normalisée capturée.', rawResponse: { rawAI: runtimeResult?.rawPayload || null, normalized: finalStructured, returnedToApp: { status: 'ok', payload: runtimePayload, runtimePayload }, validation } })
           event.source?.postMessage({
             source: 'creatia-host',
             type: 'ai-runtime-generation-result',
             requestId,
             ok: true,
-            status: 'completed',
+            traceId,
+            status: 'ok',
             responseType: 'runtime_generation',
-            payload: { status: 'completed' },
+            payload: runtimePayload,
             legacyPayload: { status: 'completed' },
             runtimePayload,
             finalStructured,
@@ -152,6 +195,8 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
             diagnostics: {
               healthcheck: runtimeResult?.healthcheck || null,
               repairAttempts: runtimeResult?.repairAttempts || 0,
+              traceId,
+              validation,
               hasRuntimePayload,
               hasFinalStructured: Boolean(finalStructured)
             }
@@ -159,8 +204,8 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
         })
         .catch((error) => {
           console.log('[AI RUNTIME HOST]', 'AI failures', error?.message || error)
-          sendRuntimeHostLog(event.source, requestId, 'host_failure', 'Host Creatia: échec de génération runtime.', { error: error?.message || String(error) })
-          event.source?.postMessage({ source: 'creatia-host', type: 'ai-runtime-generation-result', requestId, ok: false, responseType: 'generation_error', payload: { error: error?.message || String(error) } }, '*')
+          sendRuntimeHostLog(event.source, requestId, traceId, 'host_failure', 'Host Creatia: échec de génération runtime.', { error: error?.message || String(error) })
+          event.source?.postMessage({ source: 'creatia-host', type: 'ai-runtime-generation-result', requestId, traceId, ok: false, responseType: 'generation_error', payload: { error: error?.message || String(error) } }, '*')
         })
     }
 
@@ -211,11 +256,13 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
     }
   }
 
-  function sendRuntimeHostLog(target, requestId, step, message, detail = {}) {
+  function sendRuntimeHostLog(target, requestId, traceId, step, message, detail = {}) {
+    recordRuntimeTrace({ traceId, step, message, detail, timestamp: new Date().toISOString() })
     target?.postMessage({
       source: 'creatia-host',
       type: 'creatia-runtime-host-log',
       requestId,
+      traceId,
       step,
       message,
       detail,
@@ -260,6 +307,16 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
     if (!controller.result?.html) return
     setIsViewingHtml(true)
   }, [controller.result?.html])
+
+
+  async function handleCopyRuntimeTrace() {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(runtimeTrace, null, 2))
+      setExportStatus('Debug Runtime copié.')
+    } catch {
+      setExportStatus('Copie du Debug Runtime indisponible.')
+    }
+  }
 
   async function handleCopyRuntimePrompt() {
     if (!controller.lastRuntimePrompt) {
@@ -398,6 +455,35 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
       </details>
 
 
+
+
+      {mode === 'co-create' ? (
+        <details className="project-menu runtime-debug-panel" open={runtimeDebugEnabled}>
+          <summary>Debug Runtime</summary>
+          <div className="runtime-debug-summary">
+            <strong>Trace ID courant</strong>
+            <code>{runtimeTrace.currentTraceId || 'aucune demande Co-Create'}</code>
+            <button type="button" className="ghost-action slim-action" onClick={handleCopyRuntimeTrace}>Copier le debug runtime</button>
+          </div>
+          <ol className="runtime-debug-timeline">
+            {runtimeTrace.timeline.slice(0, 20).map((entry, index) => (
+              <li key={entry.id}>
+                <strong>{runtimeTrace.timeline.length - index}. {entry.step}</strong>
+                <span>{entry.timestamp} · {entry.status}{entry.durationMs != null ? ` · ${entry.durationMs}ms` : ''}</span>
+                <small>{entry.traceId || 'no-trace'} · {entry.message}</small>
+              </li>
+            ))}
+          </ol>
+          {runtimeTrace.rawResponses.length ? (
+            <details>
+              <summary>Réponses brutes capturées</summary>
+              {runtimeTrace.rawResponses.slice(0, 5).map((entry, index) => (
+                <pre key={`${entry.traceId}-${index}`}>{JSON.stringify(entry, null, 2)}</pre>
+              ))}
+            </details>
+          ) : <small>Aucune réponse brute capturée.</small>}
+        </details>
+      ) : null}
 
       {mode === 'co-create' && latestSuggestions.length ? (
         <div className="ai-suggestions-card">

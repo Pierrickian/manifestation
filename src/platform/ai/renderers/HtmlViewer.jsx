@@ -221,6 +221,7 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     continuationPlanLoaded: Boolean(continuationPlan && Object.keys(continuationPlan).length),
     preloadEntries: preload.length,
     pendingRequests: 0,
+    currentTraceId: '',
     lastAiError: ''
   };
   window.creatiaRuntimeDiagnostics = diagnostics;
@@ -232,6 +233,8 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     eventStream: [],
     aiRequests: [],
     aiResponses: [],
+    rawResponses: [],
+    currentTraceId: '',
     capabilityRequests: [],
     runtimeDecisions: [],
     errors: [],
@@ -262,6 +265,16 @@ function buildAiActivityMonitor(runtimeContext = {}) {
   const sessionStart = Date.now();
   const log = (...args) => console.log('[AI RUNTIME]', ...args);
   const now = () => new Date().toISOString();
+  function createTraceId() {
+    const stamp = new Date().toISOString().replace(/\D/g, '').slice(0, 14);
+    return 'co-create-' + stamp + '-' + Math.random().toString(16).slice(2, 8);
+  }
+  function setTraceId(traceId) {
+    if (!traceId) return '';
+    debugState.currentTraceId = traceId;
+    diagnostics.currentTraceId = traceId;
+    return traceId;
+  }
   const payloadPreview = (value) => {
     try { return JSON.stringify(value, null, 2).slice(0, 1200); } catch { return String(value).slice(0, 1200); }
   };
@@ -272,7 +285,7 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     const line = document.createElement('div');
     line.dataset.creatiaRuntimeLog = 'true';
     line.className = host.id === 'log' || host.classList?.contains('log') ? 'logItem' : '';
-    line.textContent = entry.step + '. Runtime: ' + humanizeRuntimeEvent(entry.type, entry.detail);
+    line.textContent = entry.step + '. Runtime [' + (entry.traceId || 'no-trace') + ']: ' + humanizeRuntimeEvent(entry.type, entry.detail);
     if (host.firstChild) host.insertBefore(line, host.firstChild); else host.appendChild(line);
   }
   function humanizeRuntimeEvent(type, detail = {}) {
@@ -295,10 +308,12 @@ function buildAiActivityMonitor(runtimeContext = {}) {
   function renderStepLog() {
     if (!debugEnabled) return;
     const chronological = [...debugState.eventStream].reverse().slice(-18);
-    stepLogPanel.innerHTML = '<strong>Debug runtime · étapes</strong><ol>' + chronological.map((entry) => '<li value="' + entry.step + '">' + escapeHtml(humanizeRuntimeEvent(entry.type, entry.detail)) + '<small>' + escapeHtml(entry.type) + '</small></li>').join('') + '</ol>';
+    stepLogPanel.innerHTML = '<strong>Debug runtime · étapes</strong><div>Trace: ' + escapeHtml(debugState.currentTraceId || 'aucune') + '</div><ol>' + chronological.map((entry) => '<li value="' + entry.step + '">' + escapeHtml('[' + (entry.traceId || 'no-trace') + '] ' + humanizeRuntimeEvent(entry.type, entry.detail)) + '<small>' + escapeHtml(entry.type) + '</small></li>').join('') + '</ol>';
   }
   const addEvent = (type, detail = {}) => {
-    const entry = { step: ++debugState.stepCounter, timestamp: now(), type, detail };
+    const traceId = detail.traceId || debugState.currentTraceId || diagnostics.currentTraceId || '';
+    if (traceId) setTraceId(traceId);
+    const entry = { step: ++debugState.stepCounter, timestamp: now(), type, traceId, status: detail.status || 'info', detail };
     debugState.eventStream.unshift(entry);
     debugState.eventStream = debugState.eventStream.slice(0, 80);
     appendGeneratedAppLog(entry);
@@ -409,9 +424,11 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       capabilities: { builder: builderCapabilities, runtime: runtimeCapabilities, mismatches: capabilityMismatches() },
       continuationPlan,
       preloadState: debugState.preloadState,
+      currentTraceId: debugState.currentTraceId,
       eventHistory: debugState.eventStream,
       aiRequests: debugState.aiRequests,
       aiResponses: debugState.aiResponses,
+      rawResponses: debugState.rawResponses,
       capabilityRequests: debugState.capabilityRequests,
       runtimeDecisions: debugState.runtimeDecisions,
       budget: debugState.budget,
@@ -444,7 +461,7 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     debugState.currentState = getRuntimeState();
     panel.innerHTML = '<h2>Runtime Debug Panel</h2>'
       + '<div class="creatia-runtime-debug-actions"><button type="button" data-creatia-debug-close>Close</button><button type="button" data-creatia-debug-export>Export Debug Snapshot</button></div>'
-      + '<h3>Runtime Status</h3><div class="creatia-runtime-debug-grid">'
+      + '<h3>Runtime Status</h3><div class="creatia-runtime-debug-row"><strong>Trace ID courant</strong>' + (debugState.currentTraceId || 'aucune demande') + '</div><div class="creatia-runtime-debug-grid">'
       + '<div class="creatia-runtime-debug-item"><strong>Application Mode</strong>' + debugState.mode + '</div>'
       + '<div class="creatia-runtime-debug-item"><strong>AI Status</strong>' + diagnostics.status + '</div>'
       + '<div class="creatia-runtime-debug-item"><strong>Provider Registered</strong>' + boolText(diagnostics.providerRegistered) + '</div>'
@@ -464,8 +481,10 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       + '<details><summary>Full continuationPlan JSON</summary><pre>' + payloadPreview(continuationPlan) + '</pre></details>'
       + '<h3>Preload</h3><div>Preload Entries: ' + debugState.preloadState.length + '</div>'
       + renderRows(debugState.preloadState, 'No preload entries.', (entry) => '<div class="creatia-runtime-debug-row"><strong>' + entry.trigger + '</strong><div>Status: ' + entry.status + ' · Confidence: ' + (entry.confidence ?? '—') + '</div><div>Consumed: ' + boolText(entry.consumed) + ' · Applied: ' + boolText(entry.applied) + '</div><div>Created At: ' + entry.createdAt + '</div><details><summary>Prepared Prompt</summary><pre>' + payloadPreview(entry.preparedPrompt) + '</pre></details><div>Flow: ' + entry.flow.join(' ↓ ') + '</div></div>')
+      + '<h3>Timeline Co-Create</h3>' + renderRows(debugState.eventStream, 'No runtime events yet.', (entry) => '<div class="creatia-runtime-debug-row"><strong>' + entry.step + '. ' + entry.type + '</strong><div>Trace: ' + (entry.traceId || 'no-trace') + ' · ' + entry.timestamp + ' · ' + (entry.status || 'info') + '</div><pre>' + payloadPreview(entry.detail) + '</pre></div>')
       + '<h3>AI Request Log</h3>' + renderRows(debugState.aiRequests, 'No AI requests yet.', (entry) => '<div class="creatia-runtime-debug-row"><strong>' + entry.trigger + '</strong><div>' + entry.timestamp + ' · ' + entry.requestId + ' · ' + entry.status + '</div><div>Duration: ' + (entry.durationMs ?? '—') + 'ms · Estimated Tokens: ' + (entry.estimatedTokens ?? '—') + '</div></div>')
       + '<h3>Last AI Response</h3><div class="creatia-runtime-debug-row"><strong>Response Type</strong>' + (debugState.lastResponse?.type || 'none') + '<pre>' + payloadPreview(debugState.lastResponse?.payload || {}) + '</pre></div>'
+      + '<h3>Raw Responses</h3>' + renderRows(debugState.rawResponses, 'No raw responses captured.', (entry) => '<div class="creatia-runtime-debug-row"><strong>' + (entry.traceId || 'no-trace') + '</strong><div>' + entry.timestamp + '</div><details open><summary>Returned to app</summary><pre>' + payloadPreview(entry.returnedToApp || {}) + '</pre></details><details><summary>Raw host response</summary><pre>' + payloadPreview(entry.rawHostResponse || {}) + '</pre></details><details><summary>Diagnostics</summary><pre>' + payloadPreview(entry.diagnostics || {}) + '</pre></details></div>')
       + '<h3>Capability Negotiation</h3>' + renderRows(debugState.capabilityRequests, 'No capability requests.', (entry) => '<div class="creatia-runtime-debug-row"><strong>' + entry.status + '</strong><pre>' + payloadPreview(entry.requestedCapabilities) + '</pre></div>')
       + '<h3>Event Stream</h3>' + renderRows(debugState.eventStream, 'No runtime events yet.', (entry) => '<div class="creatia-runtime-debug-row"><strong>' + entry.type + '</strong><div>' + entry.timestamp + '</div><pre>' + payloadPreview(entry.detail) + '</pre></div>')
       + '<h3>Budget</h3><pre>' + payloadPreview(debugState.budget) + '</pre>'
@@ -843,11 +862,12 @@ function buildAiActivityMonitor(runtimeContext = {}) {
   const pendingRuntimeRequestElements = new Map();
   window.addEventListener('message', (event) => {
     if (event.data?.source === 'creatia-host' && event.data?.type === 'creatia-runtime-host-log') {
-      addEvent(event.data.step || 'host_log', { message: event.data.message, requestId: event.data.requestId, ...(event.data.detail || {}) });
+      addEvent(event.data.step || 'host_log', { traceId: event.data.traceId || event.data.detail?.traceId || '', message: event.data.message, requestId: event.data.requestId, ...(event.data.detail || {}) });
       return;
     }
     if (event.data?.source !== 'creatia-host' || event.data?.type !== 'ai-runtime-generation-result') return;
     const requestId = event.data.requestId;
+    const traceId = setTraceId(event.data.traceId || event.data.diagnostics?.traceId || event.data.payload?.traceId || '');
     const entry = debugState.aiRequests.find((item) => item.requestId === requestId);
     if (entry) {
       entry.status = event.data.ok ? 'Completed' : 'Failed';
@@ -857,10 +877,10 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     const triggerElement = pendingRuntimeRequestElements.get(requestId) || null;
     pendingRuntimeRequestElements.delete(requestId);
     const runtimePayload = event.data.runtimePayload || null;
-    debugState.lastResponse = { type: event.data.responseType || 'runtime_generation', payload: runtimePayload || event.data.payload || event.data };
-    debugState.aiResponses.unshift({ timestamp: now(), type: debugState.lastResponse.type, payload: debugState.lastResponse.payload });
+    debugState.lastResponse = { traceId, type: event.data.responseType || 'runtime_generation', payload: runtimePayload || event.data.payload || event.data };
+    debugState.aiResponses.unshift({ traceId, timestamp: now(), type: debugState.lastResponse.type, payload: debugState.lastResponse.payload });
     debugState.aiResponses = debugState.aiResponses.slice(0, 30);
-    addEvent(event.data.ok ? 'generation_completed' : 'generation_failed', { requestId, responseType: debugState.lastResponse.type });
+    addEvent(event.data.ok ? 'generation_completed' : 'generation_failed', { traceId, requestId, responseType: debugState.lastResponse.type });
     const hasRuntimePayload = Boolean(runtimePayload && Object.keys(runtimePayload).length);
     const hasConsumablePayload = hasConsumableRuntimePayload(runtimePayload);
     const effectiveRuntimePayload = hasConsumablePayload ? runtimePayload : {
@@ -870,6 +890,23 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       nextChoices: [],
       statePatch: { loading: false, isLoading: false, pending: false }
     };
+    const responseDiagnostics = [];
+    if (!('status' in event.data)) responseDiagnostics.push('status missing');
+    if (!event.data.payload) responseDiagnostics.push('payload missing');
+    if (event.data.runtimePayload && !event.data.payload) responseDiagnostics.push('runtimePayload present but payload absent');
+    if (event.data.finalStructured?.html && !event.data.payload && !event.data.runtimePayload) responseDiagnostics.push('html present but payload absent');
+    if (event.data.responseType === 'runtime_generation' && !event.data.runtimePayload && !event.data.payload) responseDiagnostics.push('runtime_generation present but not transformed to payload');
+    if (event.data.ok && !hasRuntimePayload) responseDiagnostics.push('runtimePayload missing or empty');
+    if (event.data.ok && !hasConsumablePayload) responseDiagnostics.push('payload empty or not consumable');
+    const returnedToApp = {
+      status: event.data.status === 'completed' ? 'ok' : event.data.status || (event.data.ok ? 'ok' : 'error'),
+      payload: effectiveRuntimePayload,
+      runtimePayload: effectiveRuntimePayload,
+      statePatch: effectiveRuntimePayload.statePatch || {}
+    };
+    debugState.rawResponses.unshift({ traceId, timestamp: now(), rawHostResponse: event.data, returnedToApp, diagnostics: responseDiagnostics });
+    debugState.rawResponses = debugState.rawResponses.slice(0, 10);
+    responseDiagnostics.forEach((message) => addDecision(message, { traceId, requestId, responseType: event.data.responseType }));
     const hasRuntimePayloadConsumer = typeof window.applyRuntimePayload === 'function';
     const hasConsumer = typeof window.onAiResponse === 'function'
       || hasRuntimePayloadConsumer
@@ -891,19 +928,18 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       pendingRuntimeRequests.delete(requestId);
       resolver({
         ...event.data,
-        status: event.data.status === 'completed' ? 'ok' : event.data.status || 'ok',
+        ...returnedToApp,
+        traceId,
         hostStatus: event.data.status || 'completed',
-        payload: effectiveRuntimePayload,
-        runtimePayload: effectiveRuntimePayload,
-        statePatch: effectiveRuntimePayload.statePatch || {}
+        diagnostics: { ...(event.data.diagnostics || {}), responseDiagnostics }
       });
     }
-    if (event.data.ok && !hasRuntimePayload) addDecision('AI response received but runtimePayload is missing or empty.', { requestId });
+    if (event.data.ok && !hasRuntimePayload) addDecision('AI response received but runtimePayload is missing or empty.', { traceId, requestId });
     if (event.data.ok && !hasConsumablePayload) {
-      addDecision('AI response received but no consumable runtimePayload was produced.', { requestId, runtimePayload });
+      addDecision('AI response received but no consumable runtimePayload was produced.', { traceId, requestId, runtimePayload });
       clearRuntimeLoadingState(triggerElement);
     }
-    if (event.data.ok && !hasConsumer) addDecision('AI response received but no runtime consumer function was found. Applying host fallback renderer.', { requestId });
+    if (event.data.ok && !hasConsumer) addDecision('AI response received but no runtime consumer function was found. Applying host fallback renderer.', { traceId, requestId });
     if (typeof window.onAiResponse === 'function') window.onAiResponse(event.data);
     if (event.data.ok && hasRuntimePayloadConsumer) window.applyRuntimePayload(effectiveRuntimePayload);
     if (event.data.ok && !hasRuntimePayloadConsumer) applyRuntimePayloadFallback(effectiveRuntimePayload);
@@ -912,25 +948,28 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     renderDiagnostics();
   });
   window.requestAiGeneration = window.requestAiGeneration || async (request = {}) => {
-    log('AI request creation', request);
+    const traceId = setTraceId(request.traceId || request.context?.traceId || createTraceId());
+    log('[TRACE ' + traceId + '] requestAiGeneration called', request);
+    addEvent('requestAiGeneration_called', { traceId, request });
     if (!diagnostics.providerRegistered) {
       diagnostics.lastAiError = 'No runtime AI provider registered.';
       log('AI failures', diagnostics.lastAiError);
       addDecision('Blocked because: Provider not connected.', { request });
       addError('requestAiGeneration', diagnostics.lastAiError);
       logStatus('Unavailable', 'provider_missing_before_request');
-      addEvent('runtime_error', { status: 'unavailable', message: diagnostics.lastAiError });
+      addEvent('runtime_error', { traceId, status: 'unavailable', message: diagnostics.lastAiError });
       const payload = deliverRuntimeError(diagnostics.lastAiError, 'unavailable');
       return { status: 'unavailable', error: diagnostics.lastAiError, payload, runtimePayload: payload, statePatch: payload.statePatch };
     }
     if (diagnostics.pendingRequests > 0) {
       addDecision('Blocked because: Request already in progress.', { pendingRequests: diagnostics.pendingRequests });
-      addEvent('runtime_error', { status: 'blocked', message: 'A runtime generation request is already pending.' });
+      addEvent('runtime_error', { traceId, status: 'blocked', message: 'A runtime generation request is already pending.' });
       const payload = deliverRuntimeError('A runtime generation request is already pending.', 'blocked');
       return { status: 'blocked', error: 'A runtime generation request is already pending.', payload, runtimePayload: payload, statePatch: payload.statePatch };
     }
     const runtimeRequest = {
       requestId: request.requestId || 'runtime-' + Date.now() + '-' + Math.random().toString(16).slice(2),
+      traceId,
       trigger: request.trigger || 'runtime_generation',
       state: request.state || {},
       continuationPlan: mergeContinuationPlan(
@@ -941,12 +980,13 @@ function buildAiActivityMonitor(runtimeContext = {}) {
         mergePreload(request.preload || [], window.__preload || []),
         mergePreload(window.preload || [], runtimeContext.preload || [])
       ),
-      context: request.context || {}
+      context: { ...(request.context || {}), traceId }
     };
     const requestEntry = {
       timestamp: now(),
       trigger: runtimeRequest.trigger,
       requestId: runtimeRequest.requestId,
+      traceId,
       status: 'Queued',
       durationMs: null,
       estimatedTokens: Math.ceil(payloadPreview(runtimeRequest).length / 4),
@@ -959,17 +999,19 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     debugState.budget.aiCallsThisSession += 1;
     debugState.budget.aiCallsThisMinute = debugState.aiRequests.filter((entry) => Date.parse(entry.timestamp) > Date.now() - 60000).length;
     debugState.budget.estimatedTokens += requestEntry.estimatedTokens;
-    addEvent('ai_request', { trigger: runtimeRequest.trigger, requestId: runtimeRequest.requestId });
+    addEvent('button_pressed', { traceId, trigger: runtimeRequest.trigger, requestId: runtimeRequest.requestId });
+    addEvent('ai_request', { traceId, trigger: runtimeRequest.trigger, requestId: runtimeRequest.requestId, params: runtimeRequest });
     log('AI request dispatch', runtimeRequest);
     requestEntry.status = 'Generating';
     begin('Runtime AI generation · ' + runtimeRequest.trigger);
     requestEntry.status = 'Generating';
-    addEvent('generation_started', { trigger: runtimeRequest.trigger, requestId: runtimeRequest.requestId });
+    addEvent('generation_started', { traceId, trigger: runtimeRequest.trigger, requestId: runtimeRequest.requestId });
     window.parent?.postMessage({
       source: 'creatia-generated-html',
       type: 'ai-runtime-generation',
       request: runtimeRequest,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      traceId
     }, '*');
     notify('needs_generation', runtimeRequest.trigger);
     requestEntry.status = 'Sent';
@@ -984,10 +1026,10 @@ function buildAiActivityMonitor(runtimeContext = {}) {
         requestEntry.status = 'Failed';
         addDecision('Blocked because: runtime generation response timed out.', { requestId: runtimeRequest.requestId });
         clearRuntimeLoadingState(triggerElement);
-        addEvent('runtime_error', { status: 'timeout', message: 'Runtime generation response timed out.' });
+        addEvent('runtime_error', { traceId, status: 'timeout', message: 'Runtime generation response timed out.' });
         const payload = deliverRuntimeError('Runtime generation response timed out.', 'timeout');
         end('Runtime AI generation timed out · ' + runtimeRequest.trigger, false);
-        resolve({ status: 'timeout', error: payload.error, request: runtimeRequest, payload, runtimePayload: payload, statePatch: payload.statePatch });
+        resolve({ status: 'timeout', traceId, error: payload.error, request: runtimeRequest, payload, runtimePayload: payload, statePatch: payload.statePatch });
       }, 45000);
     });
   };

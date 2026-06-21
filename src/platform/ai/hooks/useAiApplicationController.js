@@ -354,17 +354,19 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
     try {
       const request = buildRuntimeGenerationPrompt({ runtimeRequest, project, designSystem })
       setLastRuntimePrompt(JSON.stringify(request, null, 2))
-      onDebug?.({ status: 'ai_request', kind: request.kind, shortTitle: `Runtime IA · ${runtimeRequest.trigger || 'runtime_generation'}`, timestamp: new Date().toISOString() })
+      onDebug?.({ status: 'ai_request', kind: request.kind, traceId: runtimeRequest.traceId || runtimeRequest.context?.traceId || '', shortTitle: `Runtime IA · ${runtimeRequest.trigger || 'runtime_generation'}`, timestamp: new Date().toISOString(), detail: { prompt: request } })
       scheduleRequestTimeout(controller)
       const payload = await aiProvider({ ...request, signal: controller.signal })
-      onDebug?.({ status: 'ai_response', kind: request.kind, shortTitle: 'Runtime IA response', timestamp: new Date().toISOString() })
+      onDebug?.({ status: 'ai_response', kind: request.kind, traceId: runtimeRequest.traceId || runtimeRequest.context?.traceId || '', shortTitle: 'Runtime IA response', timestamp: new Date().toISOString(), rawResponse: { rawAI: payload } })
       const finalStructured = normalizeForProject(payload, project?.capabilities || {}, mode)
       if (!hasUsableRuntimePayload(finalStructured)) {
-        return { error: 'Runtime generation did not return a usable runtimePayload.', finalStructured }
+        return { error: 'runtimePayload missing', finalStructured, rawPayload: payload, traceId: runtimeRequest.traceId || runtimeRequest.context?.traceId || '' }
       }
       return {
         finalStructured,
         runtimePayload: finalStructured.runtimePayload,
+        rawPayload: payload,
+        traceId: runtimeRequest.traceId || runtimeRequest.context?.traceId || '',
         project,
         healthcheck: null,
         repairAttempts: 0
