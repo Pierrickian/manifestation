@@ -58,6 +58,21 @@ function hasUsableRuntimePayload(response = {}) {
   return Boolean(response.runtimePayload && typeof response.runtimePayload === 'object' && Object.keys(response.runtimePayload).length)
 }
 
+function isQuotaFailure(error) {
+  const text = [error?.code, error?.message, error?.status, error?.payload?.error, error?.payload?.message]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+  return /openai_quota|insufficient_quota|quota|credit|billing/.test(text)
+}
+
+function formatAiError(error, fallback = 'Impossible de générer la réponse pour le moment.') {
+  if (isQuotaFailure(error)) {
+    return 'Quota OpenAI insuffisant : Creatia ne peut pas générer cette app tant que les crédits ou la facturation OpenAI ne sont pas rétablis.'
+  }
+  return error instanceof Error ? error.message : fallback
+}
+
 function mergeCapabilityRequest(current = {}, requested = {}) {
   const runtimeCapabilities = {
     ...(current.runtimeCapabilities || {}),
@@ -296,9 +311,10 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
         onDebug?.({ status: 'aborted', rendererType: 'html', timeoutMs: REQUEST_TIMEOUT_MS, timestamp: new Date().toISOString() })
       } else {
         setStatus('error')
-        setError(submitError instanceof Error ? submitError.message : 'Impossible de générer la réponse pour le moment.')
-        setMessage('La génération a échoué.')
-        onDebug?.({ status: 'error', rendererType: 'html', errorMessage: submitError?.message || 'unknown', timestamp: new Date().toISOString() })
+        const errorMessage = formatAiError(submitError)
+        setError(errorMessage)
+        setMessage(isQuotaFailure(submitError) ? 'Quota OpenAI insuffisant.' : 'La génération a échoué.')
+        onDebug?.({ status: 'error', rendererType: 'html', errorMessage, errorCode: submitError?.code || '', timestamp: new Date().toISOString() })
       }
     } finally {
       window.clearInterval(interval)
@@ -354,7 +370,7 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
         repairAttempts: 0
       }
     } catch (runtimeError) {
-      return { error: runtimeError?.message || String(runtimeError) }
+      return { error: formatAiError(runtimeError, runtimeError?.message || String(runtimeError)), errorCode: runtimeError?.code || '' }
     } finally {
       runtimeGenerationPendingRef.current = false
       if (timeoutRef.current) window.clearTimeout(timeoutRef.current)
@@ -457,9 +473,10 @@ export function useAiApplicationController({ mode = 'create', designSystem, spee
         onDebug?.({ status: 'aborted', kind: 'human_model_refresh', timestamp: new Date().toISOString() })
       } else {
         setStatus('error')
-        setError(refreshError instanceof Error ? refreshError.message : 'Impossible de reconstruire le modèle humain pour le moment.')
-        setMessage('La reconstruction a échoué.')
-        onDebug?.({ status: 'error', kind: 'human_model_refresh', errorMessage: refreshError?.message || 'unknown', timestamp: new Date().toISOString() })
+        const errorMessage = formatAiError(refreshError, 'Impossible de reconstruire le modèle humain pour le moment.')
+        setError(errorMessage)
+        setMessage(isQuotaFailure(refreshError) ? 'Quota OpenAI insuffisant.' : 'La reconstruction a échoué.')
+        onDebug?.({ status: 'error', kind: 'human_model_refresh', errorMessage, errorCode: refreshError?.code || '', timestamp: new Date().toISOString() })
       }
     } finally {
       if (timeoutRef.current) window.clearTimeout(timeoutRef.current)

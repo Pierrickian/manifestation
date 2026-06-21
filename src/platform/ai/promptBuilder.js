@@ -27,6 +27,7 @@ const CO_CREATE_APP_INSTRUCTIONS = [
   'Generated Co-Create apps must await or handle the Promise returned by window.requestAiGeneration and clear loading states when it returns status "unavailable", "blocked", or "timeout".',
   'Generated Co-Create apps should listen for the "creatia-runtime-ready" event and re-render their AI/runtime availability indicator when it fires.',
   'Generated Co-Create apps must implement window.applyRuntimePayload(runtimePayload) to receive runtimePayload, clear loading states, and update themselves without reloading.',
+  'Generated Co-Create apps should log only app-level steps such as button pressed, waiting for runtime, payload applied, or runtime error. The injected Creatia runtime overlay logs host bridge and AI provider steps; do not claim the app contacts OpenAI directly.',
   'Do not label Co-Create runtime AI as offline-ready. The static shell may remain usable without the host, but live runtime generation requires an online Creatia parent bridge.',
   'continuationPlan must be short: one or two sentences only, for example { "runtimeRole": "Generate new inspiration cards when AI+ is pressed." }.',
   'preload must contain only trigger descriptors and context requirements, for example { "trigger": "ai_plus", "event": "renew_requested", "sendContext": ["originalRequest", "applicationState", "userHistory"] }.',

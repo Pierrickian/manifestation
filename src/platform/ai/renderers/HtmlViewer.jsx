@@ -73,6 +73,28 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     animation: creatiaAiSpin 850ms linear infinite;
   }
   .creatia-ai-activity-dot.is-active { opacity: 0.78; transform: scale(1); }
+  .creatia-runtime-step-log {
+    position: fixed;
+    left: max(12px, env(safe-area-inset-left));
+    top: max(12px, env(safe-area-inset-top));
+    z-index: 2147483646;
+    width: min(420px, calc(100vw - 24px));
+    max-height: 34vh;
+    overflow: auto;
+    padding: 10px;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,.18);
+    background: rgba(12, 10, 24, .88);
+    color: white;
+    font: 11px/1.35 system-ui, sans-serif;
+    box-shadow: 0 14px 38px rgba(0,0,0,.32);
+    backdrop-filter: blur(12px);
+    pointer-events: auto;
+  }
+  .creatia-runtime-step-log strong { display: block; margin-bottom: 6px; color: #ffeeb3; }
+  .creatia-runtime-step-log ol { margin: 0; padding-left: 20px; }
+  .creatia-runtime-step-log li { margin: 0 0 5px; color: rgba(255,255,255,.88); }
+  .creatia-runtime-step-log small { display: block; color: rgba(255,255,255,.58); }
   .creatia-runtime-debug-button {
     position: fixed;
     top: 12px;
@@ -154,7 +176,12 @@ function buildAiActivityMonitor(runtimeContext = {}) {
   const dot = document.createElement('div');
   dot.className = 'creatia-ai-activity-dot';
   dot.setAttribute('aria-hidden', 'true');
+  const stepLogPanel = document.createElement('aside');
+  stepLogPanel.className = 'creatia-runtime-step-log';
+  stepLogPanel.setAttribute('aria-live', 'polite');
+  stepLogPanel.setAttribute('aria-label', 'Runtime step-by-step log');
   const runtimeContext = ${serializedContext};
+  const debugEnabled = runtimeContext.debugEnabled !== false;
   const runtimeCapabilities = runtimeContext.runtimeCapabilities || runtimeContext.capabilities?.runtimeCapabilities || {};
   const isNonEmptyObject = (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length);
   const asArray = (value) => Array.isArray(value) ? value : [];
@@ -229,7 +256,8 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       preloadsConsumed: preload.filter((entry) => entry.consumed).length,
       preloadsDiscarded: preload.filter((entry) => entry.discarded).length
     },
-    lastResponse: null
+    lastResponse: null,
+    stepCounter: 0
   };
   const sessionStart = Date.now();
   const log = (...args) => console.log('[AI RUNTIME]', ...args);
@@ -237,9 +265,44 @@ function buildAiActivityMonitor(runtimeContext = {}) {
   const payloadPreview = (value) => {
     try { return JSON.stringify(value, null, 2).slice(0, 1200); } catch { return String(value).slice(0, 1200); }
   };
+  function appendGeneratedAppLog(entry) {
+    if (!debugEnabled) return;
+    const host = document.querySelector('[data-creatia-generated-log], #log, .log');
+    if (!host || host.closest?.('.creatia-runtime-debug-panel, .creatia-runtime-step-log')) return;
+    const line = document.createElement('div');
+    line.dataset.creatiaRuntimeLog = 'true';
+    line.className = host.id === 'log' || host.classList?.contains('log') ? 'logItem' : '';
+    line.textContent = entry.step + '. Runtime: ' + humanizeRuntimeEvent(entry.type, entry.detail);
+    if (host.firstChild) host.insertBefore(line, host.firstChild); else host.appendChild(line);
+  }
+  function humanizeRuntimeEvent(type, detail = {}) {
+    const labels = {
+      runtime_guard_loaded: 'guard chargé dans l’iframe',
+      provider_registered: 'bridge parent détecté',
+      ai_request: 'demande envoyée au runtime host',
+      generation_started: 'génération runtime démarrée',
+      host_request_received: 'host a reçu la demande',
+      host_dispatch_controller: 'host interroge l’IA',
+      host_response_received: 'host a reçu la réponse IA',
+      host_payload_posted: 'host renvoie le payload à l’iframe',
+      generation_completed: 'réponse runtime reçue',
+      runtime_payload_applied: 'payload appliqué dans l’app',
+      generation_failed: 'échec runtime',
+      runtime_error: 'erreur runtime'
+    };
+    return labels[type] || detail.message || type;
+  }
+  function renderStepLog() {
+    if (!debugEnabled) return;
+    const chronological = [...debugState.eventStream].reverse().slice(-18);
+    stepLogPanel.innerHTML = '<strong>Debug runtime · étapes</strong><ol>' + chronological.map((entry) => '<li value="' + entry.step + '">' + escapeHtml(humanizeRuntimeEvent(entry.type, entry.detail)) + '<small>' + escapeHtml(entry.type) + '</small></li>').join('') + '</ol>';
+  }
   const addEvent = (type, detail = {}) => {
-    debugState.eventStream.unshift({ timestamp: now(), type, detail });
+    const entry = { step: ++debugState.stepCounter, timestamp: now(), type, detail };
+    debugState.eventStream.unshift(entry);
     debugState.eventStream = debugState.eventStream.slice(0, 80);
+    appendGeneratedAppLog(entry);
+    renderStepLog();
     renderDiagnostics();
   };
   const addDecision = (message, detail = {}) => {
@@ -448,9 +511,12 @@ function buildAiActivityMonitor(runtimeContext = {}) {
   };
   const ready = () => {
     if (!document.body) return;
-    document.body.appendChild(dot);
-    document.body.appendChild(button);
-    document.body.appendChild(panel);
+    if (debugEnabled) {
+      document.body.appendChild(dot);
+      document.body.appendChild(stepLogPanel);
+      document.body.appendChild(button);
+      document.body.appendChild(panel);
+    }
     button.addEventListener('click', () => {
       panel.classList.toggle('is-open');
       addEvent('debug_panel_toggled', { open: panel.classList.contains('is-open') });
@@ -465,6 +531,7 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     }, 1500);
     const observer = new MutationObserver(() => syncGeneratedStatusText());
     observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    addEvent('runtime_guard_loaded', { debugEnabled });
     renderDiagnostics();
     syncGeneratedStatusText();
   };
@@ -490,6 +557,7 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       }
     };
     log('provider registration', { provider: window.CreatiaRuntime.aiProvider, providerRegistered: true });
+    addEvent('provider_registered', { provider: window.CreatiaRuntime.aiProvider });
     logStatus('Connected', 'parent_bridge_registered');
     logStatus('Idle', 'provider_ready_no_pending_request');
   } else {
@@ -774,6 +842,10 @@ function buildAiActivityMonitor(runtimeContext = {}) {
   const pendingRuntimeRequests = new Map();
   const pendingRuntimeRequestElements = new Map();
   window.addEventListener('message', (event) => {
+    if (event.data?.source === 'creatia-host' && event.data?.type === 'creatia-runtime-host-log') {
+      addEvent(event.data.step || 'host_log', { message: event.data.message, requestId: event.data.requestId, ...(event.data.detail || {}) });
+      return;
+    }
     if (event.data?.source !== 'creatia-host' || event.data?.type !== 'ai-runtime-generation-result') return;
     const requestId = event.data.requestId;
     const entry = debugState.aiRequests.find((item) => item.requestId === requestId);
@@ -847,11 +919,13 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       addDecision('Blocked because: Provider not connected.', { request });
       addError('requestAiGeneration', diagnostics.lastAiError);
       logStatus('Unavailable', 'provider_missing_before_request');
+      addEvent('runtime_error', { status: 'unavailable', message: diagnostics.lastAiError });
       const payload = deliverRuntimeError(diagnostics.lastAiError, 'unavailable');
       return { status: 'unavailable', error: diagnostics.lastAiError, payload, runtimePayload: payload, statePatch: payload.statePatch };
     }
     if (diagnostics.pendingRequests > 0) {
       addDecision('Blocked because: Request already in progress.', { pendingRequests: diagnostics.pendingRequests });
+      addEvent('runtime_error', { status: 'blocked', message: 'A runtime generation request is already pending.' });
       const payload = deliverRuntimeError('A runtime generation request is already pending.', 'blocked');
       return { status: 'blocked', error: 'A runtime generation request is already pending.', payload, runtimePayload: payload, statePatch: payload.statePatch };
     }
@@ -910,6 +984,7 @@ function buildAiActivityMonitor(runtimeContext = {}) {
         requestEntry.status = 'Failed';
         addDecision('Blocked because: runtime generation response timed out.', { requestId: runtimeRequest.requestId });
         clearRuntimeLoadingState(triggerElement);
+        addEvent('runtime_error', { status: 'timeout', message: 'Runtime generation response timed out.' });
         const payload = deliverRuntimeError('Runtime generation response timed out.', 'timeout');
         end('Runtime AI generation timed out · ' + runtimeRequest.trigger, false);
         resolve({ status: 'timeout', error: payload.error, request: runtimeRequest, payload, runtimePayload: payload, statePatch: payload.statePatch });

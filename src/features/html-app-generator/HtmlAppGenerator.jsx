@@ -50,6 +50,7 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
   const [activeTransferInfo, setActiveTransferInfo] = useState(null)
   const importInputRef = useRef(null)
   const [mode, setMode] = useState('create')
+  const [runtimeDebugEnabled, setRuntimeDebugEnabled] = useState(true)
   const [aiActivity, setAiActivity] = useState({ active: false, log: [] })
 
   function recordAiActivity(event = {}) {
@@ -95,7 +96,8 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
     capabilities: project?.capabilities || {},
     runtimeCapabilities: project?.capabilities?.runtimeCapabilities || {},
     continuationPlan: project?.continuationPlan || null,
-    preload: project?.preloadQueue || []
+    preload: project?.preloadQueue || [],
+    debugEnabled: runtimeDebugEnabled
   }
   const lastAutoOpenedHtmlRef = useRef('')
   const isBusy = controller.status === 'loading' || controller.status === 'repairing' || controller.status === 'refreshingHumanModel'
@@ -106,12 +108,16 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
       if (event.data?.source !== 'creatia-generated-html' || event.data?.type !== 'ai-runtime-generation') return
       if (mode !== 'co-create') return
       console.log('[AI RUNTIME HOST]', 'AI request reception', event.data.request || {})
-      console.log('[AI RUNTIME HOST]', 'AI request dispatch to controller')
       const requestId = event.data.request?.requestId
+      sendRuntimeHostLog(event.source, requestId, 'host_request_received', 'Host Creatia: requête runtime reçue depuis l’iframe.', { trigger: event.data.request?.trigger || 'runtime_generation' })
+      console.log('[AI RUNTIME HOST]', 'AI request dispatch to controller')
+      sendRuntimeHostLog(event.source, requestId, 'host_dispatch_controller', 'Host Creatia: envoi au contrôleur IA runtime.', { mode })
       controller.submitRuntimeGeneration(event.data.request || {})
         .then((runtimeResult) => {
           console.log('[AI RUNTIME HOST]', 'AI response reception')
+          sendRuntimeHostLog(event.source, requestId, 'host_response_received', 'Host Creatia: réponse IA runtime reçue.', { hasError: Boolean(runtimeResult?.error) })
           if (runtimeResult?.error) {
+            sendRuntimeHostLog(event.source, requestId, 'host_response_error', 'Host Creatia: réponse runtime en erreur.', { error: runtimeResult.error })
             event.source?.postMessage({ source: 'creatia-host', type: 'ai-runtime-generation-result', requestId, ok: false, responseType: 'generation_error', payload: { error: runtimeResult.error } }, '*')
             return
           }
@@ -119,9 +125,11 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
           const runtimePayload = runtimeResult?.runtimePayload || deriveRuntimePayload(finalStructured)
           const hasRuntimePayload = Boolean(runtimePayload && typeof runtimePayload === 'object' && Object.keys(runtimePayload).length)
           if (!finalStructured || !hasRuntimePayload) {
+            sendRuntimeHostLog(event.source, requestId, 'host_payload_missing', 'Host Creatia: runtimePayload manquant ou inutilisable.', {})
             event.source?.postMessage({ source: 'creatia-host', type: 'ai-runtime-generation-result', requestId, ok: false, responseType: 'generation_error', payload: { error: 'Runtime generation did not return a usable runtimePayload.' } }, '*')
             return
           }
+          sendRuntimeHostLog(event.source, requestId, 'host_payload_posted', 'Host Creatia: payload runtime renvoyé à l’iframe.', { payloadKeys: Object.keys(runtimePayload || {}) })
           event.source?.postMessage({
             source: 'creatia-host',
             type: 'ai-runtime-generation-result',
@@ -151,6 +159,7 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
         })
         .catch((error) => {
           console.log('[AI RUNTIME HOST]', 'AI failures', error?.message || error)
+          sendRuntimeHostLog(event.source, requestId, 'host_failure', 'Host Creatia: échec de génération runtime.', { error: error?.message || String(error) })
           event.source?.postMessage({ source: 'creatia-host', type: 'ai-runtime-generation-result', requestId, ok: false, responseType: 'generation_error', payload: { error: error?.message || String(error) } }, '*')
         })
     }
@@ -173,7 +182,7 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
   }, [hasUnsavedAiApp])
 
   function rememberExport(exportData, kind) {
-    setLastExport({ ...exportData, kind })
+    setLastExport({ ...exportData, kind, content: exportData.html || exportData.json || '' })
     setExportStatus(kind === 'html' ? 'Application téléchargée.' : 'Projet complet téléchargé.')
   }
 
@@ -188,6 +197,31 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
   }
 
 
+  async function handleCopyLastExport() {
+    if (!lastExport?.content) {
+      setExportStatus('Aucun téléchargement récent à copier.')
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(lastExport.content)
+      setExportStatus(lastExport.kind === 'html' ? 'HTML exporté copié.' : 'JSON projet exporté copié.')
+    } catch {
+      setExportStatus('Copie automatique indisponible. Ouvre le téléchargement puis copie son contenu manuellement.')
+    }
+  }
+
+  function sendRuntimeHostLog(target, requestId, step, message, detail = {}) {
+    target?.postMessage({
+      source: 'creatia-host',
+      type: 'creatia-runtime-host-log',
+      requestId,
+      step,
+      message,
+      detail,
+      timestamp: new Date().toISOString()
+    }, '*')
+  }
 
 
   async function handleImport(event) {
@@ -294,6 +328,7 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
         {activeTransferInfo === 'import' ? <small>Importer charge un projet Creatia ou une app seule déjà exportée.</small> : null}
         {activeTransferInfo === 'app' ? <small>Exporter app télécharge seulement l’application à ouvrir ailleurs, sans historique de création.</small> : null}
         {activeTransferInfo === 'project' ? <small>Exporter projet télécharge l’application avec le contexte et l’historique pour continuer dans Creatia.</small> : null}
+        {lastExport?.url ? <button type="button" className="ghost-action export-link" onClick={handleCopyLastExport}>Copier le téléchargement</button> : null}
         {lastExport?.url ? <a className="ghost-action export-link" href={lastExport.url} target="_blank" rel="noreferrer">Ouvrir le téléchargement</a> : null}
         {exportStatus ? <span className="project-export-status" role="status">{exportStatus}</span> : null}
       </div>
@@ -334,6 +369,11 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
           <input type="checkbox" checked={controller.hasTime} onChange={(event) => controller.setHasTime(event.target.checked)} disabled={isBusy} />
           <span>Analyse approfondie</span>
           <small>Autorise des contrôles plus longs quand c’est utile.</small>
+        </label>
+        <label className="ai-time-option">
+          <input type="checkbox" checked={runtimeDebugEnabled} onChange={(event) => setRuntimeDebugEnabled(event.target.checked)} />
+          <span>Debug runtime dans l’iframe</span>
+          <small>Affiche par défaut les étapes numérotées du bridge host↔runtime et les logs utiles dans l’app générée.</small>
         </label>
         {project?.humanModel ? (
           <div className="human-model-help">
