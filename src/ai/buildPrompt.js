@@ -22,6 +22,7 @@ const questionVariationRules = [
 
 export function buildPrompt(kind, context) {
   if (kind === 'html_app') return buildHtmlAppPrompt(context)
+  if (kind === 'runtime_generation') return buildRuntimeGenerationMessages(context)
   if (kind?.startsWith('narratia_')) return buildNarratiaPrompt(context)
   if (kind === 'mes_questions_quiz') return buildMesQuestionsPrompt(context)
   if (kind === 'enigmia_riddle') return buildEnigmiaPrompt(context)
@@ -53,6 +54,29 @@ export function buildPrompt(kind, context) {
         kind,
         task: getTask(kind),
         expectedShape: getExpectedShape(kind),
+        context
+      })
+    }
+  ]
+}
+
+
+function buildRuntimeGenerationMessages(context = {}) {
+  return [
+    {
+      role: 'system',
+      content: [
+        'Tu es le runtime Co-Create Creatia. Réponds uniquement en JSON valide.',
+        'Pour kind runtime_generation, tu dois produire un runtimePayload non vide ou un payload non vide.',
+        'Le payload doit pouvoir être appliqué sans rechargement par window.applyRuntimePayload.',
+        'Ne contacte jamais une API depuis le HTML généré: seul le runtime host appelle l IA.'
+      ].join('\n')
+    },
+    {
+      role: 'user',
+      content: JSON.stringify({
+        kind: 'runtime_generation',
+        expectedShape: { kind: 'runtime_generation', runtimePayload: { title: 'string', intro: 'string', items: 'array', statePatch: 'object' } },
         context
       })
     }

@@ -32,6 +32,36 @@ function createEvolutionEntry({ at, request, response = {} }) {
   }
 }
 
+export function normalizePreloadQueue(preload = []) {
+  if (!Array.isArray(preload)) return []
+
+  return preload
+    .map((item) => {
+      if (typeof item === 'string') {
+        return {
+          trigger: 'manual_or_contextual_followup',
+          preparedPrompt: item,
+          confidence: null,
+          legacyVisibleSuggestion: true,
+          migratedFrom: 'legacy_preload_string'
+        }
+      }
+
+      if (!item || typeof item !== 'object') return null
+
+      const preparedPrompt = item.preparedPrompt || item.prompt || item.task || item.reason || item.description || ''
+      return {
+        ...item,
+        trigger: item.trigger || item.event || item.when || 'contextual_followup',
+        preparedPrompt,
+        confidence: typeof item.confidence === 'number' ? item.confidence : item.confidence ?? null,
+        legacyVisibleSuggestion: Boolean(item.legacyVisibleSuggestion || item.task || item.reason),
+        migratedFrom: item.migratedFrom || ((item.task || item.reason) && !item.preparedPrompt ? 'legacy_preload_action' : undefined)
+      }
+    })
+    .filter(Boolean)
+}
+
 export function createProject({ mode, request, response, designSystem }) {
   const now = new Date().toISOString()
   const humanModel = normalizeHumanModel(response.humanModel || response.human || response.state?.humanModel)
@@ -43,13 +73,14 @@ export function createProject({ mode, request, response, designSystem }) {
     humanModel,
     technicalModel,
     currentApplication: response.html || '',
+    lastValidApplication: response.html || '',
     systemPrompt: response.systemPrompt || '',
     applicationState: response.state || {},
     generationHistory: [{ at: now, request, response }],
     evolutionHistory: [createEvolutionEntry({ at: now, request, response })],
     aiSuggestionsHistory: Array.isArray(response.suggestedActions) ? [{ at: now, suggestions: response.suggestedActions }] : [],
     continuationPlan: response.continuationPlan || null,
-    preloadQueue: Array.isArray(response.preload) ? response.preload : [],
+    preloadQueue: normalizePreloadQueue(response.preload),
     capabilities: response.capabilities || {},
     metadata: { createdAt: now, updatedAt: now, designSystem, renderer: 'html' }
   }
@@ -58,15 +89,17 @@ export function createProject({ mode, request, response, designSystem }) {
 export function evolveProject(project, request, response) {
   const now = new Date().toISOString()
   const currentHtml = response.html || project.currentApplication
+  const lastValidApplication = response.html || project.lastValidApplication || project.currentApplication || ''
   return {
     ...project,
     humanModel: normalizeHumanModel(response.humanModel || response.human || project.humanModel || response.state?.humanModel),
     technicalModel: normalizeTechnicalModel(response),
     currentApplication: currentHtml,
+    lastValidApplication,
     systemPrompt: response.systemPrompt || project.systemPrompt,
     applicationState: response.state || project.applicationState || {},
     continuationPlan: response.continuationPlan || project.continuationPlan || null,
-    preloadQueue: Array.isArray(response.preload) ? response.preload : project.preloadQueue || [],
+    preloadQueue: Array.isArray(response.preload) ? normalizePreloadQueue(response.preload) : normalizePreloadQueue(project.preloadQueue || []),
     capabilities: response.capabilities || project.capabilities || {},
     generationHistory: [...(project.generationHistory || []), { at: now, request, response }],
     evolutionHistory: [...(project.evolutionHistory || []), createEvolutionEntry({ at: now, request, response })],

@@ -12,6 +12,19 @@ const client = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: OPENAI_REQUEST_TIMEOUT_MS })
   : null
 
+function previewForLog(value, max = 1600) {
+  try { return JSON.stringify(value).slice(0, max) } catch { return String(value).slice(0, max) }
+}
+
+function apiTrace(traceId, step, detail = {}) {
+  console.log(`[API AI][TRACE ${traceId || 'no-trace'}] ${step}`, detail)
+}
+
+function getTraceId(context = {}) {
+  return context?.metadata?.traceId || context?.traceId || context?.runtimeRequest?.traceId || 'no-trace'
+}
+
+
 const responseFormats = {
   answer: {
     type: 'json_schema',
@@ -306,7 +319,7 @@ const responseFormats = {
 
 
 function getResponseFormat(kind, context) {
-  if (kind === 'html_app') return undefined
+  if (kind === 'html_app' || kind === 'runtime_generation') return undefined
   if (kind !== 'mes_questions_quiz') return responseFormats[kind] || responseFormats.question
 
   const exactQuestionCount = Math.max(1, Math.min(10, Number(context?.questionCount || 5)))
@@ -337,6 +350,8 @@ export default async function handler(request, response) {
   }
 
   const { kind, context } = request.body || {}
+  const traceId = getTraceId(context)
+  apiTrace(traceId, 'request_received', { kind, promptLength: String(context?.prompt || '').length })
 
   if (!client) {
     response.status(200).json(withDebug(getLocalResult(kind, context), {
@@ -346,6 +361,7 @@ export default async function handler(request, response) {
       kind,
       timeoutMs: OPENAI_REQUEST_TIMEOUT_MS,
       fallbackAfterMs: LOCAL_FALLBACK_DELAY_MS,
+      traceId,
       timestamp: new Date().toISOString()
     }))
     return
@@ -355,7 +371,8 @@ export default async function handler(request, response) {
 
   try {
     const model = process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL
-    const result = await createValidatedAiResult(kind, context, model)
+    apiTrace(traceId, 'ai_call_prepare', { kind, model, promptPreview: previewForLog(context?.prompt || context) })
+    const result = await createValidatedAiResult(kind, context, model, traceId)
 
     response.status(200).json(withDebug(result.payload, {
       source: 'ai',
@@ -366,6 +383,7 @@ export default async function handler(request, response) {
       kind,
       timeoutMs: OPENAI_REQUEST_TIMEOUT_MS,
       fallbackAfterMs: LOCAL_FALLBACK_DELAY_MS,
+      traceId,
       timestamp: new Date().toISOString()
     }))
   } catch (error) {
@@ -377,10 +395,14 @@ export default async function handler(request, response) {
       errorName: error?.name || 'Error',
       errorMessage: error?.message || 'Unknown OpenAI error',
       invalidPayloadKeys: error?.payloadKeys?.join(', ') || 'none',
+      missingFields: error?.missingFields || [],
+      expectedSchema: error?.expectedSchema || '',
+      receivedSchema: error?.receivedSchema || null,
       retryCount: error?.retryCount ?? 0,
       kind,
       timeoutMs: OPENAI_REQUEST_TIMEOUT_MS,
       fallbackAfterMs: LOCAL_FALLBACK_DELAY_MS,
+      traceId,
       timestamp: new Date().toISOString()
     }
 
@@ -405,7 +427,7 @@ export default async function handler(request, response) {
   }
 }
 
-async function createValidatedAiResult(kind, context, model) {
+async function createValidatedAiResult(kind, context, model, traceId = 'no-trace') {
   const attempts = kind === 'html_app' ? [buildPrompt(kind, context)] : [buildPrompt(kind, context), buildPrompt(kind, context)]
   if (kind !== 'html_app') {
     attempts[1] = [
@@ -425,6 +447,8 @@ async function createValidatedAiResult(kind, context, model) {
   let lastError = null
 
   for (const [attemptIndex, messages] of attempts.entries()) {
+    const startedAt = Date.now()
+    apiTrace(traceId, 'ai_call_started', { kind, model, attemptIndex, messagesPreview: previewForLog(messages) })
     const completion = await client.chat.completions.create({
       model,
       messages,
@@ -433,8 +457,12 @@ async function createValidatedAiResult(kind, context, model) {
     })
 
     const content = completion.choices[0]?.message?.content || '{}'
+    apiTrace(traceId, 'ai_response_raw', { kind, durationMs: Date.now() - startedAt, finishReason: completion.choices[0]?.finish_reason || 'unknown', rawResponse: content.slice(0, 4000) })
     const payload = kind === 'html_app' ? normalizeHtmlAppPayload(content) : normalizeAiPayload(kind, JSON.parse(content), context)
+    apiTrace(traceId, 'response_normalized', { kind, keys: Object.keys(payload || {}), normalized: previewForLog(payload) })
     const validationError = validateAiPayload(kind, payload, context)
+    if (validationError) apiTrace(traceId, 'validation_failed', { message: validationError.message, missingFields: validationError.missingFields, expectedSchema: validationError.expectedSchema, receivedSchema: validationError.receivedSchema })
+    else apiTrace(traceId, 'response_validated', { kind })
 
     if (!validationError) {
       return {
@@ -451,6 +479,24 @@ async function createValidatedAiResult(kind, context, model) {
   throw lastError
 }
 
+function describeValidationFailure(kind, payload, context = {}) {
+  const keys = Object.keys(payload || {})
+  if (kind === 'runtime_generation') {
+    return {
+      message: 'runtimePayload missing',
+      missingFields: ['runtimePayload or payload'],
+      expectedSchema: 'runtime_generation response with non-empty runtimePayload or payload object',
+      receivedSchema: { keys, kind: payload?.kind || 'unknown', hasRuntimePayload: Boolean(payload?.runtimePayload), hasPayload: Boolean(payload?.payload) }
+    }
+  }
+  return {
+    message: `Invalid AI ${kind} payload: ${keys.join(', ') || 'empty object'}`,
+    missingFields: [],
+    expectedSchema: getShapeInstruction(kind),
+    receivedSchema: { keys }
+  }
+}
+
 function validateAiPayload(kind, payload, context = {}) {
   const validators = {
     answer: (value) => Boolean(value?.answer?.label && value.answer.needId && value.answer.scores),
@@ -462,6 +508,7 @@ function validateAiPayload(kind, payload, context = {}) {
     narratia_child_choices: (value) => Array.isArray(value?.childChoices) && value.childChoices.length >= 6,
     narratia_story_package: (value) => Boolean(value?.title && Array.isArray(value.milestones) && Array.isArray(value.segments) && Array.isArray(value.endings) && value.endings.length === 3),
     enigmia_riddle: (value) => validateEnigmiaRiddle(value?.riddle).isValid,
+    runtime_generation: (value) => Boolean((value?.runtimePayload && typeof value.runtimePayload === 'object' && Object.keys(value.runtimePayload).length) || (value?.payload && typeof value.payload === 'object' && Object.keys(value.payload).length)),
     html_app: (value) => typeof value?.html === 'string' && /^\s*(<!doctype html|<html)/i.test(value.html) && typeof value?.systemPrompt === 'string' && value?.state && Array.isArray(value?.suggestedActions),
     mes_questions_quiz: (value) => Array.isArray(value?.questions) && value.questions.length === Number(context?.questionCount || value.questions.length) && value.questions.every((question) => question?.id && question.subject && question.question && Array.isArray(question.answers) && question.answers.length === 3 && question.answers.some((answer) => answer.id === question.correctAnswerId))
   }
@@ -469,10 +516,14 @@ function validateAiPayload(kind, payload, context = {}) {
   const isValid = (validators[kind] || validators.question)(payload)
   if (isValid) return null
 
-  const error = new Error(`Invalid AI ${kind} payload: ${Object.keys(payload || {}).join(', ') || 'empty object'}`)
+  const failure = describeValidationFailure(kind, payload, context)
+  const error = new Error(failure.message)
   error.name = 'InvalidAIResponseError'
   error.code = 'invalid_ai_payload'
   error.payloadKeys = Object.keys(payload || {})
+  error.missingFields = failure.missingFields
+  error.expectedSchema = failure.expectedSchema
+  error.receivedSchema = failure.receivedSchema
   return error
 }
 

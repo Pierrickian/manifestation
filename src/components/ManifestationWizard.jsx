@@ -1361,6 +1361,7 @@ function WizardMenu({
               <div className="menu-health-actions">
                 <button type="button" className="ghost-action" onClick={() => setShowCreatiaHealthDetails((visible) => !visible)}>{showCreatiaHealthDetails ? 'Masquer' : 'View details'}</button>
                 <button type="button" className="ghost-action" onClick={creatiaMenu.healthcheckActions?.retry} disabled={creatiaMenu.healthcheckActions?.isBusy}>Retry</button>
+                <button type="button" className="ghost-action" onClick={creatiaMenu.healthcheckActions?.copyPrompt} disabled={!creatiaMenu.healthcheckActions?.canCopyPrompt}>Copy Runtime Prompt</button>
                 <button type="button" className="primary-action" onClick={creatiaMenu.healthcheckActions?.repair} disabled={creatiaMenu.healthcheckActions?.isBusy || !creatiaMenu.healthcheckActions?.canRepair}>Repair</button>
               </div>
               {showCreatiaHealthDetails ? (
