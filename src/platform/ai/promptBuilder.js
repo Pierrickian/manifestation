@@ -28,6 +28,9 @@ const CO_CREATE_APP_INSTRUCTIONS = [
   'Generated Co-Create apps must await or handle the Promise returned by window.requestAiGeneration, log status/payload diagnostics with the returned traceId when available, and clear loading states when it returns status "unavailable", "blocked", or "timeout".',
   'Generated Co-Create apps should listen for the "creatia-runtime-ready" event, also check window.CreatiaRuntime/requestAiGeneration at click time, and re-render their AI/runtime availability indicator when the host bridge appears.',
   'Generated Co-Create apps must implement window.applyRuntimePayload(runtimePayload) to receive runtimePayload, clear loading states, and update themselves without reloading.',
+  'applyRuntimePayload must project runtimePayload into user-facing fields, not display the raw runtimePayload object: first merge runtimePayload.statePatch into app state, then map runtimePayload.items by id/type to known UI fields, then render the updated state.',
+  'For typed items, handle { type: "quote", id: "quoteField", text } by updating the visible quote/text field; handle generic items with title/text/value by rendering concise cards or list rows.',
+  'Never render JSON.stringify(runtimePayload), JSON.stringify(result), payloadPreview(runtimePayload), or a raw <pre> dump in the user-facing UI; raw payload dumps are only allowed inside an explicit debug panel.',
   'Generated Co-Create apps should log only app-level steps such as button pressed, requestAiGeneration called, raw response received, status received, payload detected, payload applied, or runtime error. Include the propagated traceId in those app logs when available. The injected Creatia runtime overlay logs host bridge and AI provider steps; do not claim the app contacts OpenAI directly.',
   'Do not label Co-Create runtime AI as offline-ready. The static shell may remain usable without the host, but live runtime generation requires an online Creatia parent bridge.',
   'continuationPlan must be short: one or two sentences only, for example { "runtimeRole": "Generate new inspiration cards when AI+ is pressed." }.',
@@ -41,7 +44,8 @@ const RUNTIME_GENERATION_INSTRUCTIONS = [
   'Return ONLY valid JSON, without Markdown or code fences.',
   'Return { "kind": "runtime_generation", "runtimePayload": object, "state": object, "continuationPlan": object|null, "preload": array }.',
   'Generate only the runtimePayload needed for the current trigger. Do not rebuild the full HTML app; for a page change, return page/screen/route/title/text/htmlFragment fields inside runtimePayload.',
-  'runtimePayload must be directly consumable by window.applyRuntimePayload(runtimePayload). Include page, choices, items, statePatch, route, screen, title, text, or htmlFragment when relevant.'
+  'runtimePayload must be directly consumable by window.applyRuntimePayload(runtimePayload). Include page, choices, items, statePatch, route, screen, title, text, or htmlFragment when relevant.',
+  'Prefer a statePatch with explicit user-facing fields plus typed items, for example { statePatch: { status: "ready", busy: false, quote: "..." }, items: [{ type: "quote", id: "quoteField", text: "..." }] }.'
 ]
 
 function looksLikeHtmlDocument(value = '') {
@@ -315,7 +319,7 @@ export function buildRepairPrompt({ originalRequest, failedResponse, healthcheck
       'The following application failed validation.',
       'Repair the failed checks while preserving the intended functionality and visual style.',
       'Do not merely repeat the original request; use the previousHtml and healthcheckReport as debugging context.',
-      'This is a final repair pass, not a planning or negotiation step: never return capability_request, clarification_request, or generation_error for repairable Co-Create bridge/status issues; if unsure, make the smallest concrete HTML/JS repair that removes the failed healthcheck.',
+      'This is a final repair pass, not a planning or negotiation step: do not return capability_request, clarification_request, or generation_error unless repair is impossible.',
       'When mode is co-create and only continuationPlan or preload is missing, keep the existing HTML runnable and repair the JSON collaboration metadata with a non-empty continuationPlan and trigger-driven preload entries.',
       'Return a corrected standalone HTML application using the required JSON shape.'
     ].join(' ')

@@ -142,6 +142,19 @@ function consumesRuntimePayload(html = '') {
   return hasStandardConsumer && consumesCoreFields
 }
 
+function rendersRuntimePayloadRaw(html = '') {
+  const text = String(html)
+  return /JSON\.stringify\s*\(\s*(?:runtimePayload|result|payload)\s*\)|payloadPreview\s*\(\s*runtimePayload\s*\)|<pre[^>]*>[^<]*(?:runtimePayload|payload|result)/i.test(text)
+}
+
+function projectsRuntimePayloadFields(html = '') {
+  const text = String(html)
+  const mergesStatePatch = /runtimePayload\s*\.\s*statePatch|statePatch\s*&&|Object\.assign\s*\([^)]*statePatch|\.\.\.\s*statePatch/i.test(text)
+  const mapsItems = /runtimePayload\s*\.\s*items|\.items\s*\?\.|\.items\s*&&/i.test(text)
+  const routesItemFields = /\.\s*(id|type)\b|\[['"](?:id|type)['"]\]/i.test(text) && /\.\s*(text|title|value)\b|\[['"](?:text|title|value)['"]\]/i.test(text)
+  return mergesStatePatch && mapsItems && routesItemFields
+}
+
 function displaysOfflineByDefault(html = '') {
   return />\s*Offline\s*</i.test(String(html)) || /status[^<>"']*Offline/i.test(String(html))
 }
@@ -334,6 +347,28 @@ export function runGeneratedAppHealthcheck(response = {}, strategy = {}) {
       message: 'Runtime payload consumer detected.',
       expected: 'The generated application must implement applyRuntimePayload/onAiResponse and consume runtimePayload fields such as page, title, summary, items, choices, htmlFragment, or statePatch without reloading.',
       actual: 'No standard runtimePayload consumer was detected for direct in-app continuation.',
+      repairConfidence: 'high',
+      repairable: true,
+      severity: 'warning'
+    }))
+
+    checks.push(createCheck({
+      id: 'cocreate_runtime_payload_projects_fields',
+      ok: projectsRuntimePayloadFields(html),
+      message: 'Runtime payload projects fields into app state and UI.',
+      expected: 'applyRuntimePayload must merge runtimePayload.statePatch and map runtimePayload.items by id/type into visible UI fields.',
+      actual: 'No concrete statePatch merge plus typed item mapping was detected.',
+      repairConfidence: 'high',
+      repairable: true,
+      severity: 'warning'
+    }))
+
+    checks.push(createCheck({
+      id: 'cocreate_runtime_payload_not_rendered_raw',
+      ok: !rendersRuntimePayloadRaw(html),
+      message: 'Runtime payload is not rendered as raw JSON.',
+      expected: 'Runtime payload must be projected into user-facing fields; raw JSON may only be shown inside an explicit debug panel.',
+      actual: 'The generated application appears to render raw runtime payload/result JSON to the user-facing UI.',
       repairConfidence: 'high',
       repairable: true,
       severity: 'warning'
