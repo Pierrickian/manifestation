@@ -858,6 +858,19 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       element.classList?.remove('loading', 'is-loading', 'pending', 'is-pending');
     });
   }
+
+  function installHostRequestAiGeneration(handler) {
+    const existing = window.requestAiGeneration;
+    if (typeof existing === 'function' && !existing.__creatiaHostBridge) {
+      window.__creatiaGeneratedRequestAiGeneration = existing;
+      addEvent('generated_requestAiGeneration_stub_replaced', { existingType: typeof existing, reason: 'Generated app defined requestAiGeneration before Creatia host bridge.' });
+      addDecision('Generated app stubbed requestAiGeneration. Creatia replaced it with the host bridge.', { existingType: typeof existing });
+    }
+    handler.__creatiaHostBridge = true;
+    handler.__creatiaBridgeVersion = 'host-postmessage-v1';
+    window.requestAiGeneration = handler;
+  }
+
   const pendingRuntimeRequests = new Map();
   const pendingRuntimeRequestElements = new Map();
   window.addEventListener('message', (event) => {
@@ -947,7 +960,7 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     if (event.data.ok && typeof window.applyGeneratedRoom === 'function') window.applyGeneratedRoom(effectiveRuntimePayload?.room || effectiveRuntimePayload);
     renderDiagnostics();
   });
-  window.requestAiGeneration = window.requestAiGeneration || async (request = {}) => {
+  const creatiaHostRequestAiGeneration = async (request = {}) => {
     const traceId = setTraceId(request.traceId || request.context?.traceId || createTraceId());
     log('[TRACE ' + traceId + '] requestAiGeneration called', request);
     addEvent('requestAiGeneration_called', { traceId, request });
@@ -1033,6 +1046,7 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       }, 45000);
     });
   };
+  installHostRequestAiGeneration(creatiaHostRequestAiGeneration);
   syncGeneratedStatusText();
   window.dispatchEvent(new CustomEvent('creatia-runtime-ready', { detail: { diagnostics: { ...diagnostics } } }));
   document.dispatchEvent(new CustomEvent('creatia-runtime-ready', { detail: { diagnostics: { ...diagnostics } } }));

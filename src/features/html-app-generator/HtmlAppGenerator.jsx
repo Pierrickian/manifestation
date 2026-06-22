@@ -79,8 +79,17 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
   const [aiActivity, setAiActivity] = useState({ active: false, log: [] })
   const [runtimeTrace, setRuntimeTrace] = useState({ currentTraceId: '', timeline: [], rawResponses: [] })
 
+  function isRuntimeTraceEvent(event = {}) {
+    return event.kind === 'runtime_generation'
+      || event.responseType === 'runtime_generation'
+      || event.step?.startsWith?.('host_')
+      || event.status?.startsWith?.('runtime_')
+      || event.type === 'creatia-runtime-host-log'
+  }
+
   function recordRuntimeTrace(event = {}) {
-    const traceId = event.traceId || event.detail?.traceId || runtimeTrace.currentTraceId || ''
+    const incomingTraceId = event.traceId || event.detail?.traceId || ''
+    const traceId = incomingTraceId && incomingTraceId !== 'no-trace' ? incomingTraceId : runtimeTrace.currentTraceId || ''
     setRuntimeTrace((current) => ({
       currentTraceId: traceId || current.currentTraceId,
       timeline: [{ id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, traceId: traceId || current.currentTraceId, timestamp: event.timestamp || new Date().toISOString(), step: event.step || event.status || 'runtime_event', status: event.status || 'info', durationMs: event.durationMs ?? null, message: event.message || event.shortTitle || '', detail: event.detail || event }, ...current.timeline].slice(0, 80),
@@ -90,7 +99,7 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
 
   function recordAiActivity(event = {}) {
     onDebug?.(event)
-    if (event.traceId || event.status?.startsWith?.('runtime_')) recordRuntimeTrace(event)
+    if (isRuntimeTraceEvent(event)) recordRuntimeTrace(event)
     const status = event.status || 'info'
     const isRequest = status === 'ai_request' || status === 'request'
     const isResponse = status === 'ai_response' || status === 'response' || status === 'success' || status === 'error' || status === 'aborted'
@@ -465,6 +474,7 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
             <code>{runtimeTrace.currentTraceId || 'aucune demande Co-Create'}</code>
             <button type="button" className="ghost-action slim-action" onClick={handleCopyRuntimeTrace}>Copier le debug runtime</button>
           </div>
+          {runtimeTrace.timeline.length ? null : <small>Aucune demande runtime reçue par Creatia. Le bridge iframe n’a probablement pas été appelé ou a été remplacé par l’app générée.</small>}
           <ol className="runtime-debug-timeline">
             {runtimeTrace.timeline.slice(0, 20).map((entry, index) => (
               <li key={entry.id}>
