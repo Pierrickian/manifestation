@@ -16,6 +16,12 @@ Before changing runtime behavior, identify:
 - whether the response uses the currently validated `runtimePayload` evolution path, full HTML, or another contract;
 - the code path that consumes the response.
 
+## Capability and domain prompt layering
+
+Prompt assembly must distinguish structural `system-capabilities/` from optional `domain-skills/`. System capabilities may contribute runtime API instructions, contracts, compatibility fragments, diagnostic fragments, repair fragments, and Co-Create prompt fragments. Domain skills may contribute domain vocabulary, examples, tone, and business constraints only.
+
+Domain skills must never define the Creatia runtime API, bridge functions, message envelopes, `runtime_generation` response shapes, or `runtimePayload` projection rules. If a domain skill needs live AI behavior, the prompt must bind it to an existing system capability such as `CreatiaCoCreate` or `CreatiaRuntimeGenerator` rather than letting the domain layer invent a runtime contract.
+
 ## Prompt governance
 
 - Keep responsibilities explicit between Creatia, the generated application, and the AI.

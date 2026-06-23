@@ -34,6 +34,23 @@ User request
 
 Cette position permettrait à `Prompt Assembly` de recevoir une description structurée de ce qui est nécessaire, sans déplacer la responsabilité de génération vers la découverte.
 
+## Couches de capacités
+
+La découverte prospective ne doit plus supposer une modélisation unique `skills/`. Elle doit distinguer deux couches :
+
+- `system-capabilities/` : capacités structurelles Creatia, capables de porter des contrats, fragments de compatibilité, API runtime, diagnostics, réparations et fragments de prompt.
+- `domain-skills/` : compétences métier optionnelles, limitées au vocabulaire, au ton, aux exemples, aux contraintes produit et aux besoins d'interaction du domaine.
+
+Un `domain skill` ne définit jamais l'API runtime Creatia. Il peut seulement déclarer qu'il a besoin d'une capacité système existante.
+
+### Classement canonique
+
+- `CreatiaCompatibleApp` : contrat + fragment de compatibilité.
+- `CreatiaRuntimeGenerator` : capacité runtime + contrat de sortie.
+- `CreatiaDiagnoser` : capacité système de diagnostic.
+- `CreatiaRepairer` : capacité système de réparation.
+- `CreatiaCoCreate` : combinaison API runtime + contrat Co-Create + fragments de prompt.
+
 ## Output conceptuel
 
 L'output attendu serait un objet conceptuel minimal :
@@ -41,8 +58,9 @@ L'output attendu serait un objet conceptuel minimal :
 ```json
 {
   "mode": "create | coCreate | runtime | clarification",
-  "requiredCapabilities": ["html_app", "runtime_ai", "touch_ui"],
-  "requiredNeeds": ["standalone_app", "adaptive_questions", "mobile_scroll"],
+  "requiredCapabilities": ["CreatiaCompatibleApp", "CreatiaCoCreate"],
+  "requiredDomainSkills": ["adaptive_questions"],
+  "requiredNeeds": ["standalone_app", "mobile_scroll"],
   "constraints": ["no_fake_bridge", "no_full_rebuild_when_runtimePayload_is_sufficient"]
 }
 ```
@@ -50,7 +68,8 @@ L'output attendu serait un objet conceptuel minimal :
 ### Champs
 
 - `mode` : classe le type de flux attendu, par exemple création simple, co-création, génération runtime ou besoin de clarification.
-- `requiredCapabilities` : liste les capacités techniques ou contractuelles nécessaires.
+- `requiredCapabilities` : liste les capacités système Creatia nécessaires, issues de `system-capabilities/`.
+- `requiredDomainSkills` : liste optionnelle de compétences métier issues de `domain-skills/`; ces compétences ne définissent jamais l'API runtime.
 - `requiredNeeds` : exprime les besoins produit ou interactionnels requis par la demande.
 - `constraints` : capture les limites non négociables à transmettre à `Prompt Assembly`.
 

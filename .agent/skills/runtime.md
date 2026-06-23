@@ -75,6 +75,12 @@ Working callback loops have priority over architectural purity.
 
 Whenever a new architectural rule, responsibility, runtime contract, prompt contract, or evolution mechanism becomes validated, update the corresponding skill in the same PR. No architectural direction may exist only in code.
 
+## Runtime capability ownership
+
+The Creatia runtime API is owned by system capabilities and the versioned contract, not by domain skills. `CreatiaRuntimeGenerator` owns the runtime capability/output-contract framing, and `CreatiaCoCreate` combines the runtime API with the Co-Create contract and prompt fragments. `CreatiaCompatibleApp`, `CreatiaDiagnoser`, and `CreatiaRepairer` cover compatibility, diagnostics, and repair respectively.
+
+A domain skill can request runtime behavior only by depending on these system capabilities. It must never redefine bridge functions, host/iframe messages, `runtime_generation`, `runtimePayload`, diagnostics, repair, persistence, import/export, or runtime orchestration.
+
 ## Operational API documentation
 
 `runtime-api/creatia-runtime/v1/` is the official source of truth for the Creatia runtime operational contract. This skill records governance and validated direction only; it must not redefine bridge message shapes, runtime result envelopes, payload projection rules, or runtime field stability outside that versioned API documentation.
