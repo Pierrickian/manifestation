@@ -70,6 +70,8 @@ Statuts de retour usuels :
 - `blocked` : une demande est déjà en cours ;
 - `timeout` : aucune réponse host reçue dans le délai runtime.
 
+Les statuts `unavailable`, `blocked` et `timeout` peuvent être produits localement par le guard iframe sans appel IA réussi. Ils utilisent la même enveloppe de compatibilité (`status`, `error`, `payload`, `runtimePayload`, `statePatch`) afin que l’application générée puisse vider ses états de chargement de manière uniforme.
+
 ### `window.applyRuntimePayload(runtimePayload)`
 
 Fonction fournie par l’application générée. Creatia l’appelle lorsque `ai-runtime-generation-result` contient un payload consommable.
@@ -94,7 +96,7 @@ Payload :
 
 ```ts
 type CreatiaRuntimeReadyEvent = CustomEvent<{
-  diagnostics: RuntimeDiagnostics
+  diagnostics: RuntimeIframeDiagnostics
 }>
 ```
 
@@ -182,7 +184,15 @@ Ces logs alimentent l’overlay et le journal de l’activité IA côté Creatia
 
 ## Shapes
 
+> Note : ces shapes sont des **shapes documentaires déduites du runtime actuel**. Elles formalisent les objets observés dans le bridge, les prompts, les healthchecks et les tests de contrat ; elles ne sont pas encore des types exportés par le code ni une validation exhaustive appliquée à l’exécution.
+
 Les shapes ci-dessous décrivent le contrat v1 en termes opérationnels. Les champs additionnels sont autorisés s’ils restent sérialisables et ne déplacent pas les responsabilités du host vers l’application générée.
+
+### Niveaux de stabilité des champs
+
+- Champs requis par le flux actuel : `source`, `type`, `request`, `requestId`, `traceId`, et les alias `payload` / `runtimePayload` sur une réponse runtime réussie.
+- Champs optionnels ou observés : `projectPatch`, `finalStructured`, `healthcheck`, `repairAttempts`, `hasRuntimePayload`, `hasFinalStructured` et les diagnostics de validation.
+- Champs projetables du `RuntimePayload` : `page`, `screen`, `route`, `title`, `text`, `summary`, `items`, `htmlFragment`, `choices`, `nextChoices` et `statePatch`. Aucun de ces champs n’est obligatoire individuellement, mais un payload réussi doit contenir au moins un contenu consommable ou un `statePatch` utile.
 
 ### `RuntimeRequest`
 
@@ -219,7 +229,7 @@ type RuntimeResult = {
   runtimePayload?: RuntimePayload | RuntimeError
   statePatch?: Record<string, unknown>
   error?: string
-  diagnostics?: RuntimeDiagnostics | Record<string, unknown>
+  diagnostics?: RuntimeIframeDiagnostics | RuntimeHostDiagnostics | Record<string, unknown>
 }
 ```
 
@@ -274,10 +284,12 @@ type RuntimeError = {
 }
 ```
 
-### `RuntimeDiagnostics`
+### `RuntimeIframeDiagnostics`
+
+Diagnostics exposés dans l’iframe, notamment dans `window.creatiaRuntimeDiagnostics` et dans l’événement `creatia-runtime-ready`.
 
 ```ts
-type RuntimeDiagnostics = {
+type RuntimeIframeDiagnostics = {
   status: string
   providerRegistered: boolean
   providerConnected: boolean
@@ -287,12 +299,30 @@ type RuntimeDiagnostics = {
   pendingRequests: number
   currentTraceId: string
   lastAiError: string
+}
+```
+
+### `RuntimeHostDiagnostics`
+
+Diagnostics renvoyés par le host dans `ai-runtime-generation-result`. Ils décrivent la validation et l’état du traitement IA côté Creatia pour une requête donnée.
+
+```ts
+type RuntimeHostDiagnostics = {
+  traceId: string
   validation?: Record<string, unknown>
   healthcheck?: Record<string, unknown> | null
   repairAttempts?: number
   hasRuntimePayload?: boolean
   hasFinalStructured?: boolean
 }
+```
+
+### `RuntimeDiagnostics`
+
+Alias documentaire utilisé quand le contexte n’a pas besoin de distinguer les diagnostics iframe des diagnostics host.
+
+```ts
+type RuntimeDiagnostics = RuntimeIframeDiagnostics | RuntimeHostDiagnostics
 ```
 
 ## Comportements interdits
