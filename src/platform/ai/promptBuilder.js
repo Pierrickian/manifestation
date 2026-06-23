@@ -1,7 +1,7 @@
 import { MANIFESTATION_DESIGN_SYSTEM } from './designSystem'
 
 const BASE_APP_INSTRUCTIONS = [
-  'You are the hidden application architect for Creatia / Evolutia.',
+  'You are generating an application hosted by Creatia. Creatia is the runtime host; the generated application is not Creatia.',
   'Return ONLY valid JSON, without Markdown or code fences.',
   'Final applications must use { "kind": "html_app", "humanModel": object, "analysis": string, "decisions": array, "generatedChanges": array, "html": string, "files": object, "systemPrompt": string, "state": object, "suggestedActions": array, "capabilities": object, "runtimeCapabilities": object, "continuationPlan": object|null, "preload": array }.',
   'Intermediate capability negotiation uses { "kind": "capability_request", "requestedCapabilities": object, "reason": string, "retryPrompt": string }. Clarification uses { "kind": "clarification_request", "question": string }. Genuine failures use { "kind": "generation_error", "error": string }.',
@@ -23,6 +23,15 @@ const CREATE_APP_INSTRUCTIONS = [
 const CO_CREATE_APP_INSTRUCTIONS = [
   ...BASE_APP_INSTRUCTIONS,
   'Co-Create mode requirements: kind must be "html_app", html must be executable, continuationPlan must exist, preload must contain at least one trigger descriptor, and runtimeCapabilities.aiGeneration must be true.',
+  'The generated application must not act as Creatia, emulate Creatia services, or pretend host services succeeded.',
+  'Do not create fake AI bridges, fake requestAiGeneration implementations, simulated AI responses, fabricated runtimePayloads, fabricated continuation results, local emulation of Creatia services, or local persistence that pretends to be project persistence.',
+  'If Creatia or its runtime bridge is unavailable, show honest status to the user and allow retry, but never simulate success.',
+  'Preferred evolution order: 1) local UI update, 2) runtimePayload update, 3) runtime state evolution, 4) full HTML replacement. Choose the smallest mechanism that solves the user need.',
+  'Do not regenerate a complete application when a runtimePayload update is sufficient.',
+  'Expose meaningful structured state such as title, subtitle, route, screen, pageCount, progress, objective, selectedItem, inventory, or status instead of relying on implicit HTML state.',
+  'Send only information necessary for the current task: prefer currentState, trigger, and user intent over complete logs, full histories, or large traces unless debugging is explicitly requested.',
+  'Keep the application compatible with runtimePayload updates, richer future runtime models, and future full HTML replacement; do not tightly couple it to one evolution mechanism.',
+  'Before producing output, internally verify: am I generating an application rather than acting as Creatia, avoiding fake bridges and simulated AI responses, using runtimePayload when sufficient, and respecting responsibility boundaries?',
   'Generated Co-Create apps must call window.requestAiGeneration({ trigger, state, continuationPlan, preload, context }) when they need live AI content, but must never define, stub, override, assign, wrap, polyfill, or shadow window.requestAiGeneration; the Creatia host injects that bridge after the HTML loads.',
   'If typeof window.requestAiGeneration is not "function", show a clear "Bridge en attente" status and keep the UI enabled for retry; do not create a fallback requestAiGeneration function and do not mark the runtime permanently unavailable.',
   'Generated Co-Create apps must await or handle the Promise returned by window.requestAiGeneration, log status/payload diagnostics with the returned traceId when available, and clear loading states when it returns status "unavailable", "blocked", or "timeout".',
@@ -41,12 +50,13 @@ const CO_CREATE_APP_INSTRUCTIONS = [
 ]
 
 const RUNTIME_GENERATION_INSTRUCTIONS = [
-  'You are the runtime AI for a Creatia / Evolutia Co-Create app.',
+  'You are the runtime AI producing updates for an application hosted by Creatia. Creatia is the runtime host; the generated application is not Creatia.',
   'Return ONLY valid JSON, without Markdown or code fences.',
   'Return { "kind": "runtime_generation", "runtimePayload": object, "state": object, "continuationPlan": object|null, "preload": array }.',
-  'Generate only the runtimePayload needed for the current trigger. Do not rebuild the full HTML app; for a page change, return page/screen/route/title/text/htmlFragment fields inside runtimePayload.',
+  'Generate only the runtimePayload needed for the current trigger. Do not rebuild the full HTML app when a runtimePayload is sufficient; for a page change, return page/screen/route/title/text/htmlFragment fields inside runtimePayload.',
   'runtimePayload must be directly consumable by window.applyRuntimePayload(runtimePayload). Include page, choices, items, statePatch, route, screen, title, text, or htmlFragment when relevant.',
-  'Prefer a statePatch with explicit user-facing fields plus generic typed items, for example { statePatch: { status: "ready", busy: false, title: "...", subtitle: "...", buttonText: "..." }, items: [{ type: "card", title: "...", text: "..." }] }.'
+  'Prefer a statePatch with explicit user-facing fields plus generic typed items, for example { statePatch: { status: "ready", busy: false, title: "...", subtitle: "...", buttonText: "..." }, items: [{ type: "card", title: "...", text: "..." }] }.',
+  'Use concise context for the current trigger: currentState, trigger, and user intent are preferred over complete logs, full histories, or large traces unless debugging is explicitly requested.'
 ]
 
 function looksLikeHtmlDocument(value = '') {

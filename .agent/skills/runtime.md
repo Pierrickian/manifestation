@@ -6,7 +6,9 @@ Use this skill before changing Creatia, generated applications, runtime orchestr
 
 ## Current validated direction for Creatia
 
-The overloaded prompt is the keystone of the system.
+Creatia is the application. Evolutia is the host platform around it.
+
+The overloaded prompt is the keystone of the system and a critical architectural component.
 
 Any runtime change must begin by analyzing the prompt actually sent to the AI, including:
 
@@ -21,7 +23,7 @@ Any runtime change must begin by analyzing the prompt actually sent to the AI, i
 
 ## Validated path
 
-`runtimePayload` is currently the validated path.
+`runtimePayload` is currently the validated evolution path.
 
 Validated proof:
 
@@ -37,23 +39,25 @@ This callback loop is the reference implementation until a replacement path demo
 Creatia owns:
 
 - AI orchestration;
-- trace IDs;
-- diagnostics;
 - persistence;
+- diagnostics;
 - import/export;
-- runtime request execution.
+- project history;
+- continuation execution;
+- runtime execution.
 
 The generated application owns:
 
 - rendering;
-- local state;
-- user interactions;
-- runtime trigger emission.
+- local interaction;
+- local UI state;
+- intent emission.
 
 The AI owns:
 
-- runtime payload generation;
-- optional future full-page generation.
+- generation;
+- runtimePayload generation;
+- optional future full application generation.
 
 ## HTML replacement policy
 
@@ -66,3 +70,7 @@ A future full-replacement path may be used only when it preserves the validated 
 Never remove a validated working path in favor of a theoretical architecture.
 
 Working callback loops have priority over architectural purity.
+
+## Skill maintenance
+
+Whenever a new architectural rule, responsibility, runtime contract, prompt contract, or evolution mechanism becomes validated, update the corresponding skill in the same PR. No architectural direction may exist only in code.

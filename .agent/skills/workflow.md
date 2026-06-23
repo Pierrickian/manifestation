@@ -23,7 +23,7 @@ Before editing code or docs, classify whether the change touches:
 - project conventions;
 - rule/module responsibilities.
 
-If it does, update the corresponding skill in `.agent/skills/` as part of the same change.
+If it does, update the corresponding skill in `.agent/skills/` as part of the same change. No architectural direction may exist only in code.
 
 ## Review workflow
 
