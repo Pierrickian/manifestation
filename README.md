@@ -5,7 +5,7 @@ Manifestation est une application React/Vite mobile-first d’exploration intér
 
 ## Gouvernance agents
 
-Le point d'entrée officiel pour les agents est `.agent/README.md`. Les skills canoniques sont dans `.agent/skills/` et doivent être lus avant toute modification. Toute évolution d'architecture, de runtime, de prompting, de convention projet ou de responsabilité doit mettre à jour le skill correspondant dans la même PR.
+Le point d'entrée officiel pour les agents est `.agent/README.md`. Les skills canoniques sont dans `.agent/skills/` et doivent être lus avant toute modification. Toute évolution d'architecture, de runtime, de prompting, de convention projet ou de responsabilité doit mettre à jour le skill correspondant dans la même PR. Le contrat runtime Creatia normatif vit dans `runtime-api/creatia-runtime/v1/`; prompts, skills, healthchecks, tests et implémentations doivent rester alignés avec cette source de vérité.
 
 ## Philosophie produit
 
