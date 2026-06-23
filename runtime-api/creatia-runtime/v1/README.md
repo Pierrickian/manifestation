@@ -9,6 +9,12 @@ Cette couche documente l’API opérationnelle entre trois acteurs : le **Creati
 - Stratégie validée : évolution par `runtimePayload` appliqué dans l’application générée.
 - Stratégie non par défaut : remplacement complet du HTML, qui reste possible pour une évolution future mais ne fait pas partie du chemin runtime v1 par défaut.
 
+## Couche propriétaire
+
+Le contrat runtime v1 appartient à la couche `system-capabilities/`, pas à `domain-skills/`. Les capacités système concernées sont notamment `CreatiaRuntimeGenerator` pour le contrat de sortie runtime, `CreatiaCoCreate` pour la combinaison API runtime + contrat Co-Create + fragments de prompt, `CreatiaCompatibleApp` pour la compatibilité applicative, `CreatiaDiagnoser` pour le diagnostic et `CreatiaRepairer` pour la réparation.
+
+Un domain skill peut déclarer qu'il a besoin d'une de ces capacités, mais il ne définit jamais l'API runtime Creatia, les fonctions de bridge, les enveloppes postMessage, les shapes `runtime_generation` ou les règles de projection `runtimePayload`.
+
 ## Source de vérité
 
 `runtime-api/creatia-runtime/v1/` est la source de vérité officielle du contrat runtime Creatia. Les prompts, skills, healthchecks, tests de contrat, guards iframe, bridge host et implémentations runtime doivent rester alignés avec cette définition. Les autres documents peuvent fournir de la gouvernance ou du contexte historique, mais ils ne doivent pas redéfinir, élargir ou contredire ce contrat v1.

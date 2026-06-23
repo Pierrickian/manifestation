@@ -37,6 +37,23 @@ The UI should keep a soft, reflective tone:
 - Full HTML replacement is not currently the default path.
 - Never remove a validated working path in favor of a theoretical architecture.
 
+## Creatia capability layering
+
+Creatia must not model every reusable instruction as one generic `skills/` layer. Use two explicit layers instead:
+
+- `system-capabilities/` for structural Creatia capabilities that can own contracts, runtime APIs, diagnostics, repair behavior, compatibility fragments, and prompt fragments.
+- `domain-skills/` for optional business/domain skills that may describe product knowledge and domain interaction patterns but never define the Creatia runtime API.
+
+Classifications to preserve:
+
+- `CreatiaCompatibleApp` is a compatibility contract plus compatibility fragment.
+- `CreatiaRuntimeGenerator` is a runtime capability plus output contract.
+- `CreatiaDiagnoser` is a system diagnostic capability.
+- `CreatiaRepairer` is a system repair capability.
+- `CreatiaCoCreate` is a combination of runtime API, Co-Create contract, and prompt fragments.
+
+A domain skill may require these system capabilities, but it must not define, fork, stub, or reinterpret `window.requestAiGeneration`, `window.applyRuntimePayload`, host/iframe message envelopes, `runtime_generation`, `runtimePayload`, diagnostics, repair, persistence, or host orchestration.
+
 ## Responsibility governance
 
 Creatia owns:
