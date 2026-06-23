@@ -54,6 +54,10 @@ Classifications to preserve:
 
 A domain skill may require these system capabilities, but it must not define, fork, stub, or reinterpret `window.requestAiGeneration`, `window.applyRuntimePayload`, host/iframe message envelopes, `runtime_generation`, `runtimePayload`, diagnostics, repair, persistence, or host orchestration.
 
+## Protocol documentation layer
+
+`protocols/` documents operational sequences for Creatia system capabilities such as Co-Create, runtime generation, diagnostics, and repair. Protocol documents describe actors, sequence, responsibilities, inputs/outputs, and errors, while linking back to `runtime-api/creatia-runtime/v1/` for normative message shapes and runtime API details. Protocols must not duplicate or fork exhaustive runtime shapes already owned by the versioned runtime API.
+
 ## Responsibility governance
 
 Creatia owns:
