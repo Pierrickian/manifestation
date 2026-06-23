@@ -1,6 +1,17 @@
 # Creatia domain skills
 
-This directory contains optional **business/domain skills** for generated applications. A domain skill describes product knowledge, interaction patterns, vocabulary, examples, tone, constraints, and domain-specific UI needs.
+`domain-skills/` is the documentary home for optional **business/domain skills** that may later guide generated applications. A domain skill describes domain knowledge, vocabulary, interaction patterns, examples, tone, safety constraints, and domain-specific UX expectations.
+
+## Current status
+
+This directory is intentionally exploratory. The repository may already contain product features or domain candidates, but they are not automatically reusable domain skills.
+
+See `inventory.md` for the current distinction between:
+
+- existing features;
+- existing business/domain areas;
+- domain skills actually extracted;
+- hypothetical future domain skills.
 
 ## Hard boundary
 
@@ -26,3 +37,7 @@ A domain skill may define:
 - examples and anti-examples;
 - accessibility, safety, or UX constraints for that domain;
 - which existing system capabilities it requires.
+
+## Candidate documents
+
+Candidate documents in `candidates/` are **not active skills**. They are draft descriptions that can help decide whether a domain deserves extraction into a reusable skill later.
