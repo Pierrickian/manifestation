@@ -75,6 +75,10 @@ Working callback loops have priority over architectural purity.
 
 Whenever a new architectural rule, responsibility, runtime contract, prompt contract, or evolution mechanism becomes validated, update the corresponding skill in the same PR. No architectural direction may exist only in code.
 
+## Operational API documentation
+
+The operational API between Creatia host, generated applications, and runtime AI is documented in `runtime-api/creatia-runtime/v1/`. Keep that versioned documentation aligned with runtime bridge, prompt, healthcheck, or message-shape changes. Additive changes may stay in v1; breaking message or shape changes require a new versioned layer.
+
 ## Callback-driven Co-Create runtime contract
 
 Some Co-Create apps are callback-driven: adaptive interviews, questionnaires, coaches, teachers, dungeons, stories, game masters, and progressive experiences should treat the validated primary user action as the AI trigger. Generated apps should call the host-injected `window.requestAiGeneration({ trigger, state, continuationPlan, preload, context })` immediately for semantic triggers such as `answer_submitted`, `choice_selected`, `question_answered`, `continue_pressed`, `next_requested`, `needs_next_step`, `runtime_generation_requested`, `ai_request`, `needs_generation`, `preload_requested`, `branch_requested`, and `content_exhausted`.
