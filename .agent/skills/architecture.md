@@ -31,6 +31,7 @@ The UI should keep a soft, reflective tone:
 - Evolutia is the host platform around Creatia.
 - The overloaded prompt is a critical architectural component, not incidental copy.
 - Any runtime change must begin by analyzing the actual prompt sent to the AI before changing UI, bridge, or payload code.
+- `runtime-api/creatia-runtime/v1/` is the official source of truth for the Creatia runtime operational contract.
 - `runtimePayload` is the currently validated evolution path for live generated-application updates.
 - Full HTML replacement remains allowed for future evolution and must not be removed.
 - Full HTML replacement is not currently the default path.
@@ -63,7 +64,7 @@ AI owns:
 
 When a change creates a new responsibility or moves an existing one, update this skill and any affected runtime or prompting skill in the same PR.
 
-Do not introduce a new architectural direction only in implementation code, comments, or a transient prompt. The direction must be captured in `.agent/skills/`.
+Do not introduce a new architectural direction only in implementation code, comments, or a transient prompt. The direction must be captured in `.agent/skills/`; runtime contract details must be captured in `runtime-api/creatia-runtime/v1/`.
 
 ## Skill maintenance
 

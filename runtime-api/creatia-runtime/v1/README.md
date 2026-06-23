@@ -9,6 +9,10 @@ Cette couche documente l’API opérationnelle entre trois acteurs : le **Creati
 - Stratégie validée : évolution par `runtimePayload` appliqué dans l’application générée.
 - Stratégie non par défaut : remplacement complet du HTML, qui reste possible pour une évolution future mais ne fait pas partie du chemin runtime v1 par défaut.
 
+## Source de vérité
+
+`runtime-api/creatia-runtime/v1/` est la source de vérité officielle du contrat runtime Creatia. Les prompts, skills, healthchecks, tests de contrat, guards iframe, bridge host et implémentations runtime doivent rester alignés avec cette définition. Les autres documents peuvent fournir de la gouvernance ou du contexte historique, mais ils ne doivent pas redéfinir, élargir ou contredire ce contrat v1.
+
 ## Acteurs et responsabilités
 
 ### Creatia host

@@ -2,9 +2,9 @@
 
 ## Statut
 
-`Capability Discovery` est une direction prospective de conception. Cette note décrit le rôle possible d'une étape de découverte des capacités, mais ne crée pas de pipeline d'exécution, ne modifie aucun prompt runtime et ne valide aucune implémentation immédiate.
+`Capability Discovery` est une direction prospective de conception. Cette note décrit le rôle possible d'une étape de découverte des capacités, mais ne crée pas de pipeline d'exécution, ne modifie aucun prompt runtime et ne valide aucune implémentation immédiate. Le contrat runtime normatif reste `runtime-api/creatia-runtime/v1/`.
 
-Décision actuelle : **ne pas l'implémenter immédiatement**. La priorité reste de préserver le chemin validé existant : génération d'application, métadonnées de continuation, rappel runtime et application de `runtimePayload`.
+Décision actuelle : **ne pas l'implémenter immédiatement**. La priorité reste de préserver le chemin validé existant défini par `runtime-api/creatia-runtime/v1/`, notamment le rappel runtime et l'application de `runtimePayload`.
 
 ## Rôle exact
 
@@ -132,6 +132,6 @@ Ces validations décrivent ce qu'il faudrait vérifier si une implémentation es
 
 Ne pas implémenter `Capability Discovery` maintenant.
 
-Raison : la documentation clarifie une frontière future utile, mais l'introduction d'une étape active modifierait le contrat de prompt et le flux d'orchestration. Cette modification doit attendre une proposition démontrable avec tests, diagnostics et préservation du chemin validé `runtimePayload`.
+Raison : la documentation clarifie une frontière future utile, mais l'introduction d'une étape active modifierait le contrat de prompt et le flux d'orchestration. Cette modification doit attendre une proposition démontrable avec tests, diagnostics et préservation du contrat runtime v1 documenté dans `runtime-api/creatia-runtime/v1/`.
 
 Pour le moment, cette note sert uniquement de référence d'architecture prospective pour guider une éventuelle évolution future.
