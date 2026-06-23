@@ -1,5 +1,10 @@
 # Workspace
 
+
+## Gouvernance agents
+
+Avant toute modification, lire `.agent/README.md` puis tous les fichiers de `.agent/skills/`. Ces skills sont l'emplacement officiel des règles d'architecture, runtime, prompting et workflow agent. Ils doivent être respectés même si le prompt utilisateur ne les mentionne pas, et mis à jour dans la même modification lorsqu'une nouvelle direction, convention ou responsabilité apparaît.
+
 ## Overview
 
 Application React + Vite mobile-first appelée **Manifestation**.

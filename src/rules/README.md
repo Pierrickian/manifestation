@@ -1,5 +1,7 @@
 # Rule modules
 
+> Agent governance: before changing rule architecture or conventions, read `.agent/README.md` and `.agent/skills/architecture.md`. The `.agent/skills/` directory is authoritative for project conventions.
+
 Rules are independent gameplay modules. A rule should be understandable, testable, enabled, disabled, and reviewed without requiring unrelated rule changes.
 
 Each rule lives in its own folder and exports a plain object named `rule`:

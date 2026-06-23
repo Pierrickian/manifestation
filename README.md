@@ -2,6 +2,11 @@
 
 Manifestation est une application React/Vite mobile-first d’exploration intérieure. Elle fonctionne comme un wizard vivant : l’utilisateur part d’un ressenti, répond à des passages courts, puis voit apparaître les besoins dominants, les liens et le chemin exploré.
 
+
+## Gouvernance agents
+
+Le point d'entrée officiel pour les agents est `.agent/README.md`. Les skills canoniques sont dans `.agent/skills/` et doivent être lus avant toute modification. Toute évolution d'architecture, de runtime, de prompting, de convention projet ou de responsabilité doit mettre à jour le skill correspondant dans la même PR.
+
 ## Philosophie produit
 
 Créer, c’est découvrir ce qu’on crée. Découvrir, c’est créer une nouvelle réalité intérieure.
