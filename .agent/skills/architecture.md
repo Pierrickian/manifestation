@@ -60,6 +60,13 @@ A domain skill may require these system capabilities, but it must not define, fo
 
 `contracts/` documents reviewable capability contracts for generated apps and Creatia operations. Contract documents must include requirements, PASS/FAIL validations, failure examples, source API/protocol/design references, and any current correspondence with `src/platform/ai/generationPipeline.js`. Contracts may be documentary before they are fully automated; when automation exists, the contract must point to the relevant healthcheck or runtime validation instead of redefining a parallel behavior.
 
+
+## Prompt fragments documentation layer
+
+`prompt-fragments/` is a non-canonical but traceable documentation layer for prompt-ready text snippets. Fragments may summarize or adapt instructions from contracts, protocols, runtime APIs, design notes, or skills, but they must cite those sources and must not redefine, fork, or silently extend canonical layers.
+
+Prompt fragments are not wired into the prompt builder unless a later validated change explicitly connects them. Adding or editing a fragment is a documentation change unless it also changes the live prompt assembly path.
+
 ## Responsibility governance
 
 Creatia owns:

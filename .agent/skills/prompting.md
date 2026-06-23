@@ -22,6 +22,13 @@ Prompt assembly must distinguish structural `system-capabilities/` from optional
 
 Domain skills must never define the Creatia runtime API, bridge functions, message envelopes, `runtime_generation` response shapes, or `runtimePayload` projection rules. If a domain skill needs live AI behavior, the prompt must bind it to an existing system capability such as `CreatiaCoCreate` or `CreatiaRuntimeGenerator` rather than letting the domain layer invent a runtime contract.
 
+
+## Prompt fragments
+
+`prompt-fragments/` contains non-canonical prompt-ready documentation snippets. Every fragment must include source references to the contracts, protocols, runtime API, design documents, or skills it derives from. A fragment can help review or prepare prompt language, but it does not become active prompt behavior until the prompt builder is explicitly changed.
+
+Do not treat fragments as a replacement for `runtime-api/creatia-runtime/v1/`, `contracts/`, `protocols/`, or `.agent/skills/`. If a fragment reveals a durable prompt rule, update the canonical owner in the same change before relying on the fragment.
+
 ## Prompt governance
 
 - Keep responsibilities explicit between Creatia, the generated application, and the AI.
