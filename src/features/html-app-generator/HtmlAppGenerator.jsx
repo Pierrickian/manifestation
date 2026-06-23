@@ -157,13 +157,14 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
       const requestId = event.data.request?.requestId || traceId
       const runtimeRequest = { ...(event.data.request || {}), requestId, traceId, context: { ...(event.data.request?.context || {}), traceId } }
       sendRuntimeHostLog(event.source, requestId, traceId, 'host_request_received', 'Host Creatia: requête runtime reçue depuis l’iframe.', { traceId, trigger: runtimeRequest.trigger || 'runtime_generation' })
-      sendRuntimeHostLog(event.source, requestId, traceId, 'host_trigger_detected', 'Host Creatia: trigger, preload et continuationPlan détectés.', { traceId, trigger: runtimeRequest.trigger, preloadEntries: runtimeRequest.preload?.length || 0, hasContinuationPlan: Boolean(runtimeRequest.continuationPlan) })
+      sendRuntimeHostLog(event.source, requestId, traceId, 'host_trigger_classified', 'Host Creatia: trigger classé en runtime_generation.', { traceId, trigger: runtimeRequest.trigger, classification: 'runtime_generation', preloadEntries: runtimeRequest.preload?.length || 0, hasContinuationPlan: Boolean(runtimeRequest.continuationPlan) })
+      sendRuntimeHostLog(event.source, requestId, traceId, 'host_runtime_prompt_built', 'Host Creatia: prompt runtime_generation construit.', { traceId, trigger: runtimeRequest.trigger, currentStateKeys: Object.keys(runtimeRequest.state || {}), hasContinuationPlan: Boolean(runtimeRequest.continuationPlan), preloadEntries: runtimeRequest.preload?.length || 0 })
       console.log('[AI RUNTIME HOST]', '[TRACE ' + traceId + '] AI request dispatch to controller')
-      sendRuntimeHostLog(event.source, requestId, traceId, 'host_dispatch_controller', 'Host Creatia: envoi au contrôleur IA runtime.', { traceId, mode })
+      sendRuntimeHostLog(event.source, requestId, traceId, 'host_ai_call_started', 'Host Creatia: appel IA runtime démarré.', { traceId, mode })
       controller.submitRuntimeGeneration(runtimeRequest)
         .then((runtimeResult) => {
           console.log('[AI RUNTIME HOST]', 'AI response reception')
-          sendRuntimeHostLog(event.source, requestId, traceId, 'host_response_received', 'Host Creatia: réponse IA runtime reçue.', { hasError: Boolean(runtimeResult?.error) })
+          sendRuntimeHostLog(event.source, requestId, traceId, 'host_ai_raw_response_received', 'Host Creatia: réponse brute IA runtime reçue.', { hasError: Boolean(runtimeResult?.error), hasRawPayload: Boolean(runtimeResult?.rawPayload) })
           if (runtimeResult?.error) {
             sendRuntimeHostLog(event.source, requestId, traceId, 'host_response_error', 'Host Creatia: réponse runtime en erreur.', { error: runtimeResult.error })
             event.source?.postMessage({ source: 'creatia-host', type: 'ai-runtime-generation-result', requestId, traceId, ok: false, responseType: 'generation_error', payload: { error: runtimeResult.error } }, '*')
@@ -179,7 +180,8 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
             event.source?.postMessage({ source: 'creatia-host', type: 'ai-runtime-generation-result', requestId, traceId, ok: false, responseType: 'generation_error', payload: { error: validation.errors.join('; ') || 'Runtime generation did not return a usable runtimePayload.', traceId }, finalStructured, diagnostics: { traceId, validation } }, '*')
             return
           }
-          sendRuntimeHostLog(event.source, requestId, traceId, 'host_payload_posted', 'Host Creatia: payload runtime renvoyé à l’iframe.', { traceId, payloadKeys: Object.keys(runtimePayload || {}) })
+          sendRuntimeHostLog(event.source, requestId, traceId, 'host_runtime_payload_extracted', 'Host Creatia: runtimePayload extrait.', { traceId, payloadKeys: Object.keys(runtimePayload || {}) })
+          sendRuntimeHostLog(event.source, requestId, traceId, 'host_response_returned_to_app', 'Host Creatia: réponse runtime renvoyée à l’iframe.', { traceId, includesPayloadAlias: true, includesStatePatch: true })
           recordRuntimeTrace({ traceId, step: 'host_raw_response_captured', message: 'Host Creatia: réponse brute/normalisée capturée.', rawResponse: { rawAI: runtimeResult?.rawPayload || null, normalized: finalStructured, returnedToApp: { status: 'ok', payload: runtimePayload, runtimePayload }, validation } })
           event.source?.postMessage({
             source: 'creatia-host',
@@ -192,6 +194,7 @@ export function HtmlAppGenerator({ onClose, onDebug, onMenuData, speechEnabled =
             payload: runtimePayload,
             legacyPayload: { status: 'completed' },
             runtimePayload,
+            statePatch: runtimePayload.statePatch || {},
             finalStructured,
             projectPatch: {
               projectId: runtimeResult?.project?.id || project?.id || null,

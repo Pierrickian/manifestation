@@ -711,7 +711,7 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     renderDiagnostics();
     return true;
   }
-  const runtimeCallbackEvents = ['ai_request', 'needs_generation', 'preload_requested', 'branch_requested', 'content_exhausted', 'runtime_generation_requested'];
+  const runtimeCallbackEvents = ['answer_submitted', 'choice_selected', 'question_answered', 'continue_pressed', 'next_requested', 'needs_next_step', 'runtime_generation_requested', 'ai_request', 'needs_generation', 'preload_requested', 'branch_requested', 'content_exhausted'];
   function createRuntimeRequestFromSource(trigger, detail = {}) {
     return {
       trigger: trigger || detail.trigger || detail.type || 'runtime_generation',
@@ -915,7 +915,8 @@ function buildAiActivityMonitor(runtimeContext = {}) {
       status: event.data.status === 'completed' ? 'ok' : event.data.status || (event.data.ok ? 'ok' : 'error'),
       payload: effectiveRuntimePayload,
       runtimePayload: effectiveRuntimePayload,
-      statePatch: effectiveRuntimePayload.statePatch || {}
+      statePatch: effectiveRuntimePayload.statePatch || {},
+      traceId
     };
     debugState.rawResponses.unshift({ traceId, timestamp: now(), rawHostResponse: event.data, returnedToApp, diagnostics: responseDiagnostics });
     debugState.rawResponses = debugState.rawResponses.slice(0, 10);
@@ -963,7 +964,7 @@ function buildAiActivityMonitor(runtimeContext = {}) {
   const creatiaHostRequestAiGeneration = async (request = {}) => {
     const traceId = setTraceId(request.traceId || request.context?.traceId || createTraceId());
     log('[TRACE ' + traceId + '] requestAiGeneration called', request);
-    addEvent('requestAiGeneration_called', { traceId, request });
+    addEvent('requestAiGeneration_called', { traceId, trigger: request.trigger || 'runtime_generation_requested', request });
     if (!diagnostics.providerRegistered) {
       diagnostics.lastAiError = 'No runtime AI provider registered.';
       log('AI failures', diagnostics.lastAiError);
@@ -983,7 +984,7 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     const runtimeRequest = {
       requestId: request.requestId || 'runtime-' + Date.now() + '-' + Math.random().toString(16).slice(2),
       traceId,
-      trigger: request.trigger || 'runtime_generation',
+      trigger: request.trigger || 'runtime_generation_requested',
       state: request.state || {},
       continuationPlan: mergeContinuationPlan(
         mergeContinuationPlan(request.continuationPlan || null, window.__continuationPlan || null),
@@ -1012,6 +1013,7 @@ function buildAiActivityMonitor(runtimeContext = {}) {
     debugState.budget.aiCallsThisSession += 1;
     debugState.budget.aiCallsThisMinute = debugState.aiRequests.filter((entry) => Date.parse(entry.timestamp) > Date.now() - 60000).length;
     debugState.budget.estimatedTokens += requestEntry.estimatedTokens;
+    addEvent('trigger_classified', { traceId, trigger: runtimeRequest.trigger, classification: 'runtime_generation', requestId: runtimeRequest.requestId });
     addEvent('button_pressed', { traceId, trigger: runtimeRequest.trigger, requestId: runtimeRequest.requestId });
     addEvent('ai_request', { traceId, trigger: runtimeRequest.trigger, requestId: runtimeRequest.requestId, params: runtimeRequest });
     log('AI request dispatch', runtimeRequest);

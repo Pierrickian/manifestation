@@ -120,7 +120,9 @@ function hasRuntimeAiGenerationPath(html = '') {
 
 function stubsHostRequestAiGeneration(html = '') {
   const source = String(html)
-  return /window\.requestAiGeneration\s*=|window\.requestAiGeneration\s*\|\|=|window\[['\"]requestAiGeneration['\"]\]\s*=|(?:function|const|let|var)\s+requestAiGeneration\b/i.test(source)
+  const generatedStubPattern = /window\.requestAiGeneration\s*=\s*(?!handler\b|creatiaHostRequestAiGeneration\b)|window\.requestAiGeneration\s*\|\|=|window\[['"]requestAiGeneration['"]\]\s*=|(?:function|const|let|var)\s+requestAiGeneration\b/i
+  const hostGuardMarkers = /__creatiaHostBridge|generated_requestAiGeneration_stub_replaced|installHostRequestAiGeneration|creatia-runtime-ready/i
+  return generatedStubPattern.test(source) && !hostGuardMarkers.test(source)
 }
 
 function exposesRuntimeAiStatus(html = '') {

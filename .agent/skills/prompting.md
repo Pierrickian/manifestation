@@ -34,3 +34,9 @@ Do not hide prompt-contract mismatches behind silent fallback behavior.
 ## Skill maintenance
 
 Whenever a new architectural rule, responsibility, runtime contract, prompt contract, or evolution mechanism becomes validated, update the corresponding skill in the same PR. No architectural direction may exist only in code or prompts alone.
+
+## Callback-driven Co-Create prompting
+
+The overloaded prompt must explicitly teach generated Co-Create apps that adaptive/evolving/interview/questionnaire/coach/teacher/dungeon/story/game-master/progressive experiences may use the primary user action itself as the AI trigger. The generated app must call the host bridge immediately after the validated answer/choice/action and must not wait for a separate AI+ button, rely only on preload, or simulate a future IA recall locally.
+
+Runtime-generation prompts must include the traceId, trigger, currentState, concise continuationPlan, preload, and context. For adaptive interviews/questionnaires, runtime AI must return a `runtimePayload` with the next question in `statePatch.currentQuestion` or an `items` entry with `type: "question"`; it must not return raw analysis only or full HTML unless the runtime explicitly requests full replacement.
