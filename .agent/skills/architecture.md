@@ -25,8 +25,48 @@ The UI should keep a soft, reflective tone:
 - Preserve mobile-first portrait ergonomics: large touch targets, concise text, and clear hierarchy.
 - Avoid heavy infinite animations; prefer short transitions triggered by user choices.
 
+## Creatia architecture governance
+
+- Creatia is the generated-application system being built in this repository.
+- Evolutia is the host platform around Creatia.
+- The overloaded prompt is a critical architectural component, not incidental copy.
+- Any runtime change must begin by analyzing the actual prompt sent to the AI before changing UI, bridge, or payload code.
+- `runtimePayload` is the currently validated evolution path for live generated-application updates.
+- Full HTML replacement remains allowed for future evolution and must not be removed.
+- Full HTML replacement is not currently the default path.
+- Never remove a validated working path in favor of a theoretical architecture.
+
 ## Responsibility governance
+
+Creatia owns:
+
+- AI orchestration;
+- persistence;
+- diagnostics;
+- import/export;
+- project history;
+- continuation execution;
+- runtime execution.
+
+Generated applications own:
+
+- rendering;
+- local interaction;
+- local UI state;
+- intent emission.
+
+AI owns:
+
+- generation;
+- runtimePayload generation;
+- optional future full application generation.
 
 When a change creates a new responsibility or moves an existing one, update this skill and any affected runtime or prompting skill in the same PR.
 
 Do not introduce a new architectural direction only in implementation code, comments, or a transient prompt. The direction must be captured in `.agent/skills/`.
+
+## Skill maintenance
+
+Whenever a new architectural rule, responsibility, runtime contract, prompt contract, or evolution mechanism becomes validated, the corresponding skill must be updated in the same PR.
+
+No architectural direction may exist only in code.
