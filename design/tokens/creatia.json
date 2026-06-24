@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json.schemastore.org/design-tokens.json",
+  "name": "Creatia",
+  "description": "Current documented Creatia design tokens derived from src/platform/ai/designSystem.js and the active mobile-first CSS surface in src/style.css. This file documents existing sources only; it is not wired into runtime styling.",
+  "sources": [
+    "src/platform/ai/designSystem.js",
+    "src/style.css",
+    "src/platform/ai/renderers/HtmlViewer.jsx",
+    "replit.md"
+  ],
+  "theme": {
+    "name": { "value": "Creatia", "type": "other" },
+    "colorScheme": { "value": "dark", "type": "other" }
+  },
+  "color": {
+    "primary": { "value": "#6A5AE0", "type": "color", "source": "MANIFESTATION_DESIGN_SYSTEM.primaryColor" },
+    "secondary": { "value": "#A78BFA", "type": "color", "source": "MANIFESTATION_DESIGN_SYSTEM.secondaryColor" },
+    "background": { "value": "#121212", "type": "color", "source": "MANIFESTATION_DESIGN_SYSTEM.backgroundColor" },
+    "surface": { "value": "#1E1E1E", "type": "color", "source": "MANIFESTATION_DESIGN_SYSTEM.surfaceColor" },
+    "text": { "value": "#FFFFFF", "type": "color", "source": "MANIFESTATION_DESIGN_SYSTEM.textColor" },
+    "appBackgroundBase": { "value": "#070812", "type": "color", "source": ":root background" },
+    "appTextWarm": { "value": "#fffaf4", "type": "color", "source": ":root color" },
+    "accentWarm": { "value": "#fff2ad", "type": "color", "source": "active controls and spinner accents" },
+    "runtimePanelBackground": { "value": "rgba(12, 10, 24, 0.96)", "type": "color", "source": "HtmlViewer runtime debug panel" },
+    "runtimeContentBackground": { "value": "rgba(14, 12, 28, 0.92)", "type": "color", "source": "HtmlViewer runtime content fallback" }
+  },
+  "font": {
+    "family": { "value": "Inter, ui-rounded, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif", "type": "fontFamily", "source": "src/style.css :root" },
+    "designSystemFamily": { "value": "Inter", "type": "fontFamily", "source": "MANIFESTATION_DESIGN_SYSTEM.fontFamily" }
+  },
+  "space": {
+    "base": { "value": "12px", "type": "dimension", "source": "MANIFESTATION_DESIGN_SYSTEM.spacing" },
+    "shellMobileInline": { "value": "14px", "type": "dimension", "source": ".manifestation-shell padding" },
+    "shellDesktopInline": { "value": "24px", "type": "dimension", "source": "@media min-width 680px .manifestation-shell" },
+    "cardPadding": { "value": "20px", "type": "dimension", "source": ".wizard-card, .discovery-card" },
+    "panelPadding": { "value": "15px", "type": "dimension", "source": ".need-map, .history-panel, .wizard-menu" }
+  },
+  "radius": {
+    "base": { "value": "16px", "type": "dimension", "source": "MANIFESTATION_DESIGN_SYSTEM.borderRadius" },
+    "card": { "value": "24px", "type": "dimension", "source": ".wizard-card, .discovery-card" },
+    "panel": { "value": "20px", "type": "dimension", "source": ".need-map, .history-panel, .wizard-menu" },
+    "pill": { "value": "999px", "type": "dimension", "source": "pill controls and overlays" }
+  },
+  "motion": {
+    "style": { "value": "smooth", "type": "other", "source": "MANIFESTATION_DESIGN_SYSTEM.animationStyle" },
+    "shortTransition": { "value": "180ms ease", "type": "duration", "source": "AI and runtime overlays" },
+    "spinnerCycle": { "value": "850ms linear infinite", "type": "duration", "source": "AI activity spinners" },
+    "reducedMotion": { "value": "0.01ms", "type": "duration", "source": "prefers-reduced-motion override" }
+  },
+  "layout": {
+    "mobileFirst": { "value": true, "type": "other", "source": "replit.md and src/style.css" },
+    "shellMaxWidth": { "value": "720px", "type": "dimension", "source": ".manifestation-shell" },
+    "primaryBreakpoint": { "value": "680px", "type": "dimension", "source": "src/style.css" },
+    "runtimeOverlayDesktopBreakpoint": { "value": "720px", "type": "dimension", "source": "HtmlViewer runtime overlay media query" }
+  },
+  "interaction": {
+    "minimumPrimaryControlHeight": { "value": "58px", "type": "dimension", "source": ".wizard-option, .primary-action, .ghost-action" },
+    "focusOutline": { "value": "3px solid rgba(255, 250, 244, 0.78)", "type": "other", "source": "button:focus-visible" },
+    "focusOutlineOffset": { "value": "3px", "type": "dimension", "source": "button:focus-visible" }
+  }
+}
