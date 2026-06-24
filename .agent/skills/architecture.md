@@ -61,6 +61,10 @@ A domain skill may require these system capabilities, but it must not define, fo
 `contracts/` documents reviewable capability contracts for generated apps and Creatia operations. Contract documents must include requirements, PASS/FAIL validations, failure examples, source API/protocol/design references, and any current correspondence with `src/platform/ai/generationPipeline.js`. Contracts may be documentary before they are fully automated; when automation exists, the contract must point to the relevant healthcheck or runtime validation instead of redefining a parallel behavior.
 
 
+## Design documentation layer
+
+`design/` documents the current Creatia visual baseline, generated-app UI expectations, and runtime overlay behavior. The files in `design/` are reviewable documentation derived from existing implementation sources unless a future change explicitly wires them into code. Do not treat design token JSON as a runtime stylesheet by default. When changing implementation styles, runtime overlay UI, or generated-app visual contracts, update the corresponding design document in the same PR.
+
 ## Prompt fragments documentation layer
 
 `prompt-fragments/` is a non-canonical but traceable documentation layer for prompt-ready text snippets. Fragments may summarize or adapt instructions from contracts, protocols, runtime APIs, design notes, or skills, but they must cite those sources and must not redefine, fork, or silently extend canonical layers.
