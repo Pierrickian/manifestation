@@ -71,6 +71,10 @@ A domain skill may require these system capabilities, but it must not define, fo
 
 Prompt fragments are not wired into the prompt builder unless a later validated change explicitly connects them. Adding or editing a fragment is a documentation change unless it also changes the live prompt assembly path.
 
+## Prompt assembly documentation layer
+
+`prompt-assembly/` documents mode-specific target recipes for `create`, `co-create`, `runtime-generation`, `diagnose`, and `repair`. Each recipe identifies inputs, capabilities, canonical contracts and protocols, required/optional derived fragments, exclusions, output expectations, source ownership, and PASS/FAIL validation sources. These recipes are documentation only: they do not describe the live builder as already compliant, wire fragments, select capabilities, or create an execution pipeline.
+
 ## Responsibility governance
 
 Creatia owns:

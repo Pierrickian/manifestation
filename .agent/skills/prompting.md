@@ -29,6 +29,10 @@ Domain skills must never define the Creatia runtime API, bridge functions, messa
 
 Do not treat fragments as a replacement for `runtime-api/creatia-runtime/v1/`, `contracts/`, `protocols/`, or `.agent/skills/`. If a fragment reveals a durable prompt rule, update the canonical owner in the same change before relying on the fragment.
 
+## Documentary prompt assembly recipes
+
+`prompt-assembly/` records separate target recipes for `create`, `co-create`, `runtime-generation`, `diagnose`, and `repair`. The recipes must keep the runtime API normative, contracts authoritative for PASS/FAIL, protocols limited to sequences, and prompt fragments explicitly derived and non-canonical. `create` excludes unnecessary runtime/Co-Create blocks; `co-create` includes bridge, callback, continuation, safety, and `runtimePayload` obligations; `runtime-generation` updates the current app rather than rebuilding it by default; `diagnose` does not repair; and `repair` requires a diagnosis. This layer is not wired to the live prompt builder.
+
 ## Prompt governance
 
 - Keep responsibilities explicit between Creatia, the generated application, and the AI.
@@ -47,6 +51,8 @@ Do not hide prompt-contract mismatches behind silent fallback behavior.
 ## Prospective Capability Discovery
 
 `Capability Discovery` is documented as a prospective classification step before Prompt Assembly. It is analysis/classification only, not generation: it must not produce HTML, runtimePayloads, final prompts, fake bridges, or executable runtime behavior. Its conceptual output is limited to `mode`, `requiredCapabilities`, `requiredNeeds`, and `constraints`. It must not be implemented as an execution pipeline until a future change provides tests, diagnostics, and preserves the validated `runtimePayload` path.
+
+Prospectively, Discovery would feed `Capability Resolution` for matching structural needs to `system-capabilities/`, then `Skill Resolution` for optional matching to `domain-skills/`, before Prompt Assembly composes the resolved sources. `requiredNeeds` preserves product, domain, and interaction intent without assuming that a repository item with the same name exists. These resolution stages and their output schemas are not implemented or standardized. Until they are validated, prompt assembly may remain manual or use explicit heuristics.
 
 ## Skill maintenance
 

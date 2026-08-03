@@ -20,19 +20,21 @@ Elle ne doit pas :
 
 Elle doit seulement analyser l'intention utilisateur et la demande produit afin de préparer le bon contrat de prompt pour l'étape suivante.
 
-## Position dans le flux
+## Position dans le flux prospectif
 
-La position conceptuelle est **avant `Prompt Assembly`**.
+La position conceptuelle est **en amont des résolutions et avant `Prompt Assembly`**. Elle intervient une fois la demande utilisateur reçue, mais avant de choisir des éléments concrets dans `system-capabilities/` ou `domain-skills/`.
 
 ```txt
 User request
   → Capability Discovery
+  → Capability Resolution
+  → Skill Resolution
   → Prompt Assembly
   → AI generation / runtime generation
   → Normalization and host consumption
 ```
 
-Cette position permettrait à `Prompt Assembly` de recevoir une description structurée de ce qui est nécessaire, sans déplacer la responsabilité de génération vers la découverte.
+Cette position permettrait de séparer quatre questions : ce que la demande exige (`Discovery`), quelles capacités système y répondent (`Capability Resolution`), quelles compétences métier optionnelles sont pertinentes (`Skill Resolution`) et comment leurs instructions sont composées (`Prompt Assembly`). Elle n'ajoute aujourd'hui aucune étape au pipeline réel : le schéma décrit seulement une frontière possible pour une évolution ultérieure.
 
 ## Couches de capacités
 
@@ -59,8 +61,7 @@ L'output attendu serait un objet conceptuel minimal :
 {
   "mode": "create | coCreate | runtime | clarification",
   "requiredCapabilities": ["CreatiaCompatibleApp", "CreatiaCoCreate"],
-  "requiredDomainSkills": ["adaptive_questions"],
-  "requiredNeeds": ["standalone_app", "mobile_scroll"],
+  "requiredNeeds": ["adaptive_questions", "standalone_app", "mobile_scroll"],
   "constraints": ["no_fake_bridge", "no_full_rebuild_when_runtimePayload_is_sufficient"]
 }
 ```
@@ -69,11 +70,50 @@ L'output attendu serait un objet conceptuel minimal :
 
 - `mode` : classe le type de flux attendu, par exemple création simple, co-création, génération runtime ou besoin de clarification.
 - `requiredCapabilities` : liste les capacités système Creatia nécessaires, issues de `system-capabilities/`.
-- `requiredDomainSkills` : liste optionnelle de compétences métier issues de `domain-skills/`; ces compétences ne définissent jamais l'API runtime.
-- `requiredNeeds` : exprime les besoins produit ou interactionnels requis par la demande.
+- `requiredNeeds` : exprime les besoins produit, métier ou interactionnels requis par la demande, sans choisir prématurément le composant qui les satisfera.
 - `constraints` : capture les limites non négociables à transmettre à `Prompt Assembly`.
 
 L'objet doit rester descriptif. Il ne doit pas contenir de contenu final pré-généré, de prompt complet, de code applicatif, ni de payload runtime prêt à appliquer.
+
+## Pourquoi retourner des `requiredNeeds`
+
+Une intention utilisateur ne correspond pas toujours directement au nom d'une capacité ou d'une skill disponible. `requiredNeeds` conserve donc le **pourquoi fonctionnel** entre la demande brute et les inventaires du dépôt. Par exemple, `adaptive_questions` décrit un besoin d'expérience ; il ne présume ni qu'une skill de même nom existe, ni qu'elle peut définir le mécanisme runtime nécessaire.
+
+Ce champ permettrait notamment :
+
+- de ne pas confondre une exigence produit avec son mécanisme d'implémentation ;
+- de conserver un besoin qui n'a encore aucune résolution connue et de demander une clarification plutôt que d'inventer une capacité ;
+- de justifier et diagnostiquer les choix faits ensuite par les étapes de résolution ;
+- de laisser plusieurs capacités système ou skills métier contribuer à un même besoin, sans coupler la découverte à la structure actuelle des répertoires.
+
+`requiredCapabilities` reste utile pour les obligations structurelles déjà certaines, par exemple la compatibilité Creatia. `requiredNeeds` couvre ce qui doit encore être mis en correspondance ou vérifié.
+
+## Alimentation des résolutions ultérieures
+
+Dans ce modèle prospectif, les deux résolutions consommeraient la classification sans l'altérer :
+
+1. **Capability Resolution** confronterait `mode`, `requiredCapabilities`, `requiredNeeds` et `constraints` à l'inventaire de `system-capabilities/`. Elle sélectionnerait les capacités structurelles capables de satisfaire les obligations runtime, de compatibilité, de diagnostic ou de réparation. Elle ne générerait pas l'application.
+2. **Skill Resolution** examinerait les besoins métier encore pertinents et l'inventaire de `domain-skills/`. Elle sélectionnerait éventuellement du vocabulaire, un ton, des exemples ou des contraintes métier. Elle ne pourrait ni remplacer une capacité système requise, ni définir une API runtime.
+3. **Prompt Assembly** composerait ensuite les sources résolues avec les instructions de base et la demande utilisateur. Les contraintes issues de la découverte resteraient traçables afin que l'assemblage ne les perde pas.
+
+Les formes de sortie de `Capability Resolution` et de `Skill Resolution` ne sont pas définies ici : les figer reviendrait à spécifier une implémentation automatique que cette note exclut explicitement.
+
+## Pourquoi la découverte ne génère pas d'application
+
+La découverte ne dispose que d'une lecture classifiée de l'intention. Elle n'a pas encore résolu les contrats, les fragments et les éventuelles skills à assembler ; elle ne peut donc pas produire une application conforme sans court-circuiter les responsabilités suivantes.
+
+Lui permettre de générer du HTML, un prompt final ou un `runtimePayload` mélangerait analyse et exécution, rendrait les choix de capacités moins auditables et créerait un second chemin de génération concurrent du chemin validé. La génération reste la responsabilité de l'IA après assemblage, tandis que Creatia conserve l'orchestration et la consommation runtime.
+
+## Pourquoi l'assemblage peut rester manuel ou heuristique
+
+Cette séparation conceptuelle n'impose pas un moteur de résolution. À l'état actuel, un assemblage manuel ou fondé sur quelques heuristiques explicites reste acceptable parce qu'il :
+
+- préserve le prompt et le chemin `runtimePayload` déjà validés ;
+- garde les choix de fragments lisibles et révisables tant que les inventaires sont maîtrisables ;
+- évite d'ajouter un appel IA, de la latence et un nouveau format de sortie à diagnostiquer ;
+- permet d'accumuler des cas et des validations avant de stabiliser un contrat automatique.
+
+Une heuristique actuelle peut donc faire implicitement une partie de la découverte et des résolutions, à condition de respecter la séparation entre capacités système et skills métier. La présente note donne un vocabulaire pour raisonner sur ces choix ; elle ne rend ni les quatre étapes exécutables, ni leur automatisation obligatoire.
 
 ## Options d'approche
 
