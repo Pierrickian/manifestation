@@ -48,6 +48,8 @@ Do not hide prompt-contract mismatches behind silent fallback behavior.
 
 `Capability Discovery` is documented as a prospective classification step before Prompt Assembly. It is analysis/classification only, not generation: it must not produce HTML, runtimePayloads, final prompts, fake bridges, or executable runtime behavior. Its conceptual output is limited to `mode`, `requiredCapabilities`, `requiredNeeds`, and `constraints`. It must not be implemented as an execution pipeline until a future change provides tests, diagnostics, and preserves the validated `runtimePayload` path.
 
+Prospectively, Discovery would feed `Capability Resolution` for matching structural needs to `system-capabilities/`, then `Skill Resolution` for optional matching to `domain-skills/`, before Prompt Assembly composes the resolved sources. `requiredNeeds` preserves product, domain, and interaction intent without assuming that a repository item with the same name exists. These resolution stages and their output schemas are not implemented or standardized. Until they are validated, prompt assembly may remain manual or use explicit heuristics.
+
 ## Skill maintenance
 
 Whenever a new architectural rule, responsibility, runtime contract, prompt contract, or evolution mechanism becomes validated, update the corresponding skill in the same PR. No architectural direction may exist only in code or prompts alone.
