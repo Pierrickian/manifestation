@@ -29,6 +29,10 @@ Domain skills must never define the Creatia runtime API, bridge functions, messa
 
 Do not treat fragments as a replacement for `runtime-api/creatia-runtime/v1/`, `contracts/`, `protocols/`, or `.agent/skills/`. If a fragment reveals a durable prompt rule, update the canonical owner in the same change before relying on the fragment.
 
+## Documentary prompt assembly recipes
+
+`prompt-assembly/` records separate target recipes for `create`, `co-create`, `runtime-generation`, `diagnose`, and `repair`. The recipes must keep the runtime API normative, contracts authoritative for PASS/FAIL, protocols limited to sequences, and prompt fragments explicitly derived and non-canonical. `create` excludes unnecessary runtime/Co-Create blocks; `co-create` includes bridge, callback, continuation, safety, and `runtimePayload` obligations; `runtime-generation` updates the current app rather than rebuilding it by default; `diagnose` does not repair; and `repair` requires a diagnosis. This layer is not wired to the live prompt builder.
+
 ## Prompt governance
 
 - Keep responsibilities explicit between Creatia, the generated application, and the AI.
