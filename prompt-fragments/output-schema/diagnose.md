@@ -3,6 +3,7 @@
 ## Statut
 
 - Type : prompt-fragment
+- Version : v0.1.0
 - Canonicalité : non canonique
 - Intégration : non branché au prompt builder
 

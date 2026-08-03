@@ -13,6 +13,16 @@
 
 Les fragments résument des contrats, protocoles, API runtime, règles de compatibilité, schémas de sortie, règles de sécurité ou directions design déjà documentés ailleurs dans le dépôt. Ils ne doivent jamais redéfinir, forker ou étendre silencieusement les couches canoniques.
 
+## Versionnement documentaire
+
+Chaque fragment porte un champ `Version` au format `vMAJOR.MINOR.PATCH`, indépendant de la version des API et contrats cités :
+
+- `PATCH` pour une correction de formulation sans changement de sens ;
+- `MINOR` pour un ajout compatible dérivé des sources existantes ;
+- `MAJOR` pour un changement de portée ou un réalignement important.
+
+La version d'un fragment reste documentaire : elle ne versionne ni ne remplace ses sources canoniques.
+
 ## Fragments disponibles
 
 - `runtime-api/creatia-runtime-v1.md` : résumé promptable de l'API runtime Creatia v1.
@@ -30,7 +40,7 @@ Les fragments résument des contrats, protocoles, API runtime, règles de compat
 
 ## Sources
 
-- Source normative : `.agent/skills/architecture.md`
-- Source normative : `.agent/skills/prompting.md`
-- Source normative : `.agent/skills/runtime.md`
+- Source de gouvernance : `.agent/skills/architecture.md`
+- Source de gouvernance : `.agent/skills/prompting.md`
+- Source de gouvernance : `.agent/skills/runtime.md`
 - Source normative : `runtime-api/creatia-runtime/v1/README.md`
