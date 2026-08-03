@@ -31,7 +31,7 @@ Produire une application initiale Co-Create dont l'action utilisateur principale
 4. **Protocol fragment** — `prompt-fragments/protocols/co-create-flow.md`, puis les seules étapes pertinentes de `protocols/runtime-generation/v1.md` pour la continuation ; aucun fragment dérivé séparé n'existe aujourd'hui pour ce second protocole.
 5. **System capability fragments** — obligations combinées de `CreatiaCompatibleApp`, `CreatiaCoCreate` et `CreatiaRuntimeGenerator`.
 6. **Compatibility rules** — compatibilité HTML, compatibilité Co-Create et les trois fragments de sécurité obligatoires.
-7. **Output schema** — schéma HTML pour la génération initiale, complété par les obligations `continuationPlan`, `preload` et `runtimeCapabilities` du contrat Co-Create ; schéma runtime-generation pour les callbacks ultérieurs. Les deux moments ne doivent pas être confondus.
+7. **Output schema** — schéma HTML pour la génération initiale, complété par les obligations `continuationPlan` et `runtimeCapabilities`, et par la fourniture et la consommation de `preload` conformément aux exigences définies dans `contracts/co-create-app/README.md` ; schéma runtime-generation pour les callbacks ultérieurs. Les deux moments ne doivent pas être confondus.
 8. **Design fragment** — `prompt-fragments/design-system/creatia-compact.md`, incluant un statut runtime compréhensible.
 9. **Optional domain skills** — après les règles runtime afin qu'elles ne puissent pas les réinterpréter.
 10. **Relevant examples** — action principale déclenchante, demande sérialisable, projection d'un prochain écran/choix et récupération après erreur.
@@ -47,10 +47,12 @@ Produire une application initiale Co-Create dont l'action utilisateur principale
 
 ## Schéma de sortie attendu
 
-La génération initiale retourne le `html` exécutable défini par `contracts/html-app/README.md`, avec les métadonnées Co-Create requises par `contracts/co-create-app/README.md` (`continuationPlan`, `preload` utile selon le besoin et capacité IA runtime). Le callback ultérieur relève du schéma `runtime_generation`/`runtimePayload` défini exclusivement par `runtime-api/creatia-runtime/v1/README.md` et `contracts/runtime-generation/README.md`.
+La génération initiale retourne le `html` exécutable défini par `contracts/html-app/README.md` et respecte les métadonnées Co-Create requises par `contracts/co-create-app/README.md`. Elle doit notamment fournir et consommer `preload` conformément aux exigences de ce contrat, sans que la présente recette décide quand ces exigences s'appliquent.
+
+Pour un callback ultérieur, l'IA runtime retourne une réponse structurée de type `runtime_generation` contenant un `runtimePayload` utile. Creatia host valide et normalise ensuite cette réponse, puis renvoie à l'iframe un `RuntimeResult` conforme à `runtime-api/creatia-runtime/v1/README.md`, avec les alias de compatibilité `payload` et `runtimePayload` en cas de succès. `contracts/runtime-generation/README.md` reste la source des validations PASS/FAIL de cette continuation.
 
 ## Validations PASS/FAIL
 
-**PASS** si l'app visible déclenche le host sur l'action principale, fournit/consomme la continuation et le preload requis, expose l'état runtime, n'usurpe pas le bridge et applique un payload projetable. **PASS** si les erreurs permettent de sortir du chargement.
+**PASS** si l'app visible déclenche le host sur l'action principale, respecte les exigences de continuation et de `preload` du contrat Co-Create, expose l'état runtime, n'usurpe pas le bridge et applique un payload projetable. **PASS** si les erreurs permettent de sortir du chargement.
 
 **FAIL** si la capacité runtime est annoncée mais absente, si le plan est vide, si le callback dépend d'un bouton artificiel, si l'app appelle l'IA directement, simule le host, rend le payload brut ou remplace toute l'app par défaut. Les critères détaillés proviennent de `contracts/co-create-app/README.md`, `contracts/creatia-compatible-html/README.md`, `contracts/runtime-generation/README.md` et `contracts/html-app/README.md`.

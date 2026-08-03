@@ -20,7 +20,7 @@ L'assemblage ne change pas la responsabilité des couches :
 
 1. `runtime-api/creatia-runtime/v1/` est la source normative des fonctions, messages, enveloppes, statuts et shapes runtime.
 2. `contracts/` porte les exigences et validations PASS/FAIL.
-3. `protocols/` décrit uniquement les acteurs, séquences, responsabilités, entrées/sorties et erreurs.
+3. `protocols/` porte le déroulé des séquences opérationnelles. Les acteurs, responsabilités, entrées/sorties et erreurs y servent à expliquer ces séquences ; les protocoles ne définissent ni les shapes runtime ni les validations PASS/FAIL.
 4. `system-capabilities/` classe les capacités structurelles Creatia.
 5. `design/` porte les attentes documentaires d'interface et d'accessibilité.
 6. `prompt-fragments/` fournit des formulations dérivées, non canoniques. En cas d'écart, la source canonique citée par le fragment prévaut.
